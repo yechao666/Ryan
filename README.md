@@ -45,16 +45,15 @@ Aiwo 是一个管理 **DSH 实例资源** 的团队协作与任务平台。它�
 
 1. 管理员在「实例」页新增实例，选择本机/远端、host、端口、workspace、绑定项目。
 2. **本机实例**可直接点「启动本机代理」，Aiwo 自动轮换 token 并拉起代理；远端实例会拿到**一次性实例 token** 和安装命令。
-3. 远端在目标主机执行：
+3. 远端在目标主机执行（安装命令会从 Aiwo 直接下载代理包）：
 
 ```bash
-cd integrations/aiwo-instance
-npm install
-node agent.mjs \
-  --base http://<aiwo-host>:4500 \
-  --token aiwo_ins_xxx \
-  --workspace /srv/aiwo-workspace \
-  --name my-dsh-01
+curl -fsSL -H "authorization: Bearer aiwo_ins_xxx" \
+  http://<aiwo-host>:4500/api/runtime/instances/agent-package | tar xz
+cd aiwo-instance && npm install
+AIWO_BASE_URL=http://<aiwo-host>:4500 \
+AIWO_INSTANCE_TOKEN=aiwo_ins_xxx \
+node agent.mjs --workspace /srv/aiwo-workspace --name my-dsh-01
 ```
 
 4. 代理 outbound 注册 → 20s 心跳 → 5s claim → 本地启动常驻 `dsh --profile acp`，通过 ACP 执行任务、上报运行时事件、完成回写。

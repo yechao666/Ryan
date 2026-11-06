@@ -139,7 +139,7 @@ test('实例资源：管理员创建返回一次性 token，测试未接入状�
     body: { name: '测试实例', kind: 'remote', host: '10.0.0.2', projectIds: ['prj_calc'] },
   }));
   assert.match(created.token, /^aiwo_ins_/);
-  assert.ok(created.command.includes('aiwo-instance/agent.mjs'));
+  assert.ok(created.command.includes('agent-package') && created.command.includes('AIWO_INSTANCE_TOKEN='));
   const tested = ok(await call(`/api/instances/${created.instance.id}/test`, { token: tokenLin, method: 'POST' }));
   assert.equal(tested.ok, false);
   assert.equal(tested.status, 'unconfigured');

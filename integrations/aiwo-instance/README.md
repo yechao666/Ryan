@@ -39,6 +39,19 @@ Aiwo 控制台 ──创建任务──► Aiwo API ◄── register / heartbe
 - 一个 Aiwo **实例 token**（`aiwo_ins_...`）：Aiwo 控制台 → 实例 → 创建/重置 token；
   页面会给出可直接复制的启动命令。
 
+## 从 Aiwo 下载代理包（远端推荐）
+
+实例 token 可以直接拉取代理包，不需要先克隆 Aiwo 仓库：
+
+```bash
+TOKEN=aiwo_ins_xxx
+BASE=http://<aiwo-host>:4500
+curl -fsSL -H "authorization: Bearer $TOKEN" "$BASE/api/runtime/instances/agent-package" | tar xz
+cd aiwo-instance && npm install
+AIWO_BASE_URL=$BASE AIWO_INSTANCE_TOKEN=$TOKEN \
+  node agent.mjs --workspace /srv/aiwo-workspace --name my-dsh-01
+```
+
 ## 快速开始（本地）
 
 ```bash

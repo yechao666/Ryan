@@ -68,6 +68,7 @@ Aiwo 任务执行者固定为「创建人@Aiwo」；任务不支持对话，只�
 
 | Method | Path | 说明 |
 | --- | --- | --- |
+| GET | `/api/runtime/instances/agent-package` | 实例 token 拉取实例代理 tar.gz，用于远端安装 |
 | POST | `/api/runtime/instances/register` | 实例 token 注册/更新资源信息 |
 | POST | `/api/runtime/instances/heartbeat` | 心跳，返回 pending |
 | POST | `/api/runtime/tasks/claim` | 领取任务；返回 `{task,project,executor,promptCards,memory}` |

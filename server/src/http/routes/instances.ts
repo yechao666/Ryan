@@ -11,7 +11,11 @@ import { buildInstance, computeInstanceStatus, getInstanceRow } from './identity
 import type { DshInstance } from '../../../../shared/src/types.ts';
 
 function installCommand(baseUrl: string, token: string): string {
-  return `node integrations/aiwo-instance/agent.mjs --base ${baseUrl} --token ${token}`;
+  return [
+    `curl -fsSL -H "authorization: Bearer ${token}" "${baseUrl}/api/runtime/instances/agent-package" | tar xz`,
+    'cd aiwo-instance && npm install',
+    `AIWO_BASE_URL=${baseUrl} AIWO_INSTANCE_TOKEN=${token} node agent.mjs --workspace /srv/aiwo-workspace`,
+  ].join('\n');
 }
 
 const createSchema = z.object({

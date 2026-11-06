@@ -2,6 +2,11 @@
  * Aiwo 运行时 API：DSH 实例注册、心跳、领单、进展、完成与运行时事件。
  * 鉴权只用实例 token；任务的执行者固定为创建人 @Aiwo。
  */
+import { execFile } from 'node:child_process';
+import { createReadStream, mkdirSync } from 'node:fs';
+import { dirname, join, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { promisify } from 'node:util';
 import { z } from 'zod';
 import type { Router } from '../router.ts';
 import type { RequestContext } from '../context.ts';
@@ -144,6 +149,31 @@ function runtimeSummary(type: string, payload: Record<string, unknown>): string 
   }
 }
 
+const execFileAsync = promisify(execFile);
+const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../../../..');
+let agentPackagePromise: Promise<string> | null = null;
+
+/** 生成可下载的实例代理包；实例 token 即可拉取，方便远端主机安装。 */
+async function buildAgentPackage(): Promise<string> {
+  if (agentPackagePromise) return agentPackagePromise;
+  agentPackagePromise = (async () => {
+    const runDir = join(REPO_ROOT, '.run');
+    mkdirSync(runDir, { recursive: true });
+    const archive = join(runDir, 'aiwo-instance-agent.tar.gz');
+    await execFileAsync('tar', [
+      '-czf', archive,
+      '-C', join(REPO_ROOT, 'integrations'),
+      '--exclude=node_modules',
+      '--exclude=test',
+      'aiwo-instance',
+    ]);
+    return archive;
+  })().finally(() => {
+    agentPackagePromise = null;
+  });
+  return agentPackagePromise;
+}
+
 export function registerRuntimeRoutes(router: Router): void {
   // 实例注册：token 由 Aiwo 管理端预先创建；插件首次上线时更新资源信息。
   router.post('/api/runtime/instances/register', async (rc) => {
@@ -175,6 +205,16 @@ export function registerRuntimeRoutes(router: Router): void {
     const row = getInstanceRow(rc.app.db, instance.id);
     if (!row) throw errors.internal('实例注册后读取失败');
     rc.json({ instance: buildInstance(rc.app.db, row) });
+  });
+
+  router.get('/api/runtime/instances/agent-package', async (rc) => {
+    authenticateInstance(rc);
+    const archive = await buildAgentPackage();
+    rc.res.statusCode = 200;
+    rc.res.setHeader('content-type', 'application/gzip');
+    rc.res.setHeader('content-disposition', 'attachment; filename="aiwo-instance-agent.tar.gz"');
+    rc.res.setHeader('x-request-id', rc.requestId);
+    createReadStream(archive).pipe(rc.res);
   });
 
   router.post('/api/runtime/instances/heartbeat', (rc) => {
