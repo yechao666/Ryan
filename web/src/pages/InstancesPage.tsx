@@ -28,7 +28,7 @@ import {
 import { api } from '../lib/api.ts';
 import { useAuth } from '../lib/auth.tsx';
 import { fmtRelative, truncateMiddle } from '../lib/format.ts';
-import { useAsync } from '../lib/hooks.ts';
+import { useAsync, useInterval } from '../lib/hooks.ts';
 
 interface InstanceFormState {
   name: string;
@@ -85,6 +85,10 @@ export function InstancesPage() {
   const isAdmin = Boolean(person?.isAdmin);
   const instances = useAsync(() => api.instances(), []);
   const projects = useAsync(() => api.projects(), []);
+  // 实例靠心跳更新在线状态，页面每 15s 静默刷新一次资源视图。
+  useInterval(() => {
+    void instances.refresh();
+  }, 15_000);
   const [params, setParams] = useSearchParams();
   const createOpen = params.get('new') === '1';
 

@@ -196,3 +196,36 @@ test('自动化任务也固定由人员@Aiwo 执行', async () => {
   assert.equal(run.task.executorLabel, '林薇@Aiwo');
   assert.ok(run.task.createdBy);
 });
+
+test('多实例调度：两个实例分别领取不同任务，不会抢同一单', async () => {
+  const second = ok(await call('/api/instances', {
+    token: tokenLin,
+    method: 'POST',
+    body: { name: '并发实例', kind: 'remote', projectIds: ['prj_calc'] },
+  }));
+  const first = ok(await call('/api/projects/prj_calc/tasks', {
+    token: tokenLin,
+    method: 'POST',
+    body: { title: '并发任务 A', prompt: '只回复 A', priority: 99, instanceId: 'ins_local', type: 'ops' },
+  }));
+  const other = ok(await call('/api/projects/prj_calc/tasks', {
+    token: tokenLin,
+    method: 'POST',
+    body: { title: '并发任务 B', prompt: '只回复 B', priority: 98, type: 'ops' },
+  }));
+  const claimA = ok(await call('/api/runtime/tasks/claim', {
+    token: 'aiwo_ins_demo_local_7f3a2c',
+    method: 'POST',
+  }));
+  const claimB = ok(await call('/api/runtime/tasks/claim', {
+    token: second.token,
+    method: 'POST',
+  }));
+  assert.equal(claimA.task.id, first.id);
+  assert.equal(claimB.task.id, other.id);
+  assert.notEqual(claimA.task.id, claimB.task.id);
+  assert.equal((await call('/api/runtime/tasks/claim', {
+    token: 'aiwo_ins_demo_local_7f3a2c',
+    method: 'POST',
+  })).status, 204, '忙碌实例不应再领新单');
+});

@@ -27,7 +27,7 @@ import {
 import { api } from '../lib/api.ts';
 import { useAuth } from '../lib/auth.tsx';
 import { fmtInt, fmtRelative } from '../lib/format.ts';
-import { useAsync } from '../lib/hooks.ts';
+import { useAsync, useInterval } from '../lib/hooks.ts';
 
 /**
  * Aiwo 概览：项目、DSH 实例、提示词卡片与任务的总览。
@@ -38,6 +38,9 @@ export function DashboardPage() {
   const navigate = useNavigate();
   const dashboard = useAsync(() => api.dashboard(), []);
   const promptCards = useAsync(() => api.promptCards(), []);
+  useInterval(() => {
+    void dashboard.refresh();
+  }, 15_000);
 
   const data = dashboard.data;
   const displayName = data?.person.name ?? person?.name ?? '你好';
