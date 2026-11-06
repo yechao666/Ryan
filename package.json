@@ -1,0 +1,26 @@
+{
+  "name": "hive",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Hive — 数字员工工作平台",
+  "packageManager": "pnpm@10.4.0",
+  "engines": {
+    "node": ">=22.18.0"
+  },
+  "scripts": {
+    "dev": "node --watch server/src/main.ts",
+    "dev:web": "pnpm --filter @hive/web run dev",
+    "build": "pnpm --filter @hive/web run build",
+    "start": "node server/src/main.ts",
+    "seed": "node server/src/seed/run-seed.ts --force",
+    "test": "node --test 'server/src/**/*.test.ts'",
+    "typecheck": "tsc -p server/tsconfig.json --noEmit && tsc -p web/tsconfig.json --noEmit",
+    "verify": "pnpm run typecheck && pnpm run test && pnpm run build",
+    "test:runtime": "pnpm --dir integrations/dsh-runtime test"
+  },
+  "devDependencies": {
+    "@types/node": "^24.10.1",
+    "typescript": "^5.9.3"
+  }
+}

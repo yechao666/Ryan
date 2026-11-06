@@ -1,0 +1,12 @@
+import type { Context } from './dsh-types.js';
+import { type RawHiveRuntimeConfig } from './config.js';
+export declare const name = "dsh-hive-runtime";
+export declare const inject: string[];
+export { Config, HIVE_RUNTIME_SETTINGS_NAMESPACE, resolveConfig } from './config.js';
+export { HiveRuntime } from './runtime.js';
+export { HiveClient, HiveApiError } from './client.js';
+export { buildTaskPrompt, createHeadlessExecutor, createAgentExecutor, createCommandExecutor, createEchoExecutor, createExecutor, extractMemoryItems, summarizeSession, } from './executor.js';
+export type { HiveRuntimeConfig } from './config.js';
+export type { TaskExecutionInput, TaskExecutor, ExecutionHooks, ExecutionOutput } from './executor.js';
+export declare const HIVE_RUNTIME_GUIDANCE: string;
+export declare function apply(ctx: Context, config?: RawHiveRuntimeConfig): void;

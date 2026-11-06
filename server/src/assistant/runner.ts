@@ -1,0 +1,203 @@
+import { spawn } from 'node:child_process';
+import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { homedir, tmpdir } from 'node:os';
+import { dirname, join, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const here = dirname(fileURLToPath(import.meta.url));
+const REPO_ROOT = resolve(here, '../../..');
+const API_GUIDE = join(REPO_ROOT, 'docs/api.md');
+const API_HELPER = join(REPO_ROOT, 'integrations/assistant/hive-api.mjs');
+
+const sessions = new Map<string, string>();
+
+export interface AssistantTurn {
+  personName: string;
+  personId: string;
+  message: string;
+  pathname: string;
+  projectId?: string;
+  taskId?: string;
+  token: string;
+  apiBase: string;
+}
+
+export interface AssistantResult {
+  reply: string;
+  navigate?: string;
+  sessionId?: string;
+  instance: string;
+}
+
+function dshHome(): string {
+  return process.env.DSH_HOME || join(homedir(), '.dsh');
+}
+
+function dshBin(): string {
+  return process.env.HIVE_DSH_BIN || 'dsh';
+}
+
+function profile(): string {
+  return process.env.HIVE_DSH_PROFILE || 'headless';
+}
+
+function workspace(): string {
+  return process.env.HIVE_DSH_WORKSPACE || REPO_ROOT;
+}
+
+async function deepseekKey(): Promise<string> {
+  if (process.env.DEEPSEEK_API_KEY) return process.env.DEEPSEEK_API_KEY;
+  try {
+    const yaml = await readFile(join(dshHome(), '.credentials.yaml'), 'utf8');
+    const match = yaml.match(/DEEPSEEK_API_KEY:\s*["']?([^\s"']+)/);
+    if (match?.[1]) return match[1];
+  } catch {
+    /* fall through */
+  }
+  return '';
+}
+
+function buildPrompt(input: AssistantTurn): string {
+  return [
+    '你是 Hive 数字员工平台内置的 DSH 系统助手，运行在一个真实的 DSH headless 实例中。',
+    '你的职责是直接帮助当前人员操作系统，而不是只给出操作步骤。',
+    '',
+    `当前人员：${input.personName}（${input.personId}）`,
+    `当前页面：${input.pathname}`,
+    `当前项目：${input.projectId ?? '不在项目内'}`,
+    `当前任务：${input.taskId ?? '未打开具体任务'}${input.taskId ? '（用户说“这个任务”时使用这个 ID）' : ''}`,
+    '任务详情页路径格式：/projects/:projectId/tasks/:taskId（不要使用 ?task= 查询参数）。',
+    '',
+    '你可以通过 bash 直接调用 Hive 的开放 API。API 文档在：',
+    API_GUIDE,
+    '先读取该文档了解所有接口；需要时自行查询项目、智员、实例、任务、自动化、记忆等数据。',
+    '',
+    '推荐调用方式（token 已在环境变量中，不要打印 token）：',
+    `  node ${API_HELPER} GET /api/projects`,
+    `  node ${API_HELPER} GET "/api/tasks?projectId=prj_xxx&limit=20"`,
+    `  node ${API_HELPER} POST "/api/projects/prj_xxx/tasks" '{"agentId":"agt_xxx","title":"...","prompt":"...","type":"feature"}'`,
+    '也可以用 curl，但优先使用上面的 helper。',
+    '',
+    '执行规则：',
+    '- 用户明确要求创建/修改/查询时，直接调用 API 完成；先做必要的查询确认 ID 和权限。',
+    '- 不要修改仓库源码、数据库文件或系统配置，只通过开放 API 操作。',
+    '- 写操作完成后用中文简洁说明做了什么（名称、ID、时间等）；没有执行写操作就不要声称已执行。',
+    '- 如果操作影响某个页面，最后单独输出一行：HIVE_NAVIGATE: /projects/...（只能是站内以 / 开头的路径）。',
+    '- 权限不足或 API 返回错误时，如实说明，不要伪造成功。',
+    '',
+    '用户请求：',
+    input.message,
+  ].join('\n');
+}
+
+function extractNavigation(text: string): { reply: string; navigate?: string } {
+  const match = text.match(/^HIVE_NAVIGATE:\s*(\/\S+)\s*$/m);
+  if (!match) return { reply: text.trim() };
+  return {
+    reply: text.replace(match[0], '').trim(),
+    navigate: match[1],
+  };
+}
+
+export async function runAssistantTurn(input: AssistantTurn): Promise<AssistantResult> {
+  const apiKey = await deepseekKey();
+  if (!apiKey) {
+    throw new Error('DSH 助手缺少 DEEPSEEK_API_KEY：请在服务器环境中配置，或写入 ~/.dsh/.credentials.yaml');
+  }
+  const previous = sessions.get(input.personId);
+  const args = ['--profile', profile(), '--json'];
+  if (previous) args.push('--session-id', previous);
+  args.push('-');
+
+  const env = {
+    ...process.env,
+    DSH_HOME: dshHome(),
+    DEEPSEEK_API_KEY: apiKey,
+    DSH_HIVE_RUNTIME_DISABLED: '1',
+    HIVE_API_BASE: input.apiBase,
+    HIVE_TOKEN: input.token,
+  };
+
+  const tokenDir = await mkdtemp(join(tmpdir(), 'hive-assistant-'));
+  const tokenFile = join(tokenDir, 'token');
+  await writeFile(tokenFile, input.token, { mode: 0o600 });
+  const child = spawn(dshBin(), args, {
+    cwd: workspace(),
+    env: { ...env, HIVE_AUTH_FILE: tokenFile },
+    stdio: ['pipe', 'pipe', 'pipe'],
+  });
+
+  let stdout = '';
+  let stderr = '';
+  let buffer = '';
+  let finalText = '';
+  let lastText = '';
+  let sessionId = previous;
+  let failure = '';
+
+  const exitPromise = new Promise<number | null>((resolveExit, reject) => {
+    let settled = false;
+    const done = (code: number | null) => {
+      if (settled) return;
+      settled = true;
+      resolveExit(code);
+    };
+    child.once('error', (error) => {
+      if (settled) return;
+      settled = true;
+      reject(new Error(`无法启动 DSH（${dshBin()}）：${error.message}`));
+    });
+    child.once('close', (code) => done(code));
+    child.once('exit', (code) => setTimeout(() => done(code), 300));
+  });
+
+  const handleEvent = (event: any): void => {
+    if (!event || typeof event.type !== 'string') return;
+    if (event.type === 'session' && typeof event.sessionId === 'string') sessionId = event.sessionId;
+    if (event.type === 'text' && typeof event.text === 'string' && event.text.trim()) lastText = event.text;
+    if (event.type === 'final' && typeof event.text === 'string') finalText = event.text;
+    if (event.type === 'error' && typeof event.message === 'string') failure = event.message;
+  };
+
+  child.stdout.on('data', (chunk: Buffer) => {
+    stdout += chunk.toString('utf8');
+    buffer += chunk.toString('utf8');
+    const lines = buffer.split('\n');
+    buffer = lines.pop() ?? '';
+    for (const line of lines) {
+      if (!line.trim()) continue;
+      try {
+        handleEvent(JSON.parse(line));
+      } catch {
+        /* 忽略非 JSON 行 */
+      }
+    }
+  });
+  child.stderr.on('data', (chunk: Buffer) => {
+    stderr = (stderr + chunk.toString('utf8')).slice(-4000);
+  });
+
+  const timeout = setTimeout(() => child.kill('SIGTERM'), 180_000);
+  timeout.unref?.();
+  try {
+    child.stdin.end(buildPrompt(input));
+    const code = await exitPromise;
+    if (buffer.trim()) {
+      try {
+        handleEvent(JSON.parse(buffer.trim()));
+      } catch {
+        /* ignore */
+      }
+    }
+    if (failure) throw new Error(failure);
+    if (code !== 0) throw new Error(`DSH 助手退出码 ${String(code)}：${(stderr || stdout).trim().slice(-1200) || '无输出'}`);
+    const raw = (finalText || lastText).trim();
+    if (!raw) throw new Error('DSH 助手没有返回内容');
+    if (sessionId) sessions.set(input.personId, sessionId);
+    return { ...extractNavigation(raw), sessionId, instance: 'hive-assistant' };
+  } finally {
+    clearTimeout(timeout);
+    if (child.exitCode === null) child.kill('SIGTERM');
+    await rm(tokenDir, { recursive: true, force: true });
+  }
+}
