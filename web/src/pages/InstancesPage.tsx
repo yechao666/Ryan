@@ -97,6 +97,7 @@ export function InstancesPage() {
   const [submitting, setSubmitting] = useState(false);
   const [secret, setSecret] = useState<SecretState | null>(null);
   const [testingId, setTestingId] = useState<string | null>(null);
+  const [startingId, setStartingId] = useState<string | null>(null);
   const [rotateTarget, setRotateTarget] = useState<DshInstance | null>(null);
   const [rotating, setRotating] = useState(false);
   const [revokeTarget, setRevokeTarget] = useState<DshInstance | null>(null);
@@ -175,6 +176,20 @@ export function InstancesPage() {
       toast.error(message);
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  const handleStart = async (instance: DshInstance) => {
+    setStartingId(instance.id);
+    try {
+      const result = await api.startInstance(instance.id);
+      toast.success(`已启动「${instance.name}」本机实例代理，等待注册`);
+      if (result.logPath) toast.info(`代理日志：${result.logPath}`);
+      await instances.refresh();
+    } catch (cause) {
+      toast.error(errorMessage(cause, '启动实例代理失败'));
+    } finally {
+      setStartingId(null);
     }
   };
 
@@ -382,15 +397,28 @@ export function InstancesPage() {
                     className="row-between"
                     style={{ marginTop: 12, paddingTop: 10, borderTop: '1px solid var(--border-faint)' }}
                   >
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      icon="activity"
-                      loading={testingId === instance.id}
-                      onClick={() => void handleTest(instance)}
-                    >
-                      测试连接
-                    </Button>
+                    <div className="hstack gap-4">
+                      {instance.kind === 'local' && instance.status !== 'online' ? (
+                        <Button
+                          size="sm"
+                          variant="primary"
+                          icon="play"
+                          loading={startingId === instance.id}
+                          onClick={() => void handleStart(instance)}
+                        >
+                          启动本机代理
+                        </Button>
+                      ) : null}
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        icon="activity"
+                        loading={testingId === instance.id}
+                        onClick={() => void handleTest(instance)}
+                      >
+                        测试连接
+                      </Button>
+                    </div>
                     <div className="hstack gap-4">
                       <Button size="sm" variant="ghost" icon="key" onClick={() => setRotateTarget(instance)}>
                         轮换 token
@@ -422,7 +450,7 @@ export function InstancesPage() {
           </li>
           <li>
             <span className="cx-guide-step__num">2</span>
-            <div>复制创建后的一次性安装命令，在目标机器执行；token 只展示一次，请注意保存。</div>
+            <div>本机实例可直接点「启动本机代理」；远端实例复制创建后的一次性安装命令，在目标机器执行；token 只展示一次。</div>
           </li>
           <li>
             <span className="cx-guide-step__num">3</span>

@@ -120,6 +120,13 @@ export interface InstanceTokenResult {
   command: string;
 }
 
+export interface InstanceStartResult {
+  started: boolean;
+  pid?: number;
+  logPath: string;
+  instance: DshInstance | null;
+}
+
 export interface InstanceTestResult {
   ok: boolean;
   status: string;
@@ -230,6 +237,9 @@ export const api = {
   },
   testInstance(id: string): Promise<InstanceTestResult> {
     return request(`/api/instances/${id}/test`, { method: 'POST' });
+  },
+  startInstance(id: string): Promise<InstanceStartResult> {
+    return request(`/api/instances/${id}/start`, { method: 'POST' });
   },
   revokeInstance(id: string): Promise<{ ok: boolean }> {
     return request(`/api/instances/${id}`, { method: 'DELETE' });

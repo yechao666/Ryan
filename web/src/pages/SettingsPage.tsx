@@ -1,6 +1,5 @@
-import { useEffect, useMemo, useState } from 'react';
-import type { DshInstance, InstanceStatus } from '@shared';
-import { DEFAULT_SECURITY_SETTINGS, INSTANCE_STATUSES } from '@shared';
+import { useEffect, useState } from 'react';
+import { DEFAULT_SECURITY_SETTINGS } from '@shared';
 import {
   Badge,
   Button,
@@ -12,11 +11,9 @@ import {
   Input,
   PageHead,
   SectionHead,
-  Select,
   Skeleton,
   Switch,
   useToast,
-  type Tone,
 } from '@ui';
 import { api, type SecurityTestResult } from '../lib/api.ts';
 import { useAuth } from '../lib/auth.tsx';
@@ -41,10 +38,6 @@ function errorMessage(cause: unknown, fallback: string): string {
   return cause instanceof Error && cause.message ? cause.message : fallback;
 }
 
-function instanceMeta(status: InstanceStatus) {
-  return INSTANCE_STATUSES.find((item) => item.value === status) ?? { label: status, tone: 'slate' as Tone };
-}
-
 /**
  * 系统设置：安全检查组与助手运行实例。
  * API Key 只显示「已配置」，服务端不回显明文；留空保存表示保持原值。
@@ -54,7 +47,6 @@ export function SettingsPage() {
   const toast = useToast();
   const isAdmin = Boolean(person?.isAdmin);
   const settings = useAsync(() => api.settings(), []);
-  const instances = useAsync(() => api.instances(), []);
 
   const [security, setSecurity] = useState<SecurityFormState>({
     enabled: DEFAULT_SECURITY_SETTINGS.enabled,
@@ -89,11 +81,6 @@ export function SettingsPage() {
       instanceId: next.assistant.instanceId ?? '',
     });
   }, [settings.data]);
-
-  const availableInstances = useMemo(
-    () => (instances.data ?? []).filter((instance: DshInstance) => instance.status !== 'revoked'),
-    [instances.data],
-  );
 
   const handleSaveSecurity = async () => {
     if (!isAdmin) return;
@@ -175,8 +162,6 @@ export function SettingsPage() {
       setSavingAssistant(false);
     }
   };
-
-  const selectedInstance = availableInstances.find((instance) => instance.id === assistant.instanceId);
 
   return (
     <div className="page">
@@ -382,7 +367,7 @@ export function SettingsPage() {
               <Card className="card-pad">
                 <SectionHead
                   title="助手配置"
-                  desc="指定系统助手运行时使用的 DSH 实例。"
+                  desc="助手运行在服务端本地 DSH 实例中，可调用 Aiwo 开放 API。"
                   actions={
                     <Badge size="sm" tone={settings.data.assistant.enabled ? 'green' : 'slate'} dot>
                       {settings.data.assistant.enabled ? '已启用' : '已停用'}
@@ -396,33 +381,9 @@ export function SettingsPage() {
                     onChange={(next) => setAssistant((prev) => ({ ...prev, enabled: next }))}
                     label={assistant.enabled ? '启用系统助手' : '停用系统助手'}
                   />
-                  <Field
-                    label="运行实例"
-                    htmlFor="assistant-instance"
-                    hint="未指定时，由 Aiwo 选择可用实例；实例不可用时助手可能无法运行。"
-                  >
-                    <Select
-                      id="assistant-instance"
-                      value={assistant.instanceId}
-                      disabled={!isAdmin}
-                      options={[
-                        { value: '', label: '不指定（自动选择）' },
-                        ...availableInstances.map((instance) => ({
-                          value: instance.id,
-                          label: `${instance.name} · ${instanceMeta(instance.status).label}`,
-                        })),
-                      ]}
-                      onChange={(event) => setAssistant((prev) => ({ ...prev, instanceId: event.target.value }))}
-                    />
-                  </Field>
-                  {selectedInstance ? (
-                    <div className="hstack gap-6 tiny dim">
-                      <Icon name="server" size={12} />
-                      当前实例：{selectedInstance.name} · {instanceMeta(selectedInstance.status).label}
-                      {selectedInstance.lastSeenAt ? ` · 最后心跳 ${fmtRelative(selectedInstance.lastSeenAt)}` : ''}
-                    </div>
-                  ) : null}
-                  {instances.error ? <div className="tiny dim">实例列表加载失败：{instances.error}</div> : null}
+                  <Callout tone="slate" icon="info">
+                    当前版本助手固定使用服务端本地 DSH（headless）；远端实例助手路由将在后续版本开放。
+                  </Callout>
                   {assistantError ? (
                     <Callout tone="red" icon="xCircle">
                       {assistantError}

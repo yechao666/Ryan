@@ -37,6 +37,7 @@ scope：`org | team | project`；category：`workflow | style | standard | role 
 | POST | `/api/instances` | 管理员创建；返回一次性 `token` 与安装命令 |
 | PATCH | `/api/instances/:id` | 名称/host/端口/workspace/绑定项目 |
 | POST | `/api/instances/:id/token` | 轮换实例 token |
+| POST | `/api/instances/:id/start` | 本机实例：服务端自动启动实例代理（轮换 token） |
 | POST | `/api/instances/:id/test` | 测试插件心跳/在线状态 |
 | DELETE | `/api/instances/:id` | 吊销实例 |
 

@@ -66,6 +66,7 @@ POST /api/runtime/tasks/:id/complete
 ```
 
 实例 token 只存哈希；管理端创建/轮换时一次性返回明文和安装命令。
+本机实例可由控制台「启动本机代理」直接拉起：服务端轮换 token、以环境变量注入，detached 启动 `integrations/aiwo-instance/agent.mjs`；远端仍由管理员复制安装命令执行。
 
 ## 记忆
 

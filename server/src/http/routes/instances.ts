@@ -1,3 +1,7 @@
+import { spawn } from 'node:child_process';
+import { closeSync, mkdirSync, openSync } from 'node:fs';
+import { dirname, join, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { z } from 'zod';
 import type { Router } from '../router.ts';
 import { requireAdmin, requirePerson } from '../auth.ts';
@@ -124,6 +128,57 @@ export function registerInstanceRoutes(router: Router): void {
     );
     const base = process.env.AIWO_PUBLIC_BASE_URL || `http://${rc.app.env.host === '0.0.0.0' ? '127.0.0.1' : rc.app.env.host}:${rc.app.env.port}`;
     rc.json({ token, command: installCommand(base, token) });
+  });
+
+  // 本机实例：由 Aiwo 直接启动本地实例代理（轮换 token 后以环境变量注入）。
+  router.post('/api/instances/:id/start', async (rc) => {
+    requireAdmin(rc);
+    const row = getInstanceRow(rc.app.db, rc.params.id);
+    if (!row) throw errors.notFound('实例不存在');
+    if (row.kind !== 'local') throw errors.badRequest('仅本机实例支持服务端自动启动；远端请复制安装命令执行');
+    if (computeInstanceStatus(row) === 'online') throw errors.conflict('实例已在线，无需重复启动');
+
+    const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../../../..');
+    const agentPath = join(repoRoot, 'integrations/aiwo-instance/agent.mjs');
+    const workspace = row.workspace_path || join(repoRoot, '.run', 'workspace');
+    const token = `aiwo_ins_${randomToken(32)}`;
+    const base = process.env.AIWO_PUBLIC_BASE_URL || `http://${rc.app.env.host === '0.0.0.0' ? '127.0.0.1' : rc.app.env.host}:${rc.app.env.port}`;
+    rc.app.db.prepare(
+      "UPDATE dsh_instances SET token_hash = ?, token_prefix = ?, status = 'unconfigured', updated_at = ? WHERE id = ?",
+    ).run(sha256(token), token.slice(0, 18), nowIso(), row.id);
+
+    const runDir = join(repoRoot, '.run');
+    mkdirSync(runDir, { recursive: true });
+    mkdirSync(workspace, { recursive: true });
+    const logPath = join(runDir, `aiwo-instance-${row.id}.log`);
+    const logFd = openSync(logPath, 'a');
+    let child;
+    try {
+      child = spawn(process.execPath, [agentPath], {
+        cwd: repoRoot,
+        env: {
+          ...process.env,
+          AIWO_BASE_URL: base,
+          AIWO_INSTANCE_TOKEN: token,
+          AIWO_WORKSPACE: workspace,
+          AIWO_INSTANCE_NAME: row.name,
+          AIWO_INSTANCE_HOST: row.host || '127.0.0.1',
+        },
+        detached: true,
+        stdio: ['ignore', logFd, logFd],
+      });
+      child.unref();
+      child.on('error', () => {});
+    } catch (error) {
+      closeSync(logFd);
+      throw errors.internal(`启动本机实例代理失败：${error instanceof Error ? error.message : String(error)}`);
+    }
+    closeSync(logFd);
+
+    // 给代理留出注册窗口；即使未完成，UI 也会在 15s 自动刷新。
+    await new Promise((resolveDelay) => setTimeout(resolveDelay, 800));
+    const updated = getInstanceRow(rc.app.db, row.id);
+    rc.json({ started: true, pid: child.pid, logPath, instance: updated ? buildInstance(rc.app.db, updated) : null });
   });
 
   router.post('/api/instances/:id/test', (rc) => {
