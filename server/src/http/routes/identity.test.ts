@@ -162,3 +162,37 @@ test('权限：非管理员不能创建实例或修改系统设置', async () =>
   assert.equal((await call('/api/instances', { token: tokenChen, method: 'POST', body: { name: 'x' } })).status, 403);
   assert.equal((await call('/api/settings/security', { token: tokenChen, method: 'PATCH', body: { endpoint: '' } })).status, 403);
 });
+
+test('运行时：实例可查询任务状态，控制台取消后代理可感知', async () => {
+  const task = ok(await call('/api/projects/prj_calc/tasks', {
+    token: tokenLin,
+    method: 'POST',
+    body: { title: '取消测试任务', prompt: 'sleep 30', priority: 99, instanceId: 'ins_local', type: 'ops' },
+  }));
+  const claimed = ok(await call('/api/runtime/tasks/claim', {
+    token: 'aiwo_ins_demo_local_7f3a2c',
+    method: 'POST',
+  }));
+  assert.equal(claimed.task.id, task.id);
+  const running = ok(await call(`/api/runtime/tasks/${task.id}/status`, {
+    token: 'aiwo_ins_demo_local_7f3a2c',
+  }));
+  assert.equal(running.status, 'running');
+  const cancelled = ok(await call(`/api/tasks/${task.id}/cancel`, { token: tokenLin, method: 'POST' }));
+  assert.equal(cancelled.status, 'cancelled');
+  const after = ok(await call(`/api/runtime/tasks/${task.id}/status`, {
+    token: 'aiwo_ins_demo_local_7f3a2c',
+  }));
+  assert.equal(after.status, 'cancelled');
+  assert.equal((await call(`/api/runtime/tasks/${task.id}/complete`, {
+    token: 'aiwo_ins_demo_local_7f3a2c',
+    method: 'POST',
+    body: { status: 'done', summary: 'too late' },
+  })).status, 409);
+});
+
+test('自动化任务也固定由人员@Aiwo 执行', async () => {
+  const run = ok(await call('/api/automations/aut_demo_daily/run', { token: tokenLin, method: 'POST' }));
+  assert.equal(run.task.executorLabel, '林薇@Aiwo');
+  assert.ok(run.task.createdBy);
+});

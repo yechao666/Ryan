@@ -20,6 +20,8 @@
 - 一个实例同一时刻执行一个任务；任务租约 3 分钟，progress 续租。
 - ACP 不可用时自动回退 headless；两种模式都产生同样的 runtime_events。
 - 任务结束即终止，不支持对话。
+- 实例每 5s 查询任务状态；控制台取消后代理自动中止 ACP/headless 会话。
+- 完成时从最终输出的「决策 / 经验」小节提取，随结果写入 Mnemos。
 
 ### 2. 助手：DSH headless + 开放 API
 

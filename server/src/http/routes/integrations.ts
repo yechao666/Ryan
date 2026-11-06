@@ -305,7 +305,7 @@ async function handleInbound(rc: RequestContext, provider: Provider, normalize: 
         promptCardIds: parseStringArray(automation.prompt_card_ids),
         instanceId: automation.instance_id,
         priority: 0,
-        createdBy: null,
+        createdBy: automation.created_by ?? project.owner_person_id ?? null,
         dedupeKey,
         metadata: {
           ...normalized.metadata,

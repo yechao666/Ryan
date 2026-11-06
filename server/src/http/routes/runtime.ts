@@ -278,6 +278,12 @@ export function registerRuntimeRoutes(router: Router): void {
     rc.json(claimedTask);
   });
 
+  router.get('/api/runtime/tasks/:id/status', (rc) => {
+    const instance = authenticateInstance(rc);
+    const task = requireInstanceTask(rc.app.db, rc.params.id, instance.id);
+    rc.json({ id: task.id, status: task.status, updatedAt: task.finished_at ?? task.started_at ?? task.created_at });
+  });
+
   router.post('/api/runtime/tasks/:id/progress', async (rc) => {
     const instance = authenticateInstance(rc);
     const db = rc.app.db;

@@ -70,6 +70,7 @@ Aiwo 任务执行者固定为「创建人@Aiwo」；任务不支持对话，只�
 | POST | `/api/runtime/instances/register` | 实例 token 注册/更新资源信息 |
 | POST | `/api/runtime/instances/heartbeat` | 心跳，返回 pending |
 | POST | `/api/runtime/tasks/claim` | 领取任务；返回 `{task,project,executor,promptCards,memory}` |
+| GET | `/api/runtime/tasks/:id/status` | 实例侧查询任务状态（用于感知取消） |
 | POST | `/api/runtime/tasks/:id/progress` | 进展 + 续租 |
 | POST | `/api/runtime/tasks/:id/events` | 批量运行时事件（≤100） |
 | POST | `/api/runtime/tasks/:id/complete` | `{status,summary,decisions,lessons,sessionId}` |

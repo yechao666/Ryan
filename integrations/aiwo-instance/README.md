@@ -136,7 +136,7 @@ Aiwo 控制台实例页应显示 `online`，`pluginVersion` 为 `0.1.0`。
 6. **失败**：ACP prompt 错误、headless 非零退出、超时都会 `complete {status:'failed', error}`。
 7. **停止**：`SIGINT`/`SIGTERM` 停止心跳/轮询；正在执行的任务发送 ACP `session/cancel` 并上报
    `failed`（实例停止），随后退出；再次信号强退（130）。
-8. **任务取消**：Aiwo 暂无实例侧任务状态查询接口；取消由控制台处理，代理忽略（任务继续跑完）。
+8. **任务取消**：代理每 5s 查询任务状态，控制台取消后中止 ACP/headless 会话；`decisions/lessons` 从最终输出的「决策 / 经验」小节提取后写回。
 
 ## 远端安装
 

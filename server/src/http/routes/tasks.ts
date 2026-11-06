@@ -263,13 +263,17 @@ export interface CreateTaskRecordInput {
 }
 
 export function createTaskRecord(db: Db, bus: EventBus, input: CreateTaskRecordInput): WorkItem {
-  const project = rowOf<{ name: string; owner_team_id: string | null }>(
+  const project = rowOf<{ name: string; owner_team_id: string | null; owner_person_id: string | null }>(
     db,
-    'SELECT name, owner_team_id FROM projects WHERE id = ?',
+    'SELECT name, owner_team_id, owner_person_id FROM projects WHERE id = ?',
     [input.projectId],
   );
   if (!project) throw errors.notFound('项目不存在');
-  const creator = input.createdBy ? rowOf<{ name: string }>(db, 'SELECT name FROM persons WHERE id = ?', [input.createdBy]) : undefined;
+  // Aiwo 的执行者永远是人员：自动化/Webhook 没有显式创建人时落到项目负责人。
+  const effectiveCreatedBy = input.createdBy ?? project.owner_person_id ?? null;
+  if (!effectiveCreatedBy) throw errors.conflict('项目没有负责人，无法确定 人员@Aiwo 执行者');
+  const creator = rowOf<{ name: string }>(db, 'SELECT name FROM persons WHERE id = ?', [effectiveCreatedBy]);
+  if (!creator) throw errors.conflict('任务创建人不存在，无法确定 人员@Aiwo 执行者');
   if (input.instanceId) {
     const bound = rowOf<{ ok: number }>(
       db,
@@ -304,7 +308,7 @@ export function createTaskRecord(db: Db, bus: EventBus, input: CreateTaskRecordI
   const type = input.type ?? 'feature';
   const title = input.title.trim();
   const prompt = withGoalPrefix(input.prompt);
-  const executorName = creator?.name ?? input.actorName ?? '';
+  const executorName = creator.name;
   db.prepare(
     `INSERT INTO work_items
        (id, project_id, source, type, title, prompt, prompt_card_ids, status, priority, lease_until, instance_id,
@@ -320,8 +324,8 @@ export function createTaskRecord(db: Db, bus: EventBus, input: CreateTaskRecordI
     JSON.stringify(cardIds),
     input.priority ?? 0,
     input.instanceId ?? null,
-    input.createdBy ?? null,
-    input.createdBy ?? null,
+    effectiveCreatedBy,
+    effectiveCreatedBy,
     createdAt,
     JSON.stringify(input.metadata ?? {}),
     input.dedupeKey ?? null,

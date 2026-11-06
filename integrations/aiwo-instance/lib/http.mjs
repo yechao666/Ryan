@@ -93,6 +93,13 @@ export class AiwoApi {
     return this.request('POST', '/api/runtime/tasks/claim', { body: {}, timeoutMs: 20_000 });
   }
 
+  /** 实例侧轮询任务状态，用于感知控制台取消。 */
+  taskStatus(taskId) {
+    return this.request('GET', `/api/runtime/tasks/${encodeURIComponent(taskId)}/status`, {
+      timeoutMs: 10_000,
+    });
+  }
+
   progress(taskId, message, payload) {
     return this.request('POST', `/api/runtime/tasks/${encodeURIComponent(taskId)}/progress`, {
       body: { message, payload },

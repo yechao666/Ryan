@@ -22,6 +22,27 @@ import { buildDshEnv } from './lib/credentials.mjs';
 
 const MAX_SUMMARY = 20_000;
 
+/** 从最终输出中提取「决策 / 经验」小节，供 Aiwo 写回 Mnemos。 */
+function extractSection(text, labels) {
+  const lines = String(text ?? '').split(/\r?\n/);
+  const heading = new RegExp(`^#{1,6}\\s*(?:${labels})\\s*[:：]?\\s*$`);
+  const anyHeading = /^#{1,6}\s+/;
+  for (let index = 0; index < lines.length; index += 1) {
+    if (!heading.test(lines[index].trim())) continue;
+    const items = [];
+    for (let cursor = index + 1; cursor < lines.length; cursor += 1) {
+      const line = lines[cursor].trim();
+      if (anyHeading.test(line)) break;
+      if (!line) continue;
+      const item = line.replace(/^[-*+]\s+/, '').replace(/^\d+[.)、]\s*/, '').trim();
+      if (item) items.push(item.slice(0, 4_000));
+      if (items.length >= 50) break;
+    }
+    return items;
+  }
+  return [];
+}
+
 function runCapture(command, args, { cwd, env, timeoutMs = 5_000 } = {}) {
   return new Promise((resolve) => {
     let output = '';
@@ -245,6 +266,7 @@ class Agent {
       controller,
       pump,
       abortReason: '',
+      cancelledByServer: false,
       progressBusy: false,
       mode: this.mode,
     };
@@ -266,6 +288,12 @@ class Agent {
       : null;
     progressTimer?.unref?.();
 
+    // 控制台取消：任务执行期间低频轮询任务状态，感知 cancelled 后中止 ACP/headless。
+    const cancelTimer = setInterval(() => {
+      void this.pollCancellation(active);
+    }, this.config.cancelPollMs ?? 5_000);
+    cancelTimer.unref?.();
+
     let sessionId = '';
     let summary = '';
 
@@ -278,6 +306,8 @@ class Agent {
       await this.finishTask(task.id, {
         status: 'done',
         summary: summary.slice(0, MAX_SUMMARY),
+        decisions: extractSection(summary, '决策|关键决策|决策记录'),
+        lessons: extractSection(summary, '经验|经验教训|复盘|风险'),
         sessionId: sessionId || undefined,
       });
     } catch (error) {
@@ -288,6 +318,12 @@ class Agent {
         message = active.abortReason
           ? `实例停止（${active.abortReason}），任务中断`
           : '任务被中断';
+      }
+      if (active.cancelledByServer) {
+        this.logger.info(`任务 ${task.id} 已在控制台取消，停止执行`);
+        pump.push('status', { phase: 'cancelled' });
+        await pump.flush();
+        return;
       }
       const failureSummary = `任务失败：${message}`.slice(0, MAX_SUMMARY);
       pump.push('error', { message });
@@ -301,6 +337,7 @@ class Agent {
     } finally {
       if (timeoutTimer) clearTimeout(timeoutTimer);
       if (progressTimer) clearInterval(progressTimer);
+      clearInterval(cancelTimer);
       await pump.stop();
       this.active = null;
     }
@@ -363,9 +400,26 @@ class Agent {
     }
   }
 
+  async pollCancellation(active) {
+    if (!active || active.abortReason || active.controller.signal.aborted) return;
+    try {
+      const result = await this.api.taskStatus(active.taskId);
+      if (String(result?.status ?? '') === 'cancelled') {
+        active.cancelledByServer = true;
+        active.abortReason = '任务已取消';
+        this.logger.info(`任务 ${active.taskId} 已取消，正在停止执行`);
+        active.controller.abort(new TaskAbortError('任务已取消'));
+      }
+    } catch (error) {
+      this.logger.debug(`任务状态轮询失败：${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+
   async finishTask(taskId, input) {
     const payload = { status: input.status, summary: input.summary };
     if (input.error) payload.error = input.error;
+    if (input.decisions?.length) payload.decisions = input.decisions;
+    if (input.lessons?.length) payload.lessons = input.lessons;
     if (input.sessionId) payload.sessionId = input.sessionId;
     try {
       await this.api.complete(taskId, payload);
