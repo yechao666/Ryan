@@ -132,7 +132,7 @@ export function ProjectTasksPage() {
       if (!matchesDuration(task, durationFilter)) return false;
       if (!matchesStarted(task, startedFilter)) return false;
       if (!needle) return true;
-      const haystack = `${task.title} ${task.id} ${task.agentName ?? ''}`.toLowerCase();
+      const haystack = `${task.title} ${task.id} ${task.executorLabel ?? ''} ${task.instanceName ?? ''}`.toLowerCase();
       return haystack.includes(needle);
     });
   }, [tasks.data, status, typeFilter, durationFilter, startedFilter, query]);
@@ -227,10 +227,20 @@ export function ProjectTasksPage() {
       },
     },
     {
-      key: 'agent',
-      header: '智员',
-      width: 140,
-      render: (row) => <span className="truncate">{row.agentName || '未分配'}</span>,
+      key: 'executor',
+      header: '执行人',
+      width: 150,
+      render: (row) => <span className="truncate">{row.executorLabel || 'Aiwo'}</span>,
+    },
+    {
+      key: 'instance',
+      header: '实例',
+      width: 150,
+      render: (row) => (
+        <span className={row.instanceName ? 'truncate' : 'dim truncate'} title={row.instanceName || '自动分配'}>
+          {row.instanceName || '自动分配'}
+        </span>
+      ),
     },
     {
       key: 'priority',
@@ -297,7 +307,7 @@ export function ProjectTasksPage() {
     <div className="ws-page">
       <PageHead
         title="任务"
-        desc="新建任务后由项目智员认领执行；支持按类型、状态与关键词筛选，点击行查看执行详情。"
+        desc="新建任务后由绑定项目的 DSH 实例领取并交给 Aiwo 执行；支持按类型、状态与关键词筛选，点击行查看执行详情。"
       />
 
       <div className="toolbar">
@@ -337,7 +347,7 @@ export function ProjectTasksPage() {
           <SearchInput
             value={keyword}
             onChange={setKeyword}
-            placeholder="搜索标题 / 短 ID / 智员"
+            placeholder="搜索标题 / 短 ID / 执行人 / 实例"
             className="ws-search"
             onSubmit={applySearch}
           />
@@ -400,7 +410,7 @@ export function ProjectTasksPage() {
                 <EmptyState
                   icon="list"
                   title="还没有任务"
-                  description="创建第一个任务，让项目智员开始工作。"
+                  description="创建第一个任务，由绑定项目的 DSH 实例交给 Aiwo 执行。"
                   action={
                     <Button
                       size="sm"

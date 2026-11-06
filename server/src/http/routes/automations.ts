@@ -13,8 +13,9 @@ import type { Db } from '../../db/index.ts';
 import { newId, nowIso } from '../../lib/ids.ts';
 import { isValidCron } from '../../runtime/cron.ts';
 import { renderTemplate } from '../../runtime/template.ts';
-import { parseJsonObject } from './tasks.ts';
+import { parseJsonObject, parseStringArray } from './tasks.ts';
 import { createTaskRecord } from './tasks.ts';
+import { checkUserInput } from '../../security/check.ts';
 import type {
   Automation,
   AutomationRun,
@@ -30,7 +31,8 @@ import type {
 export interface AutomationRow {
   id: string;
   project_id: string;
-  agent_id: string;
+  instance_id: string | null;
+  prompt_card_ids: string;
   name: string;
   trigger_type: string;
   trigger_config: string;
@@ -42,14 +44,14 @@ export interface AutomationRow {
   last_run_at: string | null;
   last_run_status: string | null;
   project_name?: string | null;
-  agent_name?: string | null;
+  instance_name?: string | null;
 }
 
 export const AUTOMATION_SELECT = `
-  SELECT a.*, p.name AS project_name, ag.name AS agent_name
+  SELECT a.*, p.name AS project_name, i.name AS instance_name
     FROM automations a
     JOIN projects p ON p.id = a.project_id
-    JOIN agents ag ON ag.id = a.agent_id
+    LEFT JOIN dsh_instances i ON i.id = a.instance_id
 `;
 
 interface DeliveryRow {
@@ -146,15 +148,16 @@ function mapAutomation(row: AutomationRow, canManage: boolean): Automation {
     id: row.id,
     projectId: row.project_id,
     projectName: row.project_name ?? '',
-    agentId: row.agent_id,
-    agentName: row.agent_name ?? '',
     name: row.name,
     triggerType: row.trigger_type as AutomationTrigger,
     triggerConfig,
     promptTemplate: row.prompt_template,
+    promptCardIds: parseStringArray(row.prompt_card_ids),
     enabled: Number(row.enabled) === 1,
     createdAt: row.created_at,
   };
+  if (row.instance_id) automation.instanceId = row.instance_id;
+  if (row.instance_name) automation.instanceName = row.instance_name;
   if (row.created_by) automation.createdBy = row.created_by;
   if (row.last_run_at) automation.lastRunAt = row.last_run_at;
   if (row.last_run_status) automation.lastRunStatus = row.last_run_status;
@@ -224,10 +227,11 @@ export function createAutomationTask(
   const prompt = renderTemplate(row.prompt_template, options.variables);
   const task = createTaskRecord(db, bus, {
     projectId: row.project_id,
-    agentId: row.agent_id,
     source: 'automation',
     title: `[自动化] ${row.name}`,
     prompt,
+    promptCardIds: parseStringArray(row.prompt_card_ids),
+    instanceId: row.instance_id,
     priority: 0,
     createdBy: options.createdBy ?? null,
     metadata: {
@@ -259,7 +263,8 @@ export function createAutomationTask(
 
 const createSchema = z.object({
   name: z.string().trim().min(1).max(200),
-  agentId: z.string().min(1),
+  instanceId: z.string().min(1).optional(),
+  promptCardIds: z.array(z.string().min(1)).max(20).optional(),
   triggerType: z.enum(['manual', 'webhook', 'cron']),
   triggerConfig: triggerConfigSchema.optional(),
   promptTemplate: z.string().min(1).max(20_000),
@@ -268,7 +273,8 @@ const createSchema = z.object({
 
 const patchSchema = z.object({
   name: z.string().trim().min(1).max(200).optional(),
-  agentId: z.string().min(1).optional(),
+  instanceId: z.string().min(1).nullable().optional(),
+  promptCardIds: z.array(z.string().min(1)).max(20).optional(),
   triggerType: z.enum(['manual', 'webhook', 'cron']).optional(),
   triggerConfig: triggerConfigSchema.optional(),
   promptTemplate: z.string().min(1).max(20_000).optional(),
@@ -298,13 +304,13 @@ export function registerAutomationRoutes(router: Router): void {
     const person = requirePerson(rc);
     const project = requireProject(rc, rc.params.id, 'contribute');
     const input = await rc.body(createSchema);
-
-    const bound = rowOf<{ ok: number }>(
-      rc.app.db,
-      "SELECT 1 AS ok FROM project_agents WHERE project_id = ? AND agent_id = ? AND status = 'active'",
-      [project.id, input.agentId],
-    );
-    if (!bound) throw errors.badRequest('该智员未与项目建立有效绑定');
+    const security = await checkUserInput({
+      db: rc.app.db,
+      personId: person.id,
+      source: 'automation',
+      content: `${input.name}\n${input.promptTemplate}`,
+    });
+    if (!security.allowed) throw errors.badRequest(security.blockedMessage ?? '输入未通过安全检查');
 
     const triggerConfig = normalizeTriggerConfig(input.triggerType, input.triggerConfig);
     const id = newId('aut');
@@ -312,18 +318,19 @@ export function registerAutomationRoutes(router: Router): void {
     rc.app.db
       .prepare(
         `INSERT INTO automations
-           (id, project_id, agent_id, name, trigger_type, trigger_config, prompt_template, enabled,
-            created_by, created_at, updated_at, last_run_at, last_run_status)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL)`,
+           (id, project_id, instance_id, name, trigger_type, trigger_config, prompt_template,
+            prompt_card_ids, enabled, created_by, created_at, updated_at, last_run_at, last_run_status)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL)`,
       )
       .run(
         id,
         project.id,
-        input.agentId,
+        input.instanceId ?? null,
         input.name,
         input.triggerType,
         JSON.stringify(triggerConfig),
         input.promptTemplate,
+        JSON.stringify(input.promptCardIds ?? []),
         input.enabled === false ? 0 : 1,
         person.id,
         now,
@@ -342,6 +349,15 @@ export function registerAutomationRoutes(router: Router): void {
     if (!row) throw errors.notFound('自动化不存在');
     requireProject(rc, row.project_id, 'contribute');
     const input = await rc.body(patchSchema);
+    if (input.promptTemplate || input.name) {
+      const security = await checkUserInput({
+        db: rc.app.db,
+        personId: person.id,
+        source: 'automation',
+        content: `${input.name ?? row.name}\n${input.promptTemplate ?? row.prompt_template}`,
+      });
+      if (!security.allowed) throw errors.badRequest(security.blockedMessage ?? '输入未通过安全检查');
+    }
 
     const nextType = (input.triggerType ?? row.trigger_type) as AutomationTrigger;
     const typeChanged = input.triggerType !== undefined && input.triggerType !== row.trigger_type;
@@ -358,29 +374,20 @@ export function registerAutomationRoutes(router: Router): void {
       nextConfigJson = JSON.stringify(normalizeTriggerConfig(nextType, mergedConfig));
     }
 
-    const nextAgentId = input.agentId ?? row.agent_id;
-    if (input.agentId && input.agentId !== row.agent_id) {
-      const bound = rowOf<{ ok: number }>(
-        rc.app.db,
-        "SELECT 1 AS ok FROM project_agents WHERE project_id = ? AND agent_id = ? AND status = 'active'",
-        [row.project_id, input.agentId],
-      );
-      if (!bound) throw errors.badRequest('该智员未与项目建立有效绑定');
-    }
-
     rc.app.db
       .prepare(
         `UPDATE automations
-            SET name = ?, agent_id = ?, trigger_type = ?, trigger_config = ?,
-                prompt_template = ?, enabled = ?, updated_at = ?
+            SET name = ?, instance_id = ?, trigger_type = ?, trigger_config = ?,
+                prompt_template = ?, prompt_card_ids = ?, enabled = ?, updated_at = ?
           WHERE id = ?`,
       )
       .run(
         input.name ?? row.name,
-        nextAgentId,
+        input.instanceId === undefined ? row.instance_id : input.instanceId,
         nextType,
         nextConfigJson,
         input.promptTemplate ?? row.prompt_template,
+        JSON.stringify(input.promptCardIds ?? parseStringArray(row.prompt_card_ids)),
         input.enabled === undefined ? row.enabled : input.enabled ? 1 : 0,
         nowIso(),
         row.id,

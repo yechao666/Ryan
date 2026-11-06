@@ -52,8 +52,8 @@ export function useAsync<T>(fn: () => Promise<T>, deps: unknown[], enabled = tru
   useEffect(() => {
     if (!enabled) return;
     const refresh = () => void run();
-    window.addEventListener('hive:assistant-refresh', refresh);
-    return () => window.removeEventListener('hive:assistant-refresh', refresh);
+    window.addEventListener('aiwo:assistant-refresh', refresh);
+    return () => window.removeEventListener('aiwo:assistant-refresh', refresh);
   }, [enabled, run]);
 
   return {

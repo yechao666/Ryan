@@ -9,6 +9,9 @@ import { registerIntegrationRoutes } from './integrations.ts';
 import { registerMemoryRoutes } from './memory.ts';
 import { registerEventRoutes } from './events.ts';
 import { registerAssistantRoutes } from './assistant.ts';
+import { registerPromptCardRoutes } from './prompt-cards.ts';
+import { registerSettingsRoutes } from './settings.ts';
+import { registerInstanceRoutes } from './instances.ts';
 
 export function registerRoutes(router: Router, _app: AppContext): void {
   registerAuthRoutes(router);
@@ -20,4 +23,7 @@ export function registerRoutes(router: Router, _app: AppContext): void {
   registerMemoryRoutes(router);
   registerEventRoutes(router);
   registerAssistantRoutes(router);
+  registerPromptCardRoutes(router);
+  registerSettingsRoutes(router);
+  registerInstanceRoutes(router);
 }

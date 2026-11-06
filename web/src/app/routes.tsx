@@ -6,13 +6,12 @@ import { DashboardPage } from '../pages/DashboardPage.tsx';
 import { ProjectsPage } from '../pages/ProjectsPage.tsx';
 import { TeamsPage } from '../pages/TeamsPage.tsx';
 import { TeamDetailPage } from '../pages/TeamDetailPage.tsx';
-import { AgentsPage } from '../pages/AgentsPage.tsx';
-import { AgentDetailPage } from '../pages/AgentDetailPage.tsx';
 import { InstancesPage } from '../pages/InstancesPage.tsx';
+import { PromptCardsPage } from '../pages/PromptCardsPage.tsx';
+import { SettingsPage } from '../pages/SettingsPage.tsx';
 import { TasksPage } from '../pages/TasksPage.tsx';
 import { ProjectLayout } from '../pages/ProjectLayout.tsx';
 import { ProjectOverviewPage } from '../pages/project/ProjectOverviewPage.tsx';
-import { ProjectAgentsPage } from '../pages/project/ProjectAgentsPage.tsx';
 import { ProjectTasksPage } from '../pages/project/ProjectTasksPage.tsx';
 import { ProjectTaskDetailPage } from '../pages/project/ProjectTaskDetailPage.tsx';
 import { ProjectActivityPage } from '../pages/project/ProjectActivityPage.tsx';
@@ -25,8 +24,8 @@ function RequireAuth({ children }: { children: React.ReactNode }) {
   if (loading) {
     return (
       <div className="boot-screen">
-        <div className="brand-mark">H</div>
-        <div className="boot-screen__text">正在加载 Hive…</div>
+        <div className="brand-mark">A</div>
+        <div className="boot-screen__text">正在加载 Aiwo…</div>
       </div>
     );
   }
@@ -49,7 +48,6 @@ export function AppRoutes() {
         <Route path="/projects" element={<ProjectsPage />} />
         <Route path="/projects/:projectId" element={<ProjectLayout />}>
           <Route index element={<ProjectOverviewPage />} />
-          <Route path="agents" element={<ProjectAgentsPage />} />
           <Route path="tasks" element={<ProjectTasksPage />} />
           <Route path="tasks/:taskId" element={<ProjectTaskDetailPage />} />
           <Route path="activity" element={<ProjectActivityPage />} />
@@ -59,9 +57,9 @@ export function AppRoutes() {
         </Route>
         <Route path="/teams" element={<TeamsPage />} />
         <Route path="/teams/:teamId" element={<TeamDetailPage />} />
-        <Route path="/agents" element={<AgentsPage />} />
-        <Route path="/agents/:agentId" element={<AgentDetailPage />} />
         <Route path="/instances" element={<InstancesPage />} />
+        <Route path="/prompt-cards" element={<PromptCardsPage />} />
+        <Route path="/settings" element={<SettingsPage />} />
         <Route path="/tasks" element={<TasksPage />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Route>

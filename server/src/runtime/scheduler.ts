@@ -79,7 +79,7 @@ export function runDueAutomations(app: AppContext, now: Date = new Date()): numb
       triggered += 1;
     } catch (error) {
       console.warn(
-        `[hive] 定时自动化 ${row.id} 触发失败：${error instanceof Error ? error.message : String(error)}`,
+        `[aiwo] 定时自动化 ${row.id} 触发失败：${error instanceof Error ? error.message : String(error)}`,
       );
       // 记录失败并占用本分钟，避免每 30s 重复重试。
       const at = now.toISOString();
@@ -113,7 +113,7 @@ export function startAutomationScheduler(app: AppContext): () => void {
       runDueAutomations(app);
     } catch (error) {
       console.warn(
-        `[hive] 自动化调度器执行失败：${error instanceof Error ? error.message : String(error)}`,
+        `[aiwo] 自动化调度器执行失败：${error instanceof Error ? error.message : String(error)}`,
       );
     } finally {
       busy = false;

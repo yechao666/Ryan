@@ -4,16 +4,8 @@ import type { Person } from '../../../shared/src/types.ts';
 import type { AppContext } from '../contracts.ts';
 import { errors, sendJson } from './respond.ts';
 
-export interface CurrentAgent {
-  id: string;
-  name: string;
-  ownerPersonId: string;
-  status: string;
-}
-
 export interface CurrentInstance {
   id: string;
-  agentId: string;
   name: string;
   status: string;
 }
@@ -33,7 +25,6 @@ export interface RequestContext {
   params: Record<string, string>;
   requestId: string;
   person?: Person;
-  agent?: CurrentAgent;
   instance?: CurrentInstance;
   body<S extends z.ZodTypeAny>(schema: S): Promise<z.infer<S>>;
   query<S extends z.ZodTypeAny>(schema: S): z.infer<S>;

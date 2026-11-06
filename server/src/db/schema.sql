@@ -1,4 +1,4 @@
--- Hive schema v1：数字员工工作平台
+-- Aiwo schema v1：以 DSH 实例为资源，人员 @Aiwo 直接执行任务。
 PRAGMA journal_mode = WAL;
 PRAGMA foreign_keys = ON;
 PRAGMA synchronous = NORMAL;
@@ -61,6 +61,7 @@ CREATE TABLE IF NOT EXISTS projects (
   status            TEXT NOT NULL DEFAULT 'active',
   mnemos_project_id TEXT,
   mnemos_api_key    TEXT,
+  memory_agent_id   TEXT,
   created_at        TEXT NOT NULL,
   updated_at        TEXT NOT NULL
 );
@@ -75,95 +76,82 @@ CREATE TABLE IF NOT EXISTS project_members (
   PRIMARY KEY (project_id, person_id)
 );
 
-CREATE TABLE IF NOT EXISTS agents (
-  id            TEXT PRIMARY KEY,
-  owner_person_id TEXT NOT NULL REFERENCES persons(id) ON DELETE CASCADE,
-  name          TEXT NOT NULL,
-  role          TEXT NOT NULL DEFAULT 'assistant',
-  model         TEXT NOT NULL DEFAULT 'deepseek-chat',
-  description   TEXT NOT NULL DEFAULT '',
-  capabilities  TEXT NOT NULL DEFAULT '[]',
-  status        TEXT NOT NULL DEFAULT 'active',
-  created_at    TEXT NOT NULL,
-  updated_at    TEXT NOT NULL
+-- 可管理、可被任务引用的提示词卡片
+CREATE TABLE IF NOT EXISTS prompt_cards (
+  id          TEXT PRIMARY KEY,
+  name        TEXT NOT NULL,
+  category    TEXT NOT NULL DEFAULT 'workflow',
+  description TEXT NOT NULL DEFAULT '',
+  content     TEXT NOT NULL,
+  scope       TEXT NOT NULL DEFAULT 'org',
+  project_id  TEXT REFERENCES projects(id) ON DELETE CASCADE,
+  team_id     TEXT REFERENCES teams(id) ON DELETE CASCADE,
+  enabled     INTEGER NOT NULL DEFAULT 1,
+  created_by  TEXT REFERENCES persons(id) ON DELETE SET NULL,
+  created_at  TEXT NOT NULL,
+  updated_at  TEXT NOT NULL
 );
-CREATE INDEX IF NOT EXISTS idx_agents_owner ON agents(owner_person_id);
+CREATE INDEX IF NOT EXISTS idx_prompt_cards_scope ON prompt_cards(scope, enabled, updated_at DESC);
+CREATE INDEX IF NOT EXISTS idx_prompt_cards_project ON prompt_cards(project_id, updated_at DESC);
 
-CREATE TABLE IF NOT EXISTS project_agents (
-  id               TEXT PRIMARY KEY,
-  project_id       TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
-  agent_id         TEXT NOT NULL REFERENCES agents(id) ON DELETE CASCADE,
-  memory_agent_id  TEXT NOT NULL,
-  role             TEXT NOT NULL DEFAULT 'developer',
-  status           TEXT NOT NULL DEFAULT 'active',
-  added_by         TEXT REFERENCES persons(id) ON DELETE SET NULL,
-  added_at         TEXT NOT NULL,
-  UNIQUE (project_id, agent_id),
-  UNIQUE (project_id, memory_agent_id)
-);
-
-CREATE TABLE IF NOT EXISTS agent_tokens (
-  id           TEXT PRIMARY KEY,
-  agent_id     TEXT NOT NULL REFERENCES agents(id) ON DELETE CASCADE,
-  label        TEXT NOT NULL,
-  prefix       TEXT NOT NULL,
-  token_hash   TEXT NOT NULL UNIQUE,
-  created_at   TEXT NOT NULL,
-  last_used_at TEXT,
-  revoked_at   TEXT
-);
-
+-- 可独立管理的 DSH 实例资源
 CREATE TABLE IF NOT EXISTS dsh_instances (
   id             TEXT PRIMARY KEY,
-  agent_id       TEXT NOT NULL REFERENCES agents(id) ON DELETE CASCADE,
-  token_hash     TEXT NOT NULL UNIQUE,
   name           TEXT NOT NULL,
+  kind           TEXT NOT NULL DEFAULT 'remote',
   host           TEXT NOT NULL DEFAULT '',
+  port           INTEGER,
+  base_url       TEXT,
   workspace_path TEXT NOT NULL DEFAULT '',
   version        TEXT NOT NULL DEFAULT '',
-  status         TEXT NOT NULL DEFAULT 'online',
+  plugin_version TEXT,
+  token_hash     TEXT NOT NULL UNIQUE,
+  token_prefix   TEXT NOT NULL DEFAULT '',
+  status         TEXT NOT NULL DEFAULT 'unconfigured',
   registered_at  TEXT NOT NULL,
   last_seen_at   TEXT,
-  revoked_at     TEXT
-);
-CREATE INDEX IF NOT EXISTS idx_instances_agent ON dsh_instances(agent_id, last_seen_at DESC);
-
-CREATE TABLE IF NOT EXISTS work_items (
-  id             TEXT PRIMARY KEY,
-  project_id     TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
-  agent_id       TEXT NOT NULL REFERENCES agents(id) ON DELETE CASCADE,
-  source         TEXT NOT NULL DEFAULT 'human',
-  type           TEXT NOT NULL DEFAULT 'feature',
-  title          TEXT NOT NULL,
-  prompt         TEXT NOT NULL,
-  status         TEXT NOT NULL DEFAULT 'queued',
-  priority       INTEGER NOT NULL DEFAULT 0,
-  lease_until    TEXT,
-  instance_id    TEXT,
+  revoked_at     TEXT,
   created_by     TEXT REFERENCES persons(id) ON DELETE SET NULL,
   created_at     TEXT NOT NULL,
-  started_at     TEXT,
-  finished_at    TEXT,
-  result         TEXT,
-  error          TEXT,
-  metadata       TEXT NOT NULL DEFAULT '{}',
-  dedupe_key     TEXT
+  updated_at     TEXT NOT NULL,
+  metadata       TEXT NOT NULL DEFAULT '{}'
+);
+CREATE INDEX IF NOT EXISTS idx_instances_status ON dsh_instances(status, last_seen_at DESC);
+
+CREATE TABLE IF NOT EXISTS instance_projects (
+  instance_id TEXT NOT NULL REFERENCES dsh_instances(id) ON DELETE CASCADE,
+  project_id  TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+  created_at  TEXT NOT NULL,
+  PRIMARY KEY (instance_id, project_id)
+);
+CREATE INDEX IF NOT EXISTS idx_instance_projects_project ON instance_projects(project_id);
+
+CREATE TABLE IF NOT EXISTS work_items (
+  id                 TEXT PRIMARY KEY,
+  project_id         TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+  source             TEXT NOT NULL DEFAULT 'human',
+  type               TEXT NOT NULL DEFAULT 'feature',
+  title              TEXT NOT NULL,
+  prompt             TEXT NOT NULL,
+  prompt_card_ids    TEXT NOT NULL DEFAULT '[]',
+  status             TEXT NOT NULL DEFAULT 'queued',
+  priority           INTEGER NOT NULL DEFAULT 0,
+  lease_until        TEXT,
+  instance_id        TEXT REFERENCES dsh_instances(id) ON DELETE SET NULL,
+  created_by         TEXT REFERENCES persons(id) ON DELETE SET NULL,
+  executor_person_id TEXT REFERENCES persons(id) ON DELETE SET NULL,
+  created_at         TEXT NOT NULL,
+  started_at         TEXT,
+  finished_at        TEXT,
+  result             TEXT,
+  error              TEXT,
+  metadata           TEXT NOT NULL DEFAULT '{}',
+  dedupe_key         TEXT
 );
 CREATE INDEX IF NOT EXISTS idx_tasks_queue ON work_items(project_id, status, priority DESC, created_at);
-CREATE INDEX IF NOT EXISTS idx_tasks_agent ON work_items(agent_id, status, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_tasks_instance ON work_items(instance_id, status, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_tasks_created ON work_items(created_at DESC);
 CREATE UNIQUE INDEX IF NOT EXISTS idx_tasks_dedupe ON work_items(project_id, dedupe_key) WHERE dedupe_key IS NOT NULL;
-
-CREATE TABLE IF NOT EXISTS task_messages (
-  id          TEXT PRIMARY KEY,
-  task_id     TEXT NOT NULL REFERENCES work_items(id) ON DELETE CASCADE,
-  author_type TEXT NOT NULL,
-  author_id   TEXT,
-  author_name TEXT NOT NULL,
-  content     TEXT NOT NULL,
-  created_at  TEXT NOT NULL
-);
-CREATE INDEX IF NOT EXISTS idx_messages_task ON task_messages(task_id, created_at);
 
 CREATE TABLE IF NOT EXISTS task_events (
   id          TEXT PRIMARY KEY,
@@ -181,11 +169,12 @@ CREATE INDEX IF NOT EXISTS idx_task_events_project ON task_events(project_id, cr
 CREATE TABLE IF NOT EXISTS automations (
   id              TEXT PRIMARY KEY,
   project_id      TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
-  agent_id        TEXT NOT NULL REFERENCES agents(id) ON DELETE CASCADE,
+  instance_id     TEXT REFERENCES dsh_instances(id) ON DELETE SET NULL,
   name            TEXT NOT NULL,
   trigger_type    TEXT NOT NULL DEFAULT 'manual',
   trigger_config  TEXT NOT NULL DEFAULT '{}',
   prompt_template TEXT NOT NULL,
+  prompt_card_ids TEXT NOT NULL DEFAULT '[]',
   enabled         INTEGER NOT NULL DEFAULT 1,
   created_by      TEXT REFERENCES persons(id) ON DELETE SET NULL,
   created_at      TEXT NOT NULL,
@@ -238,10 +227,30 @@ CREATE TABLE IF NOT EXISTS activity_events (
   actor        TEXT NOT NULL,
   summary      TEXT NOT NULL,
   task_id      TEXT,
-  agent_id     TEXT,
   created_at   TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_activity_project ON activity_events(project_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_activity_created ON activity_events(created_at DESC);
 
-INSERT OR IGNORE INTO meta (key, value) VALUES ('schema_version', '5');
+-- 输入安全检查记录（只存摘要，不存完整敏感输入）
+CREATE TABLE IF NOT EXISTS security_checks (
+  id          TEXT PRIMARY KEY,
+  person_id   TEXT REFERENCES persons(id) ON DELETE SET NULL,
+  source      TEXT NOT NULL,
+  input_digest TEXT NOT NULL,
+  allowed     INTEGER NOT NULL,
+  reason      TEXT NOT NULL DEFAULT '',
+  model       TEXT NOT NULL DEFAULT '',
+  latency_ms  INTEGER NOT NULL DEFAULT 0,
+  created_at  TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_security_checks_time ON security_checks(created_at DESC);
+
+CREATE TABLE IF NOT EXISTS system_settings (
+  key        TEXT PRIMARY KEY,
+  value      TEXT NOT NULL,
+  updated_by TEXT REFERENCES persons(id) ON DELETE SET NULL,
+  updated_at TEXT NOT NULL
+);
+
+INSERT OR IGNORE INTO meta (key, value) VALUES ('schema_version', '1');

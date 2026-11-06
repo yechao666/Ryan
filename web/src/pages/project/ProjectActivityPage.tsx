@@ -64,7 +64,6 @@ export function ProjectActivityPage() {
         actor: event.actor,
         summary: event.summary,
         taskId: event.taskId,
-        agentId: event.agentId,
         createdAt: event.at,
       };
       setEvents((prev) => (prev.some((existing) => existing.id === item.id) ? prev : [item, ...prev].slice(0, 150)));
@@ -156,7 +155,7 @@ export function ProjectActivityPage() {
               showTaskLink
               projectId={projectId}
               emptyTitle={filter === 'all' ? '暂无活动' : '该类型暂无活动'}
-              emptyDescription="任务创建、智员接单、实例上下线等事件会实时出现在这里。"
+              emptyDescription="任务创建、实例接单、实例上下线等事件会实时出现在这里。"
             />
           </div>
           <div className="ws-activity-footbar">

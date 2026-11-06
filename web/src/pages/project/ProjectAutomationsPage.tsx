@@ -42,7 +42,6 @@ export function ProjectAutomationsPage() {
 
   const automations = useAsync(() => api.automations(projectId), [projectId]);
   const deliveries = useAsync(() => api.deliveries(projectId), [projectId]);
-  const agents = useAsync(() => api.projectAgents(projectId), [projectId]);
 
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState<Automation | null>(null);
@@ -166,7 +165,7 @@ export function ProjectAutomationsPage() {
     <div className="ws-page">
       <PageHead
         title="自动化"
-        desc="仓库事件、定时任务或手动操作都能自动生成智员任务，并复用项目记忆。"
+        desc="仓库事件、定时任务或手动操作都能自动生成 Aiwo 任务，并复用项目提示词与记忆。"
         actions={
           <>
             <Button variant="ghost" icon="refresh" onClick={() => void automations.refresh()}>
@@ -196,7 +195,7 @@ export function ProjectAutomationsPage() {
           <EmptyState
             icon="zap"
             title="还没有自动化"
-            description="创建自动化，让仓库事件或定时计划自动驱动智员工作。"
+            description="创建自动化，让仓库事件或定时计划自动驱动 Aiwo 执行任务。"
             action={
               <Button size="sm" variant="primary" icon="plus" onClick={openCreate}>
                 新建自动化
@@ -216,7 +215,11 @@ export function ProjectAutomationsPage() {
                 <div className="ws-automation-head">
                   <div className="vstack" style={{ gap: 2, minWidth: 0 }}>
                     <span className="ws-automation-name truncate">{automation.name}</span>
-                    <span className="tiny dim truncate">由 {automation.agentName || '未绑定智员'} 执行</span>
+                    <span className="tiny dim truncate">
+                      {automation.instanceName ? `实例 ${automation.instanceName}` : '实例 自动分配'}
+                      {' · '}
+                      创建人 {automation.createdByName || '—'}
+                    </span>
                   </div>
                   <Switch
                     checked={automation.enabled}
@@ -237,6 +240,12 @@ export function ProjectAutomationsPage() {
                       {webhookEventLabel(event)}
                     </span>
                   ))}
+                  {automation.promptCardIds?.length ? (
+                    <span className="chip">
+                      <Icon name="book" size={11} />
+                      {automation.promptCardIds.length} 提示词
+                    </span>
+                  ) : null}
                   {run ? (
                     <Badge tone={run.tone} size="sm">
                       {run.label}
@@ -350,7 +359,6 @@ export function ProjectAutomationsPage() {
       <AutomationForm
         open={formOpen}
         automation={editing}
-        agents={agents.data ?? []}
         onClose={() => setFormOpen(false)}
         onSaved={() => {
           setFormOpen(false);

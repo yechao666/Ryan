@@ -14,6 +14,7 @@ export interface ProjectRow {
   status: string;
   mnemos_project_id: string | null;
   mnemos_api_key: string | null;
+  memory_agent_id: string | null;
   created_at: string;
   updated_at: string;
 }

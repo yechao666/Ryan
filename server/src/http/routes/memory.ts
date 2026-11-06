@@ -22,12 +22,10 @@ const CONTEXT_BUDGET_TOKENS = 1200;
 
 const searchQuerySchema = z.object({
   q: z.string().trim().min(1).max(1_000),
-  agentId: z.string().min(1).optional(),
   topK: z.coerce.number().int().min(1).max(50).default(8),
 });
 
 const contextQuerySchema = z.object({
-  agentId: z.string().min(1).optional(),
   q: z.string().max(1_000).optional(),
 });
 
@@ -37,7 +35,7 @@ function errorMessage(error: unknown): string {
 }
 
 export function registerMemoryRoutes(router: Router): void {
-  // GET /api/projects/:id/memory/search?q=&agentId=&topK=
+  // GET /api/projects/:id/memory/search?q=&topK=
   router.get('/api/projects/:id/memory/search', async (rc) => {
     const project = requireProject(rc, rc.params.id, 'view');
     const params = rc.query(searchQuerySchema);
@@ -48,7 +46,7 @@ export function registerMemoryRoutes(router: Router): void {
       return;
     }
 
-    const resolution = resolveMemoryAgent(rc.app.db, project.id, params.agentId);
+    const resolution = resolveMemoryAgent(rc.app.db, project.id);
     if (!resolution.memoryAgentId) {
       const result: MemorySearchResult = {
         hits: [],
@@ -84,7 +82,7 @@ export function registerMemoryRoutes(router: Router): void {
     }
   });
 
-  // GET /api/projects/:id/memory/context?agentId=&q=
+  // GET /api/projects/:id/memory/context?q=
   router.get('/api/projects/:id/memory/context', async (rc) => {
     const project = requireProject(rc, rc.params.id, 'view');
     const params = rc.query(contextQuerySchema);
@@ -100,7 +98,7 @@ export function registerMemoryRoutes(router: Router): void {
       return;
     }
 
-    const resolution = resolveMemoryAgent(rc.app.db, project.id, params.agentId);
+    const resolution = resolveMemoryAgent(rc.app.db, project.id);
     if (!resolution.memoryAgentId) {
       const result: MemoryContextResult = {
         prompt: '',

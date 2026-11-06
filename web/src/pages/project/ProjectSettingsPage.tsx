@@ -348,7 +348,7 @@ export function ProjectSettingsPage() {
             <div className="ws-form-field-full">
               <Field
                 label="项目提示词"
-                hint="项目基本面：目标、规范、约束。执行任务的智员会把这部分注入 DSH 提示词；改动立即对后续任务生效。"
+                hint="项目基本面：目标、规范、约束。任务执行时会把这部分注入 DSH 提示词；改动立即对后续任务生效。"
               >
                 <Textarea
                   rows={6}
@@ -374,7 +374,7 @@ export function ProjectSettingsPage() {
                 Mnemos 集成
               </>
             }
-            desc="智员执行任务时，Hive 会按项目 ID 与 API Key 读取 / 写入 Mnemos 记忆。"
+            desc="任务执行时，Aiwo 会按项目 ID 与 API Key 读取 / 写入 Mnemos 记忆。"
             actions={
               <Badge tone={detail.project.mnemosConfigured ? 'green' : 'slate'} dot>
                 {detail.project.mnemosConfigured ? '已配置' : '未配置'}
@@ -529,7 +529,7 @@ export function ProjectSettingsPage() {
             />
           )}
         </Field>
-        <Field label="项目角色" required hint="所有者可删除项目，维护者可管理智员与自动化，开发者可创建任务，观察者只读。">
+        <Field label="项目角色" required hint="所有者可删除项目，维护者可管理实例、提示词与自动化，开发者可创建任务，观察者只读。">
           <Select
             value={newRole}
             options={PROJECT_ROLE_OPTIONS}

@@ -213,36 +213,26 @@ export interface MemoryAgentResolution {
   error?: string;
 }
 
-/**
- * 平台 Agent id → Mnemos memory_agent_id。
- * 未显式指定时取项目内第一个 active 绑定。
- */
-export function resolveMemoryAgent(db: Db, projectId: string, agentId?: string): MemoryAgentResolution {
-  if (agentId) {
-    const row = db
-      .prepare('SELECT memory_agent_id FROM project_agents WHERE project_id = ? AND agent_id = ?')
-      .get(projectId, agentId) as unknown as { memory_agent_id: string } | undefined;
-    if (!row) return { memoryAgentId: null, error: '该智员未绑定到此项目' };
-    return { memoryAgentId: row.memory_agent_id };
-  }
-  const row = db
-    .prepare(
-      `SELECT memory_agent_id FROM project_agents
-        WHERE project_id = ? AND status = 'active'
-        ORDER BY added_at ASC, memory_agent_id ASC
-        LIMIT 1`,
-    )
-    .get(projectId) as unknown as { memory_agent_id: string } | undefined;
-  if (!row) return { memoryAgentId: null, error: '项目未绑定可用智员，无法确定记忆身份' };
-  return { memoryAgentId: row.memory_agent_id };
+/** 项目级记忆身份：显式配置优先，否则使用 aiwo_<slug>。 */
+export function projectMemoryAgentId(project: ProjectRow): string {
+  const configured = project.memory_agent_id?.trim();
+  return configured || `aiwo_${project.slug.replace(/-/g, '_')}`;
 }
 
-/** 某 Agent 在该项目的 memory_agent_id（不做 active 校验，供运行时写回使用）。 */
-export function memoryAgentIdOf(db: Db, projectId: string, agentId: string): string | null {
-  const row = db
-    .prepare('SELECT memory_agent_id FROM project_agents WHERE project_id = ? AND agent_id = ?')
-    .get(projectId, agentId) as unknown as { memory_agent_id: string } | undefined;
-  return row?.memory_agent_id ?? null;
+export interface MemoryAgentResolution {
+  memoryAgentId: string | null;
+  error?: string;
+}
+
+export function resolveMemoryAgent(db: Db, projectId: string): MemoryAgentResolution {
+  const project = db.prepare('SELECT * FROM projects WHERE id = ?').get(projectId) as unknown as ProjectRow | undefined;
+  if (!project) return { memoryAgentId: null, error: '项目不存在' };
+  return { memoryAgentId: projectMemoryAgentId(project) };
+}
+
+export function memoryAgentIdOf(db: Db, projectId: string): string | null {
+  const project = db.prepare('SELECT * FROM projects WHERE id = ?').get(projectId) as unknown as ProjectRow | undefined;
+  return project ? projectMemoryAgentId(project) : null;
 }
 
 /** 任务完成写回的记忆正文（固定模板）。 */

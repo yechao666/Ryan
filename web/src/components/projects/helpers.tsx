@@ -1,13 +1,13 @@
 import { useRef, useState } from 'react';
 import type { EventType, InstanceStatus, TaskSource } from '@shared';
-import { AGENT_STATUSES, TASK_STATUSES } from '@shared';
+import { TASK_STATUSES } from '@shared';
 import { Skeleton, type IconName, type Tone } from '@ui';
 import { ApiError } from '../../lib/api.ts';
 import { useAsync } from '../../lib/hooks.ts';
 
 /**
  * 控制台核心页面共享的小工具。
- * 项目/团队/智员/实例页面都在此取色、取状态文案与错误态，避免各页重复。
+ * 项目/团队/实例/任务页面都在此取色、取状态文案与错误态，避免各页重复。
  */
 
 const TONES: Tone[] = ['violet', 'cyan', 'pink', 'amber', 'lime', 'blue'];
@@ -67,17 +67,13 @@ export function taskStatusMeta(status: string): { label: string; tone: Tone } {
   return meta ? { label: meta.label, tone: meta.tone as Tone } : { label: status, tone: 'slate' };
 }
 
-/** 智员状态标签。 */
-export function agentStatusMeta(status: string): { label: string; tone: Tone } {
-  const meta = AGENT_STATUSES.find((item) => item.value === status);
-  return meta ? { label: meta.label, tone: meta.tone as Tone } : { label: status, tone: 'slate' };
-}
-
 /** 实例状态展示元数据。 */
 export const INSTANCE_STATUS_META: Record<InstanceStatus, { label: string; tone: Tone; pulse?: boolean }> = {
   online: { label: '在线', tone: 'green', pulse: true },
   offline: { label: '离线', tone: 'slate' },
-  revoked: { label: '已吊销', tone: 'red' },
+  unconfigured: { label: '待安装插件', tone: 'amber' },
+  error: { label: '异常', tone: 'red' },
+  revoked: { label: '已吊销', tone: 'slate' },
 };
 
 export function instanceStatusMeta(status: string) {
@@ -87,17 +83,16 @@ export function instanceStatusMeta(status: string) {
 /** 活动事件 → 图标 / 色调。 */
 const ACTIVITY_META: Record<EventType, { icon: IconName; tone: Tone }> = {
   'task.created': { icon: 'plus', tone: 'blue' },
-  'task.claimed': { icon: 'bot', tone: 'violet' },
+  'task.claimed': { icon: 'server', tone: 'violet' },
   'task.progress': { icon: 'activity', tone: 'cyan' },
-  'task.message': { icon: 'send', tone: 'cyan' },
   'task.completed': { icon: 'checkCircle', tone: 'green' },
   'task.failed': { icon: 'xCircle', tone: 'red' },
   'task.cancelled': { icon: 'x', tone: 'slate' },
   'task.runtime': { icon: 'terminal', tone: 'cyan' },
   'instance.online': { icon: 'server', tone: 'green' },
   'instance.offline': { icon: 'server', tone: 'slate' },
+  'instance.registered': { icon: 'server', tone: 'violet' },
   'project.created': { icon: 'folder', tone: 'violet' },
-  'agent.bound': { icon: 'link', tone: 'pink' },
 };
 
 export function activityMeta(type: string): { icon: IconName; tone: Tone } {

@@ -1,8 +1,11 @@
 {
-  "name": "@hive/web",
+  "name": "@aiwo/web",
   "private": true,
   "type": "module",
-  "scripts": { "dev": "vite", "build": "vite build" },
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build"
+  },
   "dependencies": {
     "react": "19.3.1",
     "react-dom": "19.3.1",

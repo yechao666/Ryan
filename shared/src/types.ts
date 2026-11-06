@@ -1,5 +1,5 @@
 /**
- * Hive 共享契约：数字员工工作平台（人员管理智员，智员在项目中工作）。
+ * Aiwo 共享契约：以 DSH 实例为资源，人员 @Aiwo 直接执行项目任务。
  * 前后端唯一事实来源；HTTP JSON 均为 camelCase。
  */
 
@@ -7,26 +7,29 @@ export type TeamRole = 'lead' | 'member';
 export type ProjectRole = 'owner' | 'maintainer' | 'developer' | 'reporter';
 export type Visibility = 'private' | 'team' | 'public';
 export type ProjectType = 'manual' | 'github' | 'gitlab' | 'local';
-export type AgentStatus = 'active' | 'paused' | 'retired';
 export type TaskStatus = 'queued' | 'assigned' | 'running' | 'waiting_input' | 'done' | 'failed' | 'cancelled';
 export type TaskSource = 'human' | 'automation' | 'webhook' | 'api' | 'seed';
 export type TaskType = 'feature' | 'bugfix' | 'management' | 'ops' | 'docs' | 'other';
-export type InstanceStatus = 'online' | 'offline' | 'revoked';
+export type InstanceStatus = 'online' | 'offline' | 'unconfigured' | 'error' | 'revoked';
+export type InstanceKind = 'local' | 'remote';
 export type AutomationTrigger = 'manual' | 'webhook' | 'cron';
-export type MessageAuthor = 'person' | 'agent' | 'system';
+export type MessageAuthor = 'person' | 'aiwo' | 'system';
 export type EventType =
   | 'task.created'
   | 'task.claimed'
   | 'task.progress'
-  | 'task.message'
   | 'task.completed'
   | 'task.failed'
   | 'task.cancelled'
   | 'task.runtime'
   | 'instance.online'
   | 'instance.offline'
-  | 'project.created'
-  | 'agent.bound';
+  | 'instance.registered'
+  | 'project.created';
+
+/** 可管理、可被任务引用的提示词卡片。 */
+export type PromptCardCategory = 'workflow' | 'style' | 'standard' | 'role' | 'other';
+export type PromptCardScope = 'org' | 'team' | 'project';
 
 export interface Person {
   id: string;
@@ -72,19 +75,19 @@ export interface Project {
   ownerPersonName: string;
   visibility: Visibility;
   type: ProjectType;
-  /** 项目提示词：项目基本面，随任务注入 DSH 运行时提示词。 */
   prompt: string;
   repoUrl?: string;
   status: 'active' | 'archived';
   mnemosProjectId?: string;
-  /** 只返回是否已配置密钥，不返回明文 */
   mnemosConfigured: boolean;
+  /** Mnemos 项目级记忆身份；为空时使用 aiwo_<slug>。 */
+  memoryAgentId?: string;
   createdAt: string;
   updatedAt: string;
 }
 
 export interface ProjectCounts {
-  agents: number;
+  promptCards: number;
   tasks: number;
   activeTasks: number;
   instances: number;
@@ -106,88 +109,109 @@ export interface ProjectMember {
   addedAt: string;
 }
 
-export interface Agent {
+/** 提示词卡片：只作为任务/自动化的可引用上下文，不等于执行角色。 */
+export interface PromptCard {
   id: string;
-  ownerPersonId: string;
-  ownerName: string;
   name: string;
-  role: string;
-  model: string;
+  category: PromptCardCategory;
   description: string;
-  capabilities: string[];
-  status: AgentStatus;
+  content: string;
+  scope: PromptCardScope;
+  projectId?: string;
+  projectName?: string;
+  teamId?: string;
+  teamName?: string;
+  enabled: boolean;
+  createdBy?: string;
+  createdByName?: string;
   createdAt: string;
   updatedAt: string;
-  stats: {
-    projects: number;
-    runningTasks: number;
-    queuedTasks: number;
-    onlineInstances: number;
-  };
 }
 
-export interface ProjectAgent {
-  id: string;
-  projectId: string;
-  agentId: string;
-  memoryAgentId: string;
-  role: string;
-  status: 'active' | 'paused';
-  addedBy?: string;
-  addedAt: string;
-  agent: {
-    name: string;
-    role: string;
-    model: string;
-    ownerName: string;
-    capabilities: string[];
-  };
-  onlineInstances: number;
-}
-
-export interface AgentToken {
-  id: string;
-  agentId: string;
-  label: string;
-  prefix: string;
-  createdAt: string;
-  lastUsedAt?: string;
-  revokedAt?: string;
-}
-
-export interface AgentTokenWithSecret extends AgentToken {
-  secret: string;
-}
-
-export interface Instance {
-  id: string;
-  agentId: string;
-  agentName: string;
+export interface PromptCardInput {
   name: string;
+  category?: PromptCardCategory;
+  description?: string;
+  content: string;
+  scope?: PromptCardScope;
+  projectId?: string;
+  teamId?: string;
+  enabled?: boolean;
+}
+
+/** 可独立管理的 DSH 实例资源。 */
+export interface DshInstance {
+  id: string;
+  name: string;
+  kind: InstanceKind;
   host: string;
+  port?: number;
+  baseUrl?: string;
   workspacePath: string;
   version: string;
+  pluginVersion?: string;
   status: InstanceStatus;
   lastSeenAt?: string;
   registeredAt: string;
   revokedAt?: string;
+  createdBy?: string;
+  createdAt: string;
+  projectIds: string[];
+  projectNames: string[];
   currentTask?: {
     id: string;
     title: string;
     projectName: string;
   };
+  /** 是否已生成过实例 token（不返回明文） */
+  hasToken: boolean;
+}
+
+export type Instance = DshInstance;
+
+export interface DshInstanceInput {
+  name: string;
+  kind?: InstanceKind;
+  host?: string;
+  port?: number;
+  baseUrl?: string;
+  workspacePath?: string;
+  projectIds?: string[];
+}
+
+export interface InstanceRegisterInput {
+  name: string;
+  kind?: InstanceKind;
+  host: string;
+  port?: number;
+  workspacePath: string;
+  version: string;
+  pluginVersion?: string;
+}
+
+export interface InstanceRegisterResult {
+  instance: DshInstance;
+  token: string;
+}
+
+export interface InstanceTokenResult {
+  token: string;
+  command: string;
 }
 
 export interface WorkItem {
   id: string;
   projectId: string;
   projectName: string;
-  agentId: string;
-  agentName: string;
+  executorPersonId?: string;
+  /** 展示名，固定为「姓名@Aiwo」。 */
+  executorLabel: string;
   source: TaskSource;
   type: TaskType;
   title: string;
   prompt: string;
+  promptCardIds: string[];
+  promptCards: { id: string; name: string; category: PromptCardCategory }[];
   status: TaskStatus;
   priority: number;
   leaseUntil?: string;
@@ -205,16 +229,6 @@ export interface WorkItem {
   lastMessageAt?: string;
 }
 
-export interface TaskMessage {
-  id: string;
-  taskId: string;
-  authorType: MessageAuthor;
-  authorId?: string;
-  authorName: string;
-  content: string;
-  createdAt: string;
-}
-
 export interface TaskEvent {
   id: string;
   taskId: string;
@@ -228,11 +242,10 @@ export interface TaskEvent {
 
 export interface TaskDetail {
   task: WorkItem;
-  messages: TaskMessage[];
   events: TaskEvent[];
   memory: {
     projectId?: string;
-    agentMemoryId?: string;
+    memoryAgentId?: string;
     configured: boolean;
   };
 }
@@ -245,7 +258,6 @@ export interface ActivityEvent {
   actor: string;
   summary: string;
   taskId?: string;
-  agentId?: string;
   createdAt: string;
 }
 
@@ -253,8 +265,8 @@ export interface Automation {
   id: string;
   projectId: string;
   projectName: string;
-  agentId: string;
-  agentName: string;
+  instanceId?: string;
+  instanceName?: string;
   name: string;
   triggerType: AutomationTrigger;
   triggerConfig: {
@@ -264,8 +276,10 @@ export interface Automation {
     secret?: string;
   };
   promptTemplate: string;
+  promptCardIds: string[];
   enabled: boolean;
   createdBy?: string;
+  createdByName?: string;
   createdAt: string;
   lastRunAt?: string;
   lastRunStatus?: string;
@@ -343,8 +357,7 @@ export interface DashboardSummary {
   person: Person;
   teams: Team[];
   projects: ProjectSummary[];
-  agents: Agent[];
-  instances: Instance[];
+  instances: DshInstance[];
   tasks: {
     queued: number;
     running: number;
@@ -355,20 +368,38 @@ export interface DashboardSummary {
   activity: ActivityEvent[];
 }
 
+/** 安全检查配置：endpoint 为空即关闭。 */
+export interface SecuritySettings {
+  enabled: boolean;
+  endpoint: string;
+  model: string;
+  apiKeyConfigured: boolean;
+  timeoutMs: number;
+  blockMessage: string;
+}
+
+export interface AssistantSettings {
+  enabled: boolean;
+  instanceId?: string;
+  model?: string;
+}
+
+export interface SystemSettings {
+  security: SecuritySettings;
+  assistant: AssistantSettings;
+  updatedAt?: string;
+  updatedBy?: string;
+}
+
+export interface SecurityCheckResult {
+  allowed: boolean;
+  reason?: string;
+  model?: string;
+  latencyMs?: number;
+  blockedMessage?: string;
+}
+
 /** 运行时（DSH 实例）协议 */
-export interface InstanceRegisterInput {
-  name: string;
-  host: string;
-  workspacePath: string;
-  version: string;
-}
-
-export interface InstanceRegisterResult {
-  instance: Instance;
-  /** 一次性返回，之后只存哈希 */
-  token: string;
-}
-
 export interface ClaimedTask {
   task: WorkItem;
   project: {
@@ -378,13 +409,14 @@ export interface ClaimedTask {
     prompt: string;
     repoUrl?: string;
     type: ProjectType;
+    memoryAgentId?: string;
   };
-  agent: {
-    id: string;
+  executor: {
+    personId?: string;
     name: string;
-    memoryAgentId: string;
-    capabilities: string[];
+    label: string;
   };
+  promptCards: { id: string; name: string; category: PromptCardCategory; content: string }[];
   memory: {
     baseUrl: string;
     projectId: string;
@@ -392,7 +424,6 @@ export interface ClaimedTask {
     agentId: string;
     enabled: boolean;
   };
-  messages: TaskMessage[];
 }
 
 export interface CompleteTaskInput {
@@ -401,17 +432,10 @@ export interface CompleteTaskInput {
   decisions?: string[];
   lessons?: string[];
   error?: string;
-  /** headless 会话 id；用于任务完成后继续对话。 */
   sessionId?: string;
 }
 
-export interface TaskConversation {
-  task: WorkItem;
-  sessionId: string;
-  messages: TaskMessage[];
-}
-
-/** DSH 运行时原始事件（headless NDJSON 投影）。 */
+/** DSH 运行时原始事件（ACP/headless 投影）。 */
 export interface RuntimeEvent {
   id: string;
   taskId: string;
@@ -422,9 +446,10 @@ export interface RuntimeEvent {
 }
 
 export interface CreateTaskInput {
-  agentId: string;
   title: string;
   prompt: string;
+  promptCardIds?: string[];
+  instanceId?: string;
   priority?: number;
   source?: TaskSource;
   type?: TaskType;
@@ -442,28 +467,16 @@ export interface CreateProjectInput {
   repoUrl?: string;
   mnemosProjectId?: string;
   mnemosApiKey?: string;
-}
-
-export interface CreateAgentInput {
-  name: string;
-  role?: string;
-  model?: string;
-  description?: string;
-  capabilities?: string[];
-}
-
-export interface BindAgentInput {
-  agentId: string;
   memoryAgentId?: string;
-  role?: string;
 }
 
 export interface CreateAutomationInput {
   name: string;
-  agentId: string;
   triggerType: AutomationTrigger;
   triggerConfig?: Automation['triggerConfig'];
   promptTemplate: string;
+  promptCardIds?: string[];
+  instanceId?: string;
   enabled?: boolean;
 }
 
@@ -473,10 +486,8 @@ export interface LiveEvent {
   projectId?: string;
   projectName?: string;
   taskId?: string;
-  agentId?: string;
   actor: string;
   summary: string;
   at: string;
-  /** task.runtime 事件携带的原始运行时数据。 */
   runtime?: RuntimeEvent;
 }

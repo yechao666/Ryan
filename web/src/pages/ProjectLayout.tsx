@@ -122,13 +122,12 @@ export function ProjectLayout() {
 
   const { project, team } = detail;
   const base = `/projects/${encodeURIComponent(project.id)}`;
-  const counts = project.counts ?? { agents: 0, tasks: 0, activeTasks: 0, instances: 0, members: 0 };
+  const counts = project.counts ?? { promptCards: 0, tasks: 0, activeTasks: 0, instances: 0, members: 0 };
   const visibility = visibilityMeta(project.visibility);
   const type = projectTypeMeta(project.type);
   const teamName = project.ownerTeamName ?? team?.name;
   const tabs: TabItem[] = [
     { to: base, label: '概览', end: true },
-    { to: `${base}/agents`, label: '智员', count: counts.agents || undefined },
     { to: `${base}/tasks`, label: '任务', count: counts.tasks || undefined },
     { to: `${base}/activity`, label: '活动' },
     { to: `${base}/automations`, label: '自动化' },
@@ -187,6 +186,14 @@ export function ProjectLayout() {
             <span className="ws-project-meta-item mono tiny">
               <Icon name="tag" size={13} />
               {project.slug}
+            </span>
+            <span className="ws-project-meta-item">
+              <Icon name="book" size={13} />
+              {counts.promptCards} 提示词卡片
+            </span>
+            <span className="ws-project-meta-item">
+              <Icon name="server" size={13} />
+              {counts.instances} 个实例
             </span>
             {project.repoUrl ? (
               <a className="ws-project-meta-item ws-link" href={project.repoUrl} target="_blank" rel="noreferrer">

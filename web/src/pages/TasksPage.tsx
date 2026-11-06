@@ -112,7 +112,7 @@ export function TasksPage() {
       if (!matchesDuration(task, durationFilter)) return false;
       if (!matchesStarted(task, startedFilter)) return false;
       if (!needle) return true;
-      const haystack = `${task.title} ${task.id} ${task.agentName ?? ''}`.toLowerCase();
+      const haystack = `${task.title} ${task.id} ${task.executorLabel ?? ''} ${task.instanceName ?? ''}`.toLowerCase();
       return haystack.includes(needle);
     });
   }, [tasks, query, typeFilter, durationFilter, startedFilter]);
@@ -213,17 +213,19 @@ export function TasksPage() {
       },
     },
     {
-      key: 'agent',
-      header: '智员',
-      width: 140,
+      key: 'executor',
+      header: '执行人',
+      width: 150,
+      render: (task) => <span className="truncate">{task.executorLabel || 'Aiwo'}</span>,
+    },
+    {
+      key: 'instance',
+      header: '实例',
+      width: 150,
       render: (task) => (
-        <Link
-          to={`/agents/${task.agentId}`}
-          className="cx-table-link truncate"
-          onClick={(event) => event.stopPropagation()}
-        >
-          {task.agentName || '未分配'}
-        </Link>
+        <span className={task.instanceName ? 'truncate' : 'dim truncate'} title={task.instanceName || '自动分配'}>
+          {task.instanceName || '自动分配'}
+        </span>
       ),
     },
     {
@@ -373,7 +375,7 @@ export function TasksPage() {
           <SearchInput
             value={keyword}
             onChange={setKeyword}
-            placeholder="搜索标题 / 短 ID / 智员"
+            placeholder="搜索标题 / 短 ID / 执行人 / 实例"
             className="ws-search"
             onSubmit={applySearch}
           />

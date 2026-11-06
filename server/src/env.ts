@@ -26,18 +26,18 @@ function num(value: string | undefined, fallback: number): number {
 }
 
 export function loadEnv(overrides: Partial<Env> = {}): Env {
-  const dataDir = process.env.HIVE_DATA_DIR ?? join(APP_ROOT, 'data');
+  const dataDir = process.env.AIWO_DATA_DIR ?? join(APP_ROOT, 'data');
   return {
     nodeEnv: process.env.NODE_ENV ?? 'development',
-    host: process.env.HIVE_HOST ?? '127.0.0.1',
-    port: num(process.env.HIVE_PORT ?? process.env.PORT, DEFAULT_SERVER_PORT),
+    host: process.env.AIWO_HOST ?? '127.0.0.1',
+    port: num(process.env.AIWO_PORT ?? process.env.PORT, DEFAULT_SERVER_PORT),
     dataDir,
-    dbPath: process.env.HIVE_DB_PATH ?? join(dataDir, 'hive.db'),
-    webDist: process.env.HIVE_WEB_DIST ?? join(APP_ROOT, 'web', 'dist'),
-    demoMode: process.env.HIVE_DEMO !== '0',
-    sessionTtlHours: num(process.env.HIVE_SESSION_TTL_HOURS, 72),
+    dbPath: process.env.AIWO_DB_PATH ?? join(dataDir, 'aiwo.db'),
+    webDist: process.env.AIWO_WEB_DIST ?? join(APP_ROOT, 'web', 'dist'),
+    demoMode: process.env.AIWO_DEMO !== '0',
+    sessionTtlHours: num(process.env.AIWO_SESSION_TTL_HOURS, 72),
     mnemosBaseUrl: process.env.MNEMOS_BASE_URL ?? 'http://127.0.0.1:4380',
-    webhookMaxBytes: num(process.env.HIVE_WEBHOOK_MAX_BYTES, 1_048_576),
+    webhookMaxBytes: num(process.env.AIWO_WEBHOOK_MAX_BYTES, 1_048_576),
     ...overrides,
   };
 }

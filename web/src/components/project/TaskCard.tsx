@@ -1,19 +1,20 @@
 import type { WorkItem } from '@shared';
-import { Avatar, Badge, Icon } from '@ui';
-import { fmtInt, fmtRelative } from '@lib/format.ts';
-import { priorityMeta, taskSourceLabel, taskStatusMeta, taskTypeMeta, toneForName } from './meta.ts';
+import { Badge, Icon } from '@ui';
+import { fmtRelative } from '@lib/format.ts';
+import { priorityMeta, taskSourceLabel, taskStatusMeta, taskTypeMeta } from './meta.ts';
 
 export interface TaskCardProps {
   task: WorkItem;
   onClick: (task: WorkItem) => void;
 }
 
-/** 看板任务卡：标题、智员、状态、来源、优先级、消息数与相对时间。 */
+/** 看板任务卡：标题、执行人（姓名@Aiwo）、实例、状态、来源、优先级与时间。 */
 export function TaskCard({ task, onClick }: TaskCardProps) {
   const status = taskStatusMeta(task.status);
   const priority = priorityMeta(task.priority);
   const type = taskTypeMeta(task.type);
   const at = task.lastMessageAt ?? task.startedAt ?? task.createdAt;
+  const cardCount = task.promptCards?.length ?? task.promptCardIds?.length ?? 0;
 
   return (
     <button type="button" className="ws-task-card" onClick={() => onClick(task)}>
@@ -29,18 +30,21 @@ export function TaskCard({ task, onClick }: TaskCardProps) {
         </span>
       </div>
       <div className="ws-task-card-agent">
-        <Avatar name={task.agentName || '智员'} tone={toneForName(task.agentName || '智员')} size="sm" />
-        <span className="truncate">{task.agentName || '未分配'}</span>
+        <Icon name="user" size={12} />
+        <span className="truncate">{task.executorLabel || 'Aiwo'}</span>
         <Badge tone={status.tone} size="sm" dot>
           {status.label}
         </Badge>
       </div>
       <div className="ws-task-card-foot">
         <span className="chip">{taskSourceLabel(task.source)}</span>
-        <span className="ws-task-card-stat">
-          <Icon name="mail" size={11} />
-          {fmtInt(task.messageCount)}
-        </span>
+        {task.instanceName ? (
+          <span className="chip">
+            <Icon name="server" size={11} />
+            {task.instanceName}
+          </span>
+        ) : null}
+        {cardCount > 0 ? <span className="chip">{cardCount} 提示词</span> : null}
         <span className="ws-task-card-stat ws-task-card-time">
           <Icon name="clock" size={11} />
           {fmtRelative(at)}

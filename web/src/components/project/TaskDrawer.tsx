@@ -4,7 +4,6 @@ import { api } from '@lib/api.ts';
 import { fmtDateTime, fmtDuration, fmtInt, fmtRelative } from '@lib/format.ts';
 import { useAsync, useInterval } from '@lib/hooks.ts';
 import {
-  Avatar,
   Badge,
   Button,
   Callout,
@@ -26,10 +25,10 @@ import { Markdown } from './Markdown.tsx';
 import {
   isActiveTask,
   priorityMeta,
+  promptCardCategoryMeta,
   taskSourceLabel,
   taskStatusMeta,
   taskTypeMeta,
-  toneForName,
 } from './meta.ts';
 
 
@@ -202,11 +201,11 @@ export function TaskDrawer({ taskId, onClose, onChanged, inline = false }: TaskD
     }, projectId);
   }, [taskId, projectId, refresh]);
 
-  const memoryAgentId = detail?.memory.agentMemoryId;
+  const memoryAgentId = detail?.memory.memoryAgentId;
   const memory = useAsync(
     () => api.memoryContext(projectId, memoryAgentId, task?.title),
     [memoryOpen, projectId, memoryAgentId, task?.title],
-    memoryOpen && Boolean(memoryAgentId),
+    memoryOpen && projectDetail.project.mnemosConfigured,
   );
 
   const notifyChanged = useCallback(() => {
@@ -244,7 +243,7 @@ export function TaskDrawer({ taskId, onClose, onChanged, inline = false }: TaskD
         onClose={() => setConfirmCancel(false)}
         onConfirm={() => void handleCancel()}
         title="取消任务"
-        description={`确认取消「${task?.title ?? ''}」？智员将停止执行该任务，操作不可撤销。`}
+        description={`确认取消「${task?.title ?? ''}」？Aiwo 将停止执行该任务，操作不可撤销。`}
         confirmLabel="取消任务"
         loading={cancelling}
       />
@@ -310,13 +309,13 @@ export function TaskDrawer({ taskId, onClose, onChanged, inline = false }: TaskD
             </div>
 
             <div className="ws-meta-grid">
-              <MetaItem label="智员">
+              <MetaItem label="执行人">
                 <span className="hstack gap-6">
-                  <Avatar name={task.agentName || '智员'} tone={toneForName(task.agentName || '智员')} size="sm" />
-                  {task.agentName || '未分配'}
+                  <Icon name="user" size={12} />
+                  {task.executorLabel || 'Aiwo'}
                 </span>
               </MetaItem>
-              <MetaItem label="实例">{task.instanceName || '未分配实例'}</MetaItem>
+              <MetaItem label="实例">{task.instanceName || '自动分配'}</MetaItem>
               <MetaItem label="创建人">{task.createdByName || '—'}</MetaItem>
               <MetaItem label="创建时间">{fmtDateTime(task.createdAt)}</MetaItem>
               <MetaItem label="开始时间">{task.startedAt ? fmtDateTime(task.startedAt) : '—'}</MetaItem>
@@ -325,19 +324,44 @@ export function TaskDrawer({ taskId, onClose, onChanged, inline = false }: TaskD
               <MetaItem label="最近更新">{task.lastMessageAt ? fmtRelative(task.lastMessageAt) : '—'}</MetaItem>
             </div>
 
+            {task.promptCards?.length > 0 || task.promptCardIds?.length > 0 ? (
+              <div className="ws-drawer-section">
+                <SectionHead
+                  title="引用提示词"
+                  desc={`${task.promptCards?.length || task.promptCardIds?.length || 0} 张卡片会随任务一起注入`}
+                />
+                <div className="chip-row">
+                  {task.promptCards?.length > 0
+                    ? task.promptCards.map((card) => {
+                        const category = promptCardCategoryMeta(card.category);
+                        return (
+                          <span className="chip" key={card.id} title={card.name}>
+                            <Icon name="book" size={11} />
+                            {card.name}
+                            <Badge tone={category.tone} size="sm">
+                              {category.label}
+                            </Badge>
+                          </span>
+                        );
+                      })
+                    : (task.promptCardIds ?? []).map((id) => (
+                        <span className="chip mono" key={id}>
+                          {id.slice(0, 12)}
+                        </span>
+                      ))}
+                </div>
+              </div>
+            ) : null}
+
             {memoryOpen ? (
               <div className="ws-drawer-section">
                 <SectionHead
                   title="记忆上下文"
-                  desc={memoryAgentId ? `Mnemos 智员标识 ${memoryAgentId}` : '项目尚未关联记忆智员'}
+                  desc={memoryAgentId ? `Mnemos 记忆身份 ${memoryAgentId}` : '将使用项目默认记忆身份'}
                 />
                 {!projectDetail.project.mnemosConfigured ? (
                   <Callout tone="amber" icon="alert">
                     该项目尚未配置 Mnemos 集成，任务不会注入项目记忆。可在「设置 → Mnemos 集成」中补充项目 ID 与 API Key。
-                  </Callout>
-                ) : !memoryAgentId ? (
-                  <Callout tone="amber" icon="alert">
-                    当前智员未设置 memoryAgentId，无法生成记忆上下文。可在「智员」页编辑绑定信息并补充记忆智员标识。
                   </Callout>
                 ) : memory.loading && !memory.data ? (
                   <Skeleton h={110} style={{ borderRadius: 12 }} />
@@ -432,7 +456,7 @@ export function TaskDrawer({ taskId, onClose, onChanged, inline = false }: TaskD
                   <TaskConversation
                     events={runtimeEvents}
                     running={isActiveTask(task.status)}
-                    agentName={task.agentName}
+                    executorLabel={task.executorLabel}
                   />
                   <div className="ws-rt-toolbar">
                     <button
@@ -470,7 +494,7 @@ export function TaskDrawer({ taskId, onClose, onChanged, inline = false }: TaskD
             <h1 className="ws-task-page-title">{task?.title ?? '任务详情'}</h1>
             <div className="tiny dim">
               {task
-                ? `#${task.id.slice(0, 12)} · ${taskSourceLabel(task.source)} · ${task.agentName || '未分配智员'}`
+                ? `#${task.id.slice(0, 12)} · ${taskSourceLabel(task.source)} · ${task.executorLabel || 'Aiwo'}`
                 : '正在加载任务…'}
             </div>
           </div>
@@ -495,7 +519,7 @@ export function TaskDrawer({ taskId, onClose, onChanged, inline = false }: TaskD
         title={task ? task.title : '任务详情'}
         subtitle={
           task
-            ? `#${task.id.slice(0, 8)} · ${taskSourceLabel(task.source)} · ${task.agentName || '未分配智员'}`
+            ? `#${task.id.slice(0, 8)} · ${taskSourceLabel(task.source)} · ${task.executorLabel || 'Aiwo'}`
             : '正在加载任务…'
         }
       >

@@ -1,7 +1,12 @@
 {
-  "name": "@hive/server",
+  "name": "@aiwo/server",
   "private": true,
   "type": "module",
-  "dependencies": { "zod": "3.25.76" },
-  "devDependencies": { "@types/node": "^24.10.1", "typescript": "^5.9.3" }
+  "dependencies": {
+    "zod": "3.25.76"
+  },
+  "devDependencies": {
+    "@types/node": "^24.10.1",
+    "typescript": "^5.9.3"
+  }
 }

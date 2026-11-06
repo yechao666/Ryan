@@ -1,16 +1,17 @@
 import { NavLink, Outlet, useLocation } from 'react-router-dom';
 import { Avatar, Badge, Dot, Icon, type IconName } from '@ui';
 import { useAuth } from '../../lib/auth.tsx';
-import { APP_NAME, APP_TAGLINE } from '@shared';
+import { APP_NAME, APP_TAGLINE, APP_VERSION } from '@shared';
 import { Assistant } from '../assistant/index.ts';
 
 const NAV: { to: string; label: string; icon: IconName; end?: boolean }[] = [
   { to: '/', label: '概览', icon: 'dashboard', end: true },
   { to: '/projects', label: '项目', icon: 'folder' },
   { to: '/teams', label: '团队', icon: 'users' },
-  { to: '/agents', label: '智员', icon: 'bot' },
   { to: '/instances', label: '实例', icon: 'server' },
   { to: '/tasks', label: '任务', icon: 'list' },
+  { to: '/prompt-cards', label: '提示词', icon: 'book' },
+  { to: '/settings', label: '系统设置', icon: 'settings' },
 ];
 
 export function Shell() {
@@ -22,7 +23,7 @@ export function Shell() {
     <div className="shell">
       <aside className="sidebar">
         <div className="sidebar-brand">
-          <div className="brand-mark">H</div>
+          <div className="brand-mark">A</div>
           <div>
             <div className="brand-name">{APP_NAME}</div>
             <div className="brand-sub">{APP_TAGLINE}</div>
@@ -45,7 +46,7 @@ export function Shell() {
         </nav>
         <div className="sidebar-hint">
           <div className="sidebar-hint__title">工作方式</div>
-          <p>人员管理智员，智员加入项目后共享项目记忆；任务由人员、自动化或仓库事件触发。</p>
+          <p>人员 @Aiwo 创建项目与任务，提示词卡片定义工作方式，DSH 实例负责执行；安全检查组拦截高风险输入。</p>
         </div>
         <div className="sidebar-footer">
           <div className="sidebar-person">
@@ -60,7 +61,7 @@ export function Shell() {
           </div>
           <div className="sidebar-status">
             <Dot tone="green" pulse /> 服务正常
-            <Badge tone="slate">v0.1.0</Badge>
+            <Badge tone="slate">v{APP_VERSION}</Badge>
           </div>
         </div>
       </aside>

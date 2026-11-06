@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import type { Automation, AutomationTrigger, CreateAutomationInput, ProjectAgent } from '@shared';
+import type { Automation, AutomationTrigger, CreateAutomationInput } from '@shared';
 import { AUTOMATION_TRIGGERS } from '@shared';
 import { api } from '@lib/api.ts';
 import {
@@ -16,19 +16,18 @@ import {
 } from '@ui';
 import { useProject } from './context.ts';
 import { PROMPT_PLACEHOLDERS, WEBHOOK_EVENTS } from './meta.ts';
+import { ProjectInstanceSelect, PromptCardPicker } from './PromptCardPicker.tsx';
 
 export interface AutomationFormProps {
   open: boolean;
   /** 传入自动化即为编辑，null 为新建。 */
   automation: Automation | null;
-  agents: ProjectAgent[];
   onClose: () => void;
   onSaved: () => void;
 }
 
 interface FormErrors {
   name?: string;
-  agentId?: string;
   events?: string;
   schedule?: string;
   promptTemplate?: string;
@@ -36,14 +35,15 @@ interface FormErrors {
 
 const TRIGGER_OPTIONS = AUTOMATION_TRIGGERS.map((item) => ({ value: item.value, label: item.label }));
 
-/** 新建 / 编辑自动化弹窗。 */
-export function AutomationForm({ open, automation, agents, onClose, onSaved }: AutomationFormProps) {
+/** 新建 / 编辑自动化弹窗：触发规则 + 提示词卡片 + 可选 DSH 实例。 */
+export function AutomationForm({ open, automation, onClose, onSaved }: AutomationFormProps) {
   const { detail } = useProject();
   const projectId = detail.project.id;
   const toast = useToast();
 
   const [name, setName] = useState('');
-  const [agentId, setAgentId] = useState('');
+  const [promptCardIds, setPromptCardIds] = useState<string[]>([]);
+  const [instanceId, setInstanceId] = useState('');
   const [triggerType, setTriggerType] = useState<AutomationTrigger>('manual');
   const [events, setEvents] = useState<string[]>([]);
   const [secret, setSecret] = useState('');
@@ -58,7 +58,8 @@ export function AutomationForm({ open, automation, agents, onClose, onSaved }: A
     setErrors({});
     if (automation) {
       setName(automation.name);
-      setAgentId(automation.agentId);
+      setPromptCardIds(automation.promptCardIds ?? []);
+      setInstanceId(automation.instanceId ?? '');
       setTriggerType(automation.triggerType);
       setEvents(automation.triggerConfig.events ?? []);
       setSecret(automation.triggerConfig.secret ?? '');
@@ -67,7 +68,8 @@ export function AutomationForm({ open, automation, agents, onClose, onSaved }: A
       setEnabled(automation.enabled);
     } else {
       setName('');
-      setAgentId('');
+      setPromptCardIds([]);
+      setInstanceId('');
       setTriggerType('manual');
       setEvents(['push']);
       setSecret('');
@@ -77,17 +79,6 @@ export function AutomationForm({ open, automation, agents, onClose, onSaved }: A
     }
   }, [open, automation]);
 
-  // 绑定智员异步加载完成后，为新建表单补一个默认值。
-  useEffect(() => {
-    if (!open || automation || agentId) return;
-    if (agents.length > 0) setAgentId(agents[0]?.agentId ?? '');
-  }, [open, automation, agentId, agents.length]);
-
-  const agentOptions = agents.map((item) => ({
-    value: item.agentId,
-    label: `${item.agent.name}${item.role ? ` · ${item.role}` : ''}`,
-  }));
-
   const toggleEvent = (value: string) => {
     setEvents((prev) => (prev.includes(value) ? prev.filter((item) => item !== value) : [...prev, value]));
   };
@@ -95,7 +86,6 @@ export function AutomationForm({ open, automation, agents, onClose, onSaved }: A
   const handleSubmit = async () => {
     const nextErrors: FormErrors = {};
     if (!name.trim()) nextErrors.name = '请填写自动化名称';
-    if (!agentId) nextErrors.agentId = '请选择执行智员';
     if (triggerType === 'webhook' && events.length === 0) nextErrors.events = '至少选择一个 Webhook 事件';
     if (triggerType === 'cron' && !schedule.trim()) nextErrors.schedule = '请填写 5 段 cron 表达式';
     if (!promptTemplate.trim()) nextErrors.promptTemplate = '请填写提示词模板';
@@ -104,7 +94,6 @@ export function AutomationForm({ open, automation, agents, onClose, onSaved }: A
 
     const payload: CreateAutomationInput = {
       name: name.trim(),
-      agentId,
       triggerType,
       triggerConfig:
         triggerType === 'webhook'
@@ -113,6 +102,8 @@ export function AutomationForm({ open, automation, agents, onClose, onSaved }: A
             ? { schedule: schedule.trim() }
             : {},
       promptTemplate: promptTemplate.trim(),
+      promptCardIds,
+      instanceId: instanceId || undefined,
       enabled,
     };
 
@@ -139,44 +130,24 @@ export function AutomationForm({ open, automation, agents, onClose, onSaved }: A
       onClose={onClose}
       size="lg"
       title={automation ? '编辑自动化' : '新建自动化'}
-      description="把仓库事件、定时任务或人工操作转换成智员任务。"
+      description="把仓库事件、定时任务或人工操作转换成 Aiwo 任务。"
       footer={
         <>
           <Button variant="ghost" onClick={onClose}>
             取消
           </Button>
-          <Button
-            variant="primary"
-            icon="check"
-            loading={submitting}
-            disabled={!agentOptions.length}
-            onClick={() => void handleSubmit()}
-          >
+          <Button variant="primary" icon="check" loading={submitting} onClick={() => void handleSubmit()}>
             {automation ? '保存修改' : '创建自动化'}
           </Button>
         </>
       }
     >
-      {!agentOptions.length ? (
-        <Callout tone="amber" icon="alert">
-          该项目还没有可用的智员，请先在「智员」页关联智员后再创建自动化。
-        </Callout>
-      ) : null}
-
       <div className="ws-form-grid">
         <Field label="名称" required error={errors.name}>
           <Input
             value={name}
             placeholder="例如：PR 自动审查"
             onChange={(event) => setName(event.target.value)}
-          />
-        </Field>
-
-        <Field label="执行智员" required error={errors.agentId}>
-          <Select
-            value={agentId}
-            options={agentOptions}
-            onChange={(event) => setAgentId(event.target.value)}
           />
         </Field>
 
@@ -258,6 +229,26 @@ export function AutomationForm({ open, automation, agents, onClose, onSaved }: A
           </code>
         ))}
       </div>
+
+      <PromptCardPicker
+        projectId={projectId}
+        open={open}
+        value={promptCardIds}
+        onChange={setPromptCardIds}
+      />
+
+      <ProjectInstanceSelect
+        projectId={projectId}
+        open={open}
+        value={instanceId}
+        onChange={setInstanceId}
+      />
+
+      {!detail.project.mnemosConfigured ? (
+        <Callout tone="amber" icon="info">
+          项目尚未配置 Mnemos，自动化创建的任务不会注入项目记忆；可在「设置 → Mnemos 集成」中补充。
+        </Callout>
+      ) : null}
     </Modal>
   );
 }

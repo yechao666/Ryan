@@ -18,7 +18,7 @@ import { newId } from '../../lib/ids.ts';
 import { renderTemplate } from '../../runtime/template.ts';
 import { verifyGithubSignature, verifyGitlabToken } from '../../runtime/signature.ts';
 import { parseTriggerConfig, type AutomationRow } from './automations.ts';
-import { createTaskRecord, truncateSummary } from './tasks.ts';
+import { createTaskRecord, parseStringArray, truncateSummary } from './tasks.ts';
 
 type Provider = 'github' | 'gitlab';
 
@@ -299,10 +299,11 @@ async function handleInbound(rc: RequestContext, provider: Provider, normalize: 
       ).run(deliveryRowId, project.id, provider, normalized.deliveryId, normalized.event, now);
       const created = createTaskRecord(db, rc.app.bus, {
         projectId: project.id,
-        agentId: automation.agent_id,
         source: 'webhook',
         title,
         prompt,
+        promptCardIds: parseStringArray(automation.prompt_card_ids),
+        instanceId: automation.instance_id,
         priority: 0,
         createdBy: null,
         dedupeKey,

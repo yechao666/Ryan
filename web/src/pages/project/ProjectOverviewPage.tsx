@@ -1,10 +1,9 @@
-import { useMemo, useState } from 'react';
+import { useMemo } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { api } from '@lib/api.ts';
 import { fmtInt, fmtRelative } from '@lib/format.ts';
 import { useAsync } from '@lib/hooks.ts';
 import {
-  Avatar,
   Badge,
   Callout,
   Card,
@@ -13,29 +12,21 @@ import {
   ErrorState,
   Icon,
   SectionHead,
-  Select,
   Skeleton,
   Stat,
 } from '@ui';
 import { ActivityFeed } from '../../components/project/ActivityFeed.tsx';
-import {
-  isActiveTask,
-  priorityMeta,
-  taskStatusMeta,
-  toneForName,
-} from '../../components/project/meta.ts';
+import { isActiveTask, priorityMeta, taskStatusMeta } from '../../components/project/meta.ts';
 import { useProject } from '../ProjectLayout.tsx';
 
-/** 项目概览：核心指标、正在工作的任务、项目智员、最近活动与记忆简报。 */
+/** 项目概览：核心指标、正在工作的任务、最近任务、最近活动与记忆简报。 */
 export function ProjectOverviewPage() {
-  const { detail, reload } = useProject();
+  const { detail } = useProject();
   const navigate = useNavigate();
   const projectId = detail.project.id;
-  const counts = detail.project.counts ?? { agents: 0, tasks: 0, activeTasks: 0, instances: 0, members: 0 };
-  const [memoryAgentId, setMemoryAgentId] = useState('');
+  const counts = detail.project.counts ?? { promptCards: 0, tasks: 0, activeTasks: 0, instances: 0, members: 0 };
 
   const tasks = useAsync(() => api.tasks({ projectId, limit: 60 }), [projectId]);
-  const agents = useAsync(() => api.projectAgents(projectId), [projectId]);
   const activity = useAsync(() => api.activity(projectId, 8), [projectId]);
 
   const taskList = tasks.data ?? [];
@@ -50,24 +41,18 @@ export function ProjectOverviewPage() {
         ),
     [taskList],
   );
+  const recentTasks = useMemo(
+    () => [...taskList].sort((a, b) => b.createdAt.localeCompare(a.createdAt)).slice(0, 6),
+    [taskList],
+  );
   const queuedCount = taskList.filter((task) => isActiveTask(task.status) && task.status !== 'running').length;
   const waitingCount = taskList.filter((task) => task.status === 'waiting_input').length;
 
-  const memoryOptions = useMemo(
-    () =>
-      (agents.data ?? [])
-        .filter((item) => Boolean(item.memoryAgentId))
-        .map((item) => ({ value: item.agentId, label: item.agent.name })),
-    [agents.data],
-  );
-  const selectedMemoryId = memoryOptions.some((option) => option.value === memoryAgentId)
-    ? memoryAgentId
-    : (memoryOptions[0]?.value ?? '');
-
+  const memoryAgentId = detail.project.memoryAgentId;
   const memoryContext = useAsync(
-    () => api.memoryContext(projectId, selectedMemoryId),
-    [projectId, selectedMemoryId],
-    Boolean(selectedMemoryId) && detail.project.mnemosConfigured,
+    () => api.memoryContext(projectId, memoryAgentId),
+    [projectId, memoryAgentId],
+    detail.project.mnemosConfigured,
   );
 
   const preview = useMemo(() => {
@@ -78,6 +63,7 @@ export function ProjectOverviewPage() {
   }, [memoryContext.data]);
 
   const base = `/projects/${encodeURIComponent(projectId)}`;
+  const openTask = (taskId: string) => navigate(`${base}/tasks/${encodeURIComponent(taskId)}`);
 
   return (
     <div className="ws-page">
@@ -87,7 +73,7 @@ export function ProjectOverviewPage() {
             <Icon name="dashboard" size={15} />
             项目概览
           </div>
-          <div className="card-sub">实时掌握智员分工、任务进展与项目记忆状态。</div>
+          <div className="card-sub">实时掌握任务进展、DSH 实例与项目记忆状态。</div>
         </div>
         <div className="hstack gap-8">
           <Link className="ws-link small" to={`${base}/tasks`}>
@@ -113,18 +99,18 @@ export function ProjectOverviewPage() {
           hint={waitingCount > 0 ? `${waitingCount} 个等待输入` : `${queuedCount} 个排队中`}
         />
         <Stat
-          label="项目智员"
-          value={fmtInt(counts.agents)}
-          icon="bot"
+          label="提示词卡片"
+          value={fmtInt(counts.promptCards)}
+          icon="book"
           tone="pink"
-          hint="已加入项目的智员数"
+          hint="项目级提示词卡片"
         />
         <Stat
           label="DSH 实例"
           value={fmtInt(counts.instances)}
           icon="server"
           tone="green"
-          hint="已注册的运行时"
+          hint="已绑定项目的运行时"
         />
       </div>
 
@@ -138,7 +124,7 @@ export function ProjectOverviewPage() {
                   正在工作
                 </>
               }
-              desc="执行中或等待人工输入的智员任务"
+              desc="执行中或等待人工输入的任务"
               actions={
                 <Link className="ws-link small" to={`${base}/tasks`}>
                   任务看板
@@ -157,9 +143,9 @@ export function ProjectOverviewPage() {
                 <ErrorState message={tasks.error} onRetry={() => void tasks.refresh()} />
               ) : workingTasks.length === 0 ? (
                 <EmptyState
-                  icon="bot"
+                  icon="list"
                   title="当前没有正在执行的任务"
-                  description="创建任务后，智员会在实例上接单并开始执行。"
+                  description="创建任务后，绑定项目的 DSH 实例会领取并交给 Aiwo 执行。"
                   action={
                     <Link className="btn btn-sm btn-outline" to={`${base}/tasks?new=1`}>
                       <Icon name="plus" size={13} />
@@ -179,7 +165,7 @@ export function ProjectOverviewPage() {
                         type="button"
                         key={task.id}
                         className="ws-working-row"
-                        onClick={() => navigate(`/projects/${encodeURIComponent(detail.project.id)}/tasks/${encodeURIComponent(task.id)}`)}
+                        onClick={() => openTask(task.id)}
                       >
                         <span className={`ws-working-icon tone-${status.tone}`}>
                           <Icon name={status.icon} size={14} />
@@ -187,7 +173,8 @@ export function ProjectOverviewPage() {
                         <span className="ws-working-main">
                           <span className="ws-working-title truncate">{task.title}</span>
                           <span className="tiny dim ws-working-sub">
-                            {task.agentName || '未分配智员'} · {fmtRelative(at)}
+                            {task.executorLabel || 'Aiwo'}
+                            {task.instanceName ? ` · ${task.instanceName}` : ''} · {fmtRelative(at)}
                           </span>
                         </span>
                         <Badge tone={status.tone} size="sm" dot>
@@ -212,7 +199,7 @@ export function ProjectOverviewPage() {
                   最近活动
                 </>
               }
-              desc="项目内任务、实例与成员的最新动态"
+              desc="项目内任务与实例的最新动态"
               actions={
                 <Link className="ws-link small" to={`${base}/activity`}>
                   实时活动
@@ -239,59 +226,67 @@ export function ProjectOverviewPage() {
             <SectionHead
               title={
                 <>
-                  <Icon name="bot" size={14} />
-                  项目智员
+                  <Icon name="list" size={14} />
+                  最近任务
                 </>
               }
-              desc={`${(agents.data ?? []).length} 位智员已加入项目`}
+              desc={`${taskList.length} 个任务，按创建时间倒序`}
               actions={
-                <Link className="ws-link small" to={`${base}/agents`}>
-                  管理
+                <Link className="ws-link small" to={`${base}/tasks`}>
+                  查看全部
                   <Icon name="arrowRight" size={12} />
                 </Link>
               }
             />
             <div className="mt-12">
-              {agents.loading && !agents.data ? (
+              {tasks.loading && !tasks.data ? (
                 <div className="vstack gap-8">
                   {[0, 1].map((item) => (
                     <Skeleton key={item} h={44} style={{ borderRadius: 10 }} />
                   ))}
                 </div>
-              ) : agents.error ? (
-                <ErrorState message={agents.error} onRetry={() => void agents.refresh()} />
-              ) : !agents.data?.length ? (
+              ) : tasks.error ? (
+                <ErrorState message={tasks.error} onRetry={() => void tasks.refresh()} />
+              ) : !recentTasks.length ? (
                 <EmptyState
-                  icon="bot"
-                  title="还没有关联智员"
-                  description="把智员加入项目后，它们才能领取任务并共享项目记忆。"
+                  icon="list"
+                  title="还没有任务"
+                  description="创建第一个任务，由 DSH 实例交给 Aiwo 执行。"
                   action={
-                    <Link className="btn btn-sm btn-outline" to={`${base}/agents`}>
-                      <Icon name="link" size={13} />
-                      关联智员
+                    <Link className="btn btn-sm btn-outline" to={`${base}/tasks?new=1`}>
+                      <Icon name="plus" size={13} />
+                      新建任务
                     </Link>
                   }
                   compact
                 />
               ) : (
-                <div className="ws-agent-mini-grid">
-                  {agents.data.map((item) => (
-                    <Link
-                      key={item.id}
-                      to={`${base}/agents`}
-                      className="ws-agent-mini"
-                      title={`${item.agent.name} · ${item.role || item.agent.role}`}
-                    >
-                      <Avatar name={item.agent.name} tone={toneForName(item.agent.name)} />
-                      <span className="ws-agent-mini-main">
-                        <span className="ws-agent-mini-name truncate">{item.agent.name}</span>
-                        <span className="tiny dim truncate">{item.role || item.agent.role || '未设置角色'}</span>
-                      </span>
-                      <Badge tone={item.onlineInstances > 0 ? 'green' : 'slate'} size="sm" dot>
-                        {item.onlineInstances} 实例
-                      </Badge>
-                    </Link>
-                  ))}
+                <div className="ws-working-list">
+                  {recentTasks.map((task) => {
+                    const status = taskStatusMeta(task.status);
+                    return (
+                      <button
+                        type="button"
+                        key={task.id}
+                        className="ws-working-row"
+                        onClick={() => openTask(task.id)}
+                      >
+                        <span className={`ws-working-icon tone-${status.tone}`}>
+                          <Icon name={status.icon} size={14} />
+                        </span>
+                        <span className="ws-working-main">
+                          <span className="ws-working-title truncate">{task.title}</span>
+                          <span className="tiny dim ws-working-sub">
+                            {task.executorLabel || 'Aiwo'}
+                            {task.instanceName ? ` · ${task.instanceName}` : ''} · {fmtRelative(task.createdAt)}
+                          </span>
+                        </span>
+                        <Badge tone={status.tone} size="sm" dot>
+                          {status.label}
+                        </Badge>
+                      </button>
+                    );
+                  })}
                 </div>
               )}
             </div>
@@ -305,7 +300,7 @@ export function ProjectOverviewPage() {
                   记忆简报
                 </>
               }
-              desc="智员执行任务时自动注入的项目记忆"
+              desc="任务执行时自动注入的项目记忆"
               actions={
                 <Link className="ws-link small" to={`${base}/memory`}>
                   记忆中心
@@ -321,63 +316,37 @@ export function ProjectOverviewPage() {
                     前往设置
                   </Link>
                 </Callout>
-              ) : agents.loading && !agents.data ? (
+              ) : memoryContext.loading && !memoryContext.data ? (
                 <Skeleton h={124} style={{ borderRadius: 10 }} />
-              ) : !memoryOptions.length ? (
-                <EmptyState
-                  icon="brain"
-                  title="暂无记忆智员"
-                  description="关联智员并设置记忆智员标识后，这里会展示记忆简报。"
-                  action={
-                    <Link className="btn btn-sm btn-outline" to={`${base}/agents`}>
-                      <Icon name="link" size={13} />
-                      关联智员
-                    </Link>
-                  }
-                  compact
-                />
-              ) : (
+              ) : memoryContext.error ? (
+                <ErrorState message={memoryContext.error} onRetry={() => void memoryContext.refresh()} />
+              ) : memoryContext.data && !memoryContext.data.configured ? (
+                <Callout tone="amber" icon="alert">
+                  {memoryContext.data.error ?? 'Mnemos 尚未就绪，暂时无法读取项目记忆。'}
+                </Callout>
+              ) : memoryContext.data ? (
                 <>
-                  <Select
-                    value={selectedMemoryId}
-                    options={memoryOptions}
-                    onChange={(event) => setMemoryAgentId(event.target.value)}
-                  />
-                  <div className="mt-12">
-                    {memoryContext.loading && !memoryContext.data ? (
-                      <Skeleton h={124} style={{ borderRadius: 10 }} />
-                    ) : memoryContext.error ? (
-                      <ErrorState message={memoryContext.error} onRetry={() => void memoryContext.refresh()} />
-                    ) : memoryContext.data && !memoryContext.data.configured ? (
-                      <Callout tone="amber" icon="alert">
-                        {memoryContext.data.error ?? 'Mnemos 尚未就绪，暂时无法读取项目记忆。'}
-                      </Callout>
-                    ) : memoryContext.data ? (
-                      <>
-                        <pre className="ws-mem-preview">{preview || '（当前没有可用的记忆上下文）'}</pre>
-                        <div className="ws-mem-foot">
-                          <span className="tiny dim">约 {fmtInt(memoryContext.data.tokenEstimate)} tokens</span>
-                          <div className="hstack gap-4">
-                            <CopyButton value={memoryContext.data.prompt} label="复制" />
-                            <Link
-                              className="ws-link small"
-                              to={`${base}/memory?agentId=${encodeURIComponent(selectedMemoryId)}`}
-                            >
-                              查看完整
-                              <Icon name="arrowRight" size={12} />
-                            </Link>
-                          </div>
-                        </div>
-                      </>
-                    ) : null}
+                  <div className="tiny dim" style={{ marginBottom: 8 }}>
+                    记忆身份{' '}
+                    <span className="mono">{memoryAgentId || `aiwo_${detail.project.slug.replace(/-/g, '_')}`}</span>
+                  </div>
+                  <pre className="ws-mem-preview">{preview || '（当前没有可用的记忆上下文）'}</pre>
+                  <div className="ws-mem-foot">
+                    <span className="tiny dim">约 {fmtInt(memoryContext.data.tokenEstimate)} tokens</span>
+                    <div className="hstack gap-4">
+                      <CopyButton value={memoryContext.data.prompt} label="复制" />
+                      <Link className="ws-link small" to={`${base}/memory`}>
+                        查看完整
+                        <Icon name="arrowRight" size={12} />
+                      </Link>
+                    </div>
                   </div>
                 </>
-              )}
+              ) : null}
             </div>
           </Card>
         </div>
       </div>
-
     </div>
   );
 }

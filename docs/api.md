@@ -1,96 +1,111 @@
-# Hive API 速览
+# Aiwo API
 
-所有控制台接口为 JSON + 会话令牌：`Authorization: Bearer hive_sess_...`。
-运行时接口用 Agent / Instance 令牌：`Authorization: Bearer hive_agt_... | hive_inst_...`。
+Base URL: `http://127.0.0.1:4500`。控制台使用会话 Bearer token；实例运行时使用 `aiwo_ins_...` token；助手使用当前人员 token。
 
-## 认证与元信息
+## 认证 / 人员 / 团队 / 项目
 
-| 方法 | 路径 | 说明 |
+| Method | Path | 说明 |
 | --- | --- | --- |
-| POST | `/api/auth/login` | `{email,password}` → `{token, person}` |
+| POST | `/api/auth/login` | `{email,password}` → `{token,person}` |
 | GET | `/api/auth/me` | 当前人员 |
-| POST | `/api/auth/logout` | 注销会话 |
-| GET | `/api/meta` | 产品名、版本、演示账号 |
-| GET | `/api/health` | 健康检查 |
+| GET | `/api/persons` | 人员列表 |
+| GET/POST | `/api/teams` | 团队列表 / 创建 |
+| GET/PATCH | `/api/teams/:id` | 团队详情 / 更新 |
+| POST/DELETE | `/api/teams/:id/members` | 加人 / 移除成员 |
+| GET/POST | `/api/projects` | 项目列表 / 创建 |
+| GET/PATCH/DELETE | `/api/projects/:id` | 项目详情 / 更新 / 删除 |
+| POST/DELETE | `/api/projects/:id/members` | 项目成员 |
 
-## 概览 / 团队 / 人员 / 项目
+项目字段：`name,slug,description,ownerTeamId,visibility,type,prompt,repoUrl,mnemosProjectId,mnemosApiKey,memoryAgentId`。
 
-| 方法 | 路径 | 说明 |
+## 提示词卡片（Aiwo 没有智员，用卡片复用工作流/风格/标准）
+
+| Method | Path | 说明 |
 | --- | --- | --- |
-| GET | `/api/dashboard` | 当前人的概览数据 |
-| GET | `/api/persons` | 人员列表（选择器） |
-| GET | `/api/teams` | 我的团队（admin 全部） |
-| POST | `/api/teams` | 创建团队（admin） |
-| GET | `/api/teams/:id` | `{team, members, projects}` |
-| PATCH | `/api/teams/:id` | 更新团队（lead/admin） |
-| POST/DELETE | `/api/teams/:id/members[/:personId]` | 成员管理 |
-| GET | `/api/projects` | 我可查看的项目（含 counts） |
-| POST | `/api/projects` | 创建项目 |
-| GET | `/api/projects/:id` | `{project, members, team}` |
-| PATCH | `/api/projects/:id` | 项目设置（manage） |
-| DELETE | `/api/projects/:id` | 删除项目（owner/admin） |
-| POST/DELETE | `/api/projects/:id/members[/:personId]` | 项目成员 |
-| GET/POST | `/api/projects/:id/agents` | 项目智员 / 关联智员 |
-| PATCH/DELETE | `/api/projects/:id/agents/:agentId` | 更新/解除绑定 |
+| GET | `/api/prompt-cards` | 当前人员可见卡片；可选 `?projectId=&category=` |
+| GET | `/api/projects/:id/prompt-cards` | 项目可引用的组织/团队/项目卡片 |
+| POST | `/api/prompt-cards` | `{name,category,description,content,scope,projectId?,teamId?,enabled}` |
+| PATCH/DELETE | `/api/prompt-cards/:id` | 编辑 / 删除 |
 
-项目可见性：`private | team | public`；项目角色：`owner | maintainer | developer | reporter`。
-响应中的项目只返回 `mnemosConfigured`，**永不返回 API Key 明文**。
+scope：`org | team | project`；category：`workflow | style | standard | role | other`。
 
-## 智员 / 令牌 / 实例
+## DSH 实例资源
 
-| 方法 | 路径 | 说明 |
+| Method | Path | 说明 |
 | --- | --- | --- |
-| GET | `/api/agents?scope=mine|all` | 智员列表（含 stats） |
-| POST | `/api/agents` | 创建智员 |
-| GET | `/api/agents/:id` | `{agent, projects, tokens, instances}` |
-| PATCH | `/api/agents/:id` | 更新智员（所有者/admin） |
-| POST | `/api/agents/:id/tokens` | 创建 Agent 令牌（secret 仅一次） |
-| DELETE | `/api/agents/:id/tokens/:tokenId` | 吊销令牌 |
-| GET | `/api/instances` | 我的智员实例（admin 全部） |
+| GET | `/api/instances` | 实例列表（含绑定项目/状态/当前任务） |
+| POST | `/api/instances` | 管理员创建；返回一次性 `token` 与安装命令 |
+| PATCH | `/api/instances/:id` | 名称/host/端口/workspace/绑定项目 |
+| POST | `/api/instances/:id/token` | 轮换实例 token |
+| POST | `/api/instances/:id/test` | 测试插件心跳/在线状态 |
 | DELETE | `/api/instances/:id` | 吊销实例 |
 
-## 任务（控制台）
+创建示例：
 
-| 方法 | 路径 | 说明 |
+```json
+{"name":"远端 DSH","kind":"remote","host":"192.168.1.50","port":4501,"workspacePath":"/srv/aiwo","projectIds":["prj_calc"]}
+```
+
+实例插件安装：
+
+```bash
+node integrations/aiwo-instance/agent.mjs --base http://<aiwo>:4500 --token aiwo_ins_xxx
+```
+
+## 任务
+
+| Method | Path | 说明 |
 | --- | --- | --- |
-| GET | `/api/tasks?projectId=&status=&mine=&limit=` | 任务列表（可见项目） |
-| POST | `/api/projects/:id/tasks` | 创建任务 `{agentId,title,prompt,priority?}` |
-| GET | `/api/tasks/:id` | `{task, messages, events, memory}` |
-| POST | `/api/tasks/:id/messages` | 已禁用：任务执行过程只读，返回 409 |
-| POST | `/api/assistant/chat` | DSH 系统助手；body `{message,pathname,projectId?}`，返回 `{reply,navigate?,sessionId?,instance}` |
+| GET | `/api/tasks` | `?projectId=&status=&type=&mine=&limit=`；返回 `executorLabel`、`promptCards` |
+| GET | `/api/tasks/:id` | `{task,events,memory}` |
+| POST | `/api/projects/:id/tasks` | `{title,prompt,type,promptCardIds,instanceId,priority}` |
 | POST | `/api/tasks/:id/cancel` | 取消任务 |
-| GET | `/api/activity?projectId=&limit=` | 活动流 |
-| GET | `/api/events?token=&projectId=` | SSE（`event: activity`） |
 
-## 运行时（DSH 实例）
+Aiwo 任务执行者固定为「创建人@Aiwo」；任务不支持对话，只展示执行过程。
 
-| 方法 | 路径 | 说明 |
+## 运行时（实例代理使用）
+
+| Method | Path | 说明 |
 | --- | --- | --- |
-| POST | `/api/runtime/instances/register` | Agent 令牌注册实例，返回一次性实例 token |
-| POST | `/api/runtime/instances/heartbeat` | 心跳 |
-| GET | `/api/runtime/me` | 实例、Agent、可访问项目与 memoryAgentId |
-| GET | `/api/runtime/conversations` | 已废弃，始终返回空数组（任务一次性 /goal，不可续聊） |
-| POST | `/api/runtime/tasks/claim` | 领取任务（无任务 204） |
+| POST | `/api/runtime/instances/register` | 实例 token 注册/更新资源信息 |
+| POST | `/api/runtime/instances/heartbeat` | 心跳，返回 pending |
+| POST | `/api/runtime/tasks/claim` | 领取任务；返回 `{task,project,executor,promptCards,memory}` |
 | POST | `/api/runtime/tasks/:id/progress` | 进展 + 续租 |
-| POST | `/api/runtime/tasks/:id/messages` | 已禁用：任务内不支持对话，返回 409 |
-| POST | `/api/runtime/tasks/:id/events` | 批量上报 DSH 运行时事件（实时日志） |
-| GET | `/api/tasks/:id/runtime-events?after=` | 控制台读取运行时日志 |
-| POST | `/api/runtime/tasks/:id/complete` | `{status,summary,decisions?,lessons?}` |
+| POST | `/api/runtime/tasks/:id/events` | 批量运行时事件（≤100） |
+| POST | `/api/runtime/tasks/:id/complete` | `{status,summary,decisions,lessons,sessionId}` |
+| GET | `/api/tasks/:id/runtime-events?after=seq` | 控制台读取运行时事件 |
 
-`claim` 返回 `memory`：`{baseUrl, projectId, apiKey, agentId, enabled}`，实例可直接用该配置访问 Mnemos。
+## 自动化
 
-## 自动化 / Webhook / 记忆
-
-| 方法 | 路径 | 说明 |
+| Method | Path | 说明 |
 | --- | --- | --- |
-| GET/POST | `/api/projects/:id/automations` | 自动化列表 / 创建 |
+| GET/POST | `/api/projects/:id/automations` | 列表 / 创建 |
 | PATCH/DELETE | `/api/automations/:id` | 更新 / 删除 |
-| POST | `/api/automations/:id/run` | 手动运行 → 创建任务 |
+| POST | `/api/automations/:id/run` | 手动运行 |
 | GET | `/api/automations/:id/runs` | 运行历史 |
-| GET | `/api/projects/:id/deliveries` | 入站投递记录 |
-| POST | `/api/integrations/github/:projectId` | `X-Hub-Signature-256` 验签 |
-| POST | `/api/integrations/gitlab/:projectId` | `X-Gitlab-Token` 验签 |
-| GET | `/api/projects/:id/memory/search?q=&agentId=&topK=` | Mnemos 记忆检索 |
-| GET | `/api/projects/:id/memory/context?agentId=&q=` | 任务简报 prompt |
 
-错误统一为 `{error:{code,message,details?,requestId}}`。
+创建：`{name,triggerType:'cron'|'webhook'|'manual',triggerConfig,promptTemplate,promptCardIds,instanceId,enabled}`。
+
+## 记忆（Mnemos）
+
+| Method | Path | 说明 |
+| --- | --- | --- |
+| GET | `/api/projects/:id/memory/search?q=&topK=` | 项目记忆搜索 |
+| GET | `/api/projects/:id/memory/context?q=` | 项目记忆上下文 |
+
+## 系统设置 / 安全检查
+
+| Method | Path | 说明 |
+| --- | --- | --- |
+| GET | `/api/settings` | 安全/助手配置（apiKey 不回显） |
+| PATCH | `/api/settings/security` | `{enabled,endpoint,model,apiKey,timeoutMs,blockMessage}`；endpoint 为空即关闭 |
+| POST | `/api/settings/security/test` | 测试安全模型连通性 |
+| PATCH | `/api/settings/assistant` | `{enabled,instanceId,model}` |
+
+## 助手
+
+| Method | Path | 说明 |
+| --- | --- | --- |
+| POST | `/api/assistant/chat` | `{message,pathname,projectId?,taskId?}` → `{reply,navigate?,sessionId?,instance}` |
+
+助手运行在 DSH headless 实例中，使用当前人员 token 调用上面的开放 API。

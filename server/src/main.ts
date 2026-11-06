@@ -25,14 +25,14 @@ registerRoutes(router, app);
 const stopScheduler = startAutomationScheduler(app);
 const server = createHttpServer(app, router);
 server.listen(env.port, env.host, () => {
-  console.log(`[hive] listening http://${env.host}:${env.port} (demo=${env.demoMode})`);
+  console.log(`[aiwo] listening http://${env.host}:${env.port} (demo=${env.demoMode})`);
 });
 
 let closing = false;
 function shutdown(signal: string): void {
   if (closing) return;
   closing = true;
-  console.log(`[hive] ${signal} received, shutting down`);
+  console.log(`[aiwo] ${signal} received, shutting down`);
   stopScheduler();
   server.close(() => {
     closeDatabase(db);

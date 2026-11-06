@@ -140,7 +140,7 @@ export function ProjectsPage() {
       <PageHead
         eyebrow="项目 · Projects"
         title="项目"
-        desc="项目是智员协作的空间：可见性决定谁能看到，团队决定谁可以加入。"
+        desc="项目是团队协作的空间：可见性决定谁能看到，团队决定谁可以加入。"
         actions={
           <>
             <IconButton icon="refresh" label="刷新项目" onClick={() => void reload()} />
@@ -190,7 +190,7 @@ export function ProjectsPage() {
             <EmptyState
               icon="folder"
               title="还没有项目"
-              description="创建第一个项目，把智员、任务与项目记忆组织到一起。"
+              description="创建第一个项目，把任务、DSH 实例与项目记忆组织到一起。"
               action={
                 <Button variant="primary" icon="plus" onClick={openCreate}>
                   新建项目
@@ -211,7 +211,7 @@ export function ProjectsPage() {
         open={createOpen}
         onClose={closeCreate}
         title="新建项目"
-        description="创建后可在项目工作区关联智员、创建任务与配置记忆。"
+        description="创建后可在项目工作区绑定实例、创建任务与配置记忆。"
         size="lg"
         footer={
           <>
@@ -247,7 +247,7 @@ export function ProjectsPage() {
 
           <Field
             label="项目提示词"
-            hint="项目基本面：目标、规范、约束。领取任务时由 dsh-hive-runtime 注入 DSH 提示词。"
+            hint="项目基本面：目标、规范、约束。任务领取时注入项目提示词与提示词卡片。"
           >
             <Textarea
               rows={4}

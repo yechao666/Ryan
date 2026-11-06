@@ -1,10 +1,11 @@
 /**
- * 身份与权限路由：人员 / 团队 / 项目 / 项目成员 / 项目智员 / 智员 / 令牌 / 实例 / 仪表盘。
+ * 身份与权限路由：人员 / 团队 / 项目 / 项目成员 / 实例 / 仪表盘。
  *
  * 权限统一走 server/src/lib/access.ts 与 http/auth.ts 的 requirePerson / requireAdmin /
  * requireProject / requireTeam；所有响应形状严格对齐 shared/src/types.ts。
  */
 import { z } from 'zod';
+import type { Person } from '../../../../shared/src/types.ts';
 import type { Db } from '../../db/index.ts';
 import { tx } from '../../db/index.ts';
 import type { Router } from '../router.ts';
@@ -16,41 +17,28 @@ import { newId, nowIso, randomToken, sha256, utcDayStart } from '../../lib/ids.t
 import { recordActivity } from '../../lib/activity.ts';
 import { canManageProject, canViewProject, getProjectRow, teamIdsOf } from '../../lib/access.ts';
 import type { ProjectRow } from '../../lib/access.ts';
-import type { AgentToken, Person } from '../../../../shared/src/types.ts';
+
 import {
-  buildAgent,
-  buildProjectAgent,
   buildProjectSummary,
   buildTeam,
   buildTeamMember,
   countRows,
-  defaultMemoryAgentId,
-  getAgentRow,
-  getAgentTokenRow,
   getInstanceRow,
   getPersonRow,
-  getProjectAgentRow,
-  getTeamRow,
-  listAgentBindings,
-  listAgentTokens,
-  listAgentsForOwner,
-  listInstancesForAgent,
   listInstancesForOwner,
+  getTeamRow,
   listMyTeams,
-  listProjectAgents,
   listTeamsForPerson,
   listVisibleProjects,
   mapActivityRow,
   mapProjectMemberRow,
   mapTeamMemberRow,
-  normalizeCapabilities,
   slugify,
   sortProjectsByActivity,
   uniqueSlug,
 } from './identity-helpers.ts';
 import type {
   ActivityRow,
-  AgentRow,
   PersonRow,
   ProjectMemberRow,
   TeamMemberRow,
@@ -83,8 +71,6 @@ const visibilitySchema = z.enum(['private', 'team', 'public']);
 const projectTypeSchema = z.enum(['manual', 'github', 'gitlab', 'local']);
 const projectStatusSchema = z.enum(['active', 'archived']);
 const projectRoleSchema = z.enum(['owner', 'maintainer', 'developer', 'reporter']);
-const agentStatusSchema = z.enum(['active', 'paused', 'retired']);
-const projectAgentStatusSchema = z.enum(['active', 'paused']);
 
 const projectCreateSchema = z.object({
   name: z.string().trim().min(1, '项目名称不能为空').max(120),
@@ -97,6 +83,7 @@ const projectCreateSchema = z.object({
   repoUrl: z.string().trim().max(500).optional(),
   mnemosProjectId: z.string().trim().max(120).optional(),
   mnemosApiKey: z.string().max(500).optional(),
+  memoryAgentId: z.string().trim().max(160).optional(),
 });
 
 const projectUpdateSchema = z.object({
@@ -110,49 +97,13 @@ const projectUpdateSchema = z.object({
   mnemosProjectId: z.string().trim().max(120).nullable().optional(),
   // 空字符串表示清除密钥；字段缺省表示保持不变。
   mnemosApiKey: z.string().max(500).optional(),
+  memoryAgentId: z.string().trim().max(160).nullable().optional(),
   status: projectStatusSchema.optional(),
 });
 
 const projectMemberSchema = z.object({
   personId: z.string().trim().min(1, '人员 ID 不能为空'),
   role: projectRoleSchema,
-});
-
-const projectAgentBindSchema = z.object({
-  agentId: z.string().trim().min(1, '智员 ID 不能为空'),
-  memoryAgentId: z.string().trim().max(160).optional(),
-  role: z.string().trim().max(40).optional(),
-});
-
-const projectAgentUpdateSchema = z.object({
-  status: projectAgentStatusSchema.optional(),
-  role: z.string().trim().max(40).optional(),
-  memoryAgentId: z.string().trim().min(1).max(160).optional(),
-});
-
-const agentCreateSchema = z.object({
-  name: z.string().trim().min(1, '智员名称不能为空').max(120),
-  role: z.string().trim().max(60).optional(),
-  model: z.string().trim().max(120).optional(),
-  description: z.string().max(2000).optional(),
-  capabilities: z.array(z.string().trim().min(1).max(60)).max(40).optional(),
-});
-
-const agentUpdateSchema = z.object({
-  name: z.string().trim().min(1, '智员名称不能为空').max(120).optional(),
-  role: z.string().trim().max(60).optional(),
-  model: z.string().trim().max(120).optional(),
-  description: z.string().max(2000).optional(),
-  capabilities: z.array(z.string().trim().min(1).max(60)).max(40).optional(),
-  status: agentStatusSchema.optional(),
-});
-
-const agentTokenSchema = z.object({
-  label: z.string().trim().min(1, '令牌名称不能为空').max(80),
-});
-
-const agentListSchema = z.object({
-  scope: z.enum(['mine', 'all']).optional(),
 });
 
 const DASHBOARD_ACTIVITY_LIMIT = 20;
@@ -165,12 +116,6 @@ function loadTeamOr404(rc: RequestContext, teamId: string): TeamRow {
   const team = getTeamRow(rc.app.db, teamId);
   if (!team) throw errors.notFound('团队不存在');
   return team;
-}
-
-function loadAgentOr404(rc: RequestContext, agentId: string): AgentRow {
-  const agent = getAgentRow(rc.app.db, agentId);
-  if (!agent) throw errors.notFound('智员不存在');
-  return agent;
 }
 
 function assertPersonExists(db: Db, personId: string): void {
@@ -287,7 +232,6 @@ export function registerIdentityRoutes(router: Router): void {
       // 仪表盘只展示“我加入/负责的”团队，不因 admin 身份放大。
       teams: listMyTeams(db, person.id),
       projects,
-      agents: listAgentsForOwner(db, person.id),
       instances: listInstancesForOwner(db, person.id),
       tasks: counts,
       activity,
@@ -471,8 +415,8 @@ export function registerIdentityRoutes(router: Router): void {
     db.prepare(
       `INSERT INTO projects
          (id, slug, name, description, owner_team_id, owner_person_id, visibility, type, prompt, repo_url, status,
-          mnemos_project_id, mnemos_api_key, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'active', ?, ?, ?, ?)`,
+          mnemos_project_id, mnemos_api_key, memory_agent_id, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'active', ?, ?, ?, ?, ?)`,
     ).run(
       id,
       slug,
@@ -486,6 +430,7 @@ export function registerIdentityRoutes(router: Router): void {
       nullableText(body.repoUrl),
       nullableText(body.mnemosProjectId),
       nullableText(body.mnemosApiKey),
+      nullableText(body.memoryAgentId),
       now,
       now,
     );
@@ -561,6 +506,10 @@ export function registerIdentityRoutes(router: Router): void {
       updates.push('mnemos_api_key = ?');
       params.push(nullableText(body.mnemosApiKey));
     }
+    if (body.memoryAgentId !== undefined) {
+      updates.push('memory_agent_id = ?');
+      params.push(nullableText(body.memoryAgentId));
+    }
     if (body.status !== undefined) {
       updates.push('status = ?');
       params.push(body.status);
@@ -625,293 +574,5 @@ export function registerIdentityRoutes(router: Router): void {
     rc.json({ ok: true });
   });
 
-  // ---- 项目智员 -----------------------------------------------------------
-  router.get('/api/projects/:id/agents', (rc) => {
-    const project = requireProject(rc, rc.params.id!, 'view');
-    rc.json(listProjectAgents(rc.app.db, project.id));
-  });
 
-  router.post('/api/projects/:id/agents', async (rc) => {
-    const person = requirePerson(rc);
-    const project = requireProject(rc, rc.params.id!, 'contribute');
-    const body = await rc.body(projectAgentBindSchema);
-    const db = rc.app.db;
-    const agent = loadAgentOr404(rc, body.agentId);
-
-    if (!person.isAdmin && agent.owner_person_id !== person.id) {
-      throw errors.forbidden('只能将自己拥有的智员关联到项目');
-    }
-    if (agent.status !== 'active') {
-      throw errors.conflict(`智员当前状态为 ${agent.status}，只有在职（active）的智员可以关联到项目`);
-    }
-
-    const sameAgent = db
-      .prepare('SELECT 1 AS ok FROM project_agents WHERE project_id = ? AND agent_id = ?')
-      .get(project.id, agent.id) as unknown as { ok: number } | undefined;
-    if (sameAgent) throw errors.conflict(`智员「${agent.name}」已关联到该项目`);
-
-    const memoryAgentId =
-      body.memoryAgentId && body.memoryAgentId.length > 0
-        ? body.memoryAgentId
-        : defaultMemoryAgentId(project.slug, agent.id);
-    const sameMemory = db
-      .prepare('SELECT 1 AS ok FROM project_agents WHERE project_id = ? AND memory_agent_id = ?')
-      .get(project.id, memoryAgentId) as unknown as { ok: number } | undefined;
-    if (sameMemory) {
-      throw errors.conflict(`记忆智员标识「${memoryAgentId}」已被本项目占用，请换一个标识`);
-    }
-
-    const id = newId('pba');
-    try {
-      db.prepare(
-        `INSERT INTO project_agents
-           (id, project_id, agent_id, memory_agent_id, role, status, added_by, added_at)
-         VALUES (?, ?, ?, ?, ?, 'active', ?, ?)`,
-      ).run(id, project.id, agent.id, memoryAgentId, body.role ?? 'developer', person.id, nowIso());
-    } catch (error) {
-      if (error instanceof Error && /UNIQUE constraint failed/i.test(error.message)) {
-        throw errors.conflict('该智员或记忆标识已被项目占用，请刷新后重试');
-      }
-      throw error;
-    }
-
-    recordActivity(db, rc.app.bus, {
-      projectId: project.id,
-      projectName: project.name,
-      type: 'agent.bound',
-      actor: person.name,
-      summary: `关联智员 ${agent.name}`,
-      agentId: agent.id,
-    });
-
-    // 用最新行回读，保证契约字段与数据库一致。
-    const bound = getProjectAgentRow(db, project.id, agent.id);
-    if (!bound) throw errors.internal('项目智员关联写入失败');
-    rc.json(buildProjectAgent(db, bound));
-  });
-
-  router.patch('/api/projects/:id/agents/:agentId', async (rc) => {
-    requirePerson(rc);
-    const project = requireProject(rc, rc.params.id!, 'manage');
-    const body = await rc.body(projectAgentUpdateSchema);
-    const db = rc.app.db;
-    const binding = getProjectAgentRow(db, project.id, rc.params.agentId!);
-    if (!binding) throw errors.notFound('该智员未关联到此项目');
-
-    const updates: string[] = [];
-    const params: Array<string | number> = [];
-    if (body.status !== undefined) {
-      updates.push('status = ?');
-      params.push(body.status);
-    }
-    if (body.role !== undefined) {
-      updates.push('role = ?');
-      params.push(body.role);
-    }
-    if (body.memoryAgentId !== undefined) {
-      if (body.memoryAgentId !== binding.memory_agent_id) {
-        const conflict = db
-          .prepare(
-            'SELECT 1 AS ok FROM project_agents WHERE project_id = ? AND memory_agent_id = ? AND agent_id <> ?',
-          )
-          .get(project.id, body.memoryAgentId, binding.agent_id) as unknown as { ok: number } | undefined;
-        if (conflict) {
-          throw errors.conflict(`记忆智员标识「${body.memoryAgentId}」已被本项目其他智员占用`);
-        }
-      }
-      updates.push('memory_agent_id = ?');
-      params.push(body.memoryAgentId);
-    }
-
-    if (updates.length > 0) {
-      params.push(binding.id);
-      db.prepare(`UPDATE project_agents SET ${updates.join(', ')} WHERE id = ?`).run(...params);
-    }
-
-    rc.json(buildProjectAgent(db, getProjectAgentRow(db, project.id, binding.agent_id)!));
-  });
-
-  router.delete('/api/projects/:id/agents/:agentId', (rc) => {
-    const person = requirePerson(rc);
-    const db = rc.app.db;
-    const project = getProjectRow(db, rc.params.id!);
-    if (!project) throw errors.notFound('项目不存在');
-    const binding = getProjectAgentRow(db, project.id, rc.params.agentId!);
-    if (!binding) throw errors.notFound('该智员未关联到此项目');
-    const agent = getAgentRow(db, binding.agent_id);
-    if (!agent) throw errors.notFound('智员不存在');
-
-    const allowed = canManageProject(db, { id: person.id, isAdmin: person.isAdmin }, project) ||
-      agent.owner_person_id === person.id;
-    if (!allowed) throw errors.forbidden('需要项目管理权限或为该智员所有者');
-
-    const running = countRows(
-      db,
-      "SELECT COUNT(*) AS c FROM work_items WHERE project_id = ? AND agent_id = ? AND status = 'running'",
-      project.id,
-      agent.id,
-    );
-    if (running > 0) {
-      throw errors.conflict(`该智员在项目中仍有 ${running} 个执行中的任务，请先完成或取消后再解除关联`);
-    }
-
-    db.prepare('DELETE FROM project_agents WHERE id = ?').run(binding.id);
-    rc.json({ ok: true });
-  });
-
-  // ---- 智员 ---------------------------------------------------------------
-  router.get('/api/agents', (rc) => {
-    const person = requirePerson(rc);
-    const { scope = 'mine' } = rc.query(agentListSchema);
-    const ownerPersonId = scope === 'all' && person.isAdmin ? null : person.id;
-    rc.json(listAgentsForOwner(rc.app.db, ownerPersonId));
-  });
-
-  router.post('/api/agents', async (rc) => {
-    const person = requirePerson(rc);
-    const body = await rc.body(agentCreateSchema);
-    const db = rc.app.db;
-    const id = newId('agt');
-    const now = nowIso();
-    db.prepare(
-      `INSERT INTO agents
-         (id, owner_person_id, name, role, model, description, capabilities, status, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, 'active', ?, ?)`,
-    ).run(
-      id,
-      person.id,
-      body.name,
-      body.role ?? 'assistant',
-      body.model ?? 'deepseek-chat',
-      body.description ?? '',
-      JSON.stringify(normalizeCapabilities(body.capabilities)),
-      now,
-      now,
-    );
-    rc.json(buildAgent(db, getAgentRow(db, id)!), 201);
-  });
-
-  router.get('/api/agents/:id', (rc) => {
-    const person = requirePerson(rc);
-    const agent = loadAgentOr404(rc, rc.params.id!);
-    if (!person.isAdmin && agent.owner_person_id !== person.id) {
-      throw errors.forbidden('无权访问该智员');
-    }
-    const db = rc.app.db;
-    rc.json({
-      agent: buildAgent(db, agent),
-      projects: listAgentBindings(db, agent.id),
-      tokens: listAgentTokens(db, agent.id),
-      instances: listInstancesForAgent(db, agent.id),
-    });
-  });
-
-  router.patch('/api/agents/:id', async (rc) => {
-    const person = requirePerson(rc);
-    const agent = loadAgentOr404(rc, rc.params.id!);
-    if (!person.isAdmin && agent.owner_person_id !== person.id) {
-      throw errors.forbidden('无权修改该智员');
-    }
-    const body = await rc.body(agentUpdateSchema);
-    const db = rc.app.db;
-
-    const updates: string[] = [];
-    const params: Array<string | number> = [];
-    if (body.name !== undefined) {
-      updates.push('name = ?');
-      params.push(body.name);
-    }
-    if (body.role !== undefined) {
-      updates.push('role = ?');
-      params.push(body.role);
-    }
-    if (body.model !== undefined) {
-      updates.push('model = ?');
-      params.push(body.model);
-    }
-    if (body.description !== undefined) {
-      updates.push('description = ?');
-      params.push(body.description);
-    }
-    if (body.capabilities !== undefined) {
-      updates.push('capabilities = ?');
-      params.push(JSON.stringify(normalizeCapabilities(body.capabilities)));
-    }
-    if (body.status !== undefined) {
-      updates.push('status = ?');
-      params.push(body.status);
-    }
-    updates.push('updated_at = ?');
-    params.push(nowIso());
-    params.push(agent.id);
-    db.prepare(`UPDATE agents SET ${updates.join(', ')} WHERE id = ?`).run(...params);
-
-    rc.json(buildAgent(db, getAgentRow(db, agent.id)!));
-  });
-
-  router.post('/api/agents/:id/tokens', async (rc) => {
-    const person = requirePerson(rc);
-    const agent = loadAgentOr404(rc, rc.params.id!);
-    if (!person.isAdmin && agent.owner_person_id !== person.id) {
-      throw errors.forbidden('无权为该智员创建令牌');
-    }
-    const body = await rc.body(agentTokenSchema);
-    const db = rc.app.db;
-
-    // 明文只在本次响应返回一次；数据库仅保存 sha256 哈希与可展示前缀。
-    const secret = `hive_agt_${randomToken(24)}`;
-    const prefix = secret.slice(0, 14);
-    const id = newId('tok');
-    const now = nowIso();
-    db.prepare(
-      `INSERT INTO agent_tokens (id, agent_id, label, prefix, token_hash, created_at, last_used_at, revoked_at)
-       VALUES (?, ?, ?, ?, ?, ?, NULL, NULL)`,
-    ).run(id, agent.id, body.label, prefix, sha256(secret), now);
-
-    const token: AgentToken & { secret: string } = {
-      id,
-      agentId: agent.id,
-      label: body.label,
-      prefix,
-      createdAt: now,
-      secret,
-    };
-    rc.json(token, 201);
-  });
-
-  router.delete('/api/agents/:id/tokens/:tokenId', (rc) => {
-    const person = requirePerson(rc);
-    const agent = loadAgentOr404(rc, rc.params.id!);
-    if (!person.isAdmin && agent.owner_person_id !== person.id) {
-      throw errors.forbidden('无权吊销该智员的令牌');
-    }
-    const token = getAgentTokenRow(rc.app.db, agent.id, rc.params.tokenId!);
-    if (!token) throw errors.notFound('令牌不存在或不属于该智员');
-    rc.app.db
-      .prepare('UPDATE agent_tokens SET revoked_at = COALESCE(revoked_at, ?) WHERE id = ?')
-      .run(nowIso(), token.id);
-    rc.json({ ok: true });
-  });
-
-  // ---- 实例 ---------------------------------------------------------------
-  router.get('/api/instances', (rc) => {
-    const person = requirePerson(rc);
-    rc.json(listInstancesForOwner(rc.app.db, person.isAdmin ? null : person.id));
-  });
-
-  router.delete('/api/instances/:id', (rc) => {
-    const person = requirePerson(rc);
-    const instance = getInstanceRow(rc.app.db, rc.params.id!);
-    if (!instance) throw errors.notFound('实例不存在');
-    const agent = getAgentRow(rc.app.db, instance.agent_id);
-    if (!agent) throw errors.notFound('实例关联的智员不存在');
-    if (!person.isAdmin && agent.owner_person_id !== person.id) {
-      throw errors.forbidden('仅智员所有者或组织管理员可以吊销实例');
-    }
-    // 写入 revoked_at 后，实例鉴权会拒绝心跳（authenticateInstance 检查该字段）。
-    rc.app.db
-      .prepare("UPDATE dsh_instances SET revoked_at = COALESCE(revoked_at, ?), status = 'revoked' WHERE id = ?")
-      .run(nowIso(), instance.id);
-    rc.json({ ok: true });
-  });
 }

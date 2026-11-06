@@ -1,5 +1,5 @@
-import { useMemo, useState } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
+import { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { api } from '@lib/api.ts';
 import { fmtInt, fmtMs, fmtRelative } from '@lib/format.ts';
 import { useAsync } from '@lib/hooks.ts';
@@ -28,42 +28,29 @@ const TOP_K_OPTIONS = [
   { value: '12', label: '12 条' },
 ];
 
-/** 项目记忆：语义搜索 + 任务记忆简报预览。 */
+/** 项目记忆：语义搜索 + 任务记忆简报预览（使用项目级记忆身份）。 */
 export function ProjectMemoryPage() {
   const { detail } = useProject();
   const projectId = detail.project.id;
   const base = `/projects/${encodeURIComponent(projectId)}`;
-  const [params] = useSearchParams();
+  const memoryAgentId = detail.project.memoryAgentId;
 
-  const agents = useAsync(() => api.projectAgents(projectId), [projectId]);
-  const [agentId, setAgentId] = useState(params.get('agentId') ?? '');
   const [keyword, setKeyword] = useState('');
   const [submitted, setSubmitted] = useState<string | null>(null);
   const [topK, setTopK] = useState('8');
   const [contextQuery, setContextQuery] = useState('');
   const [contextTick, setContextTick] = useState(0);
 
-  const memoryOptions = useMemo(
-    () =>
-      (agents.data ?? [])
-        .filter((item) => Boolean(item.memoryAgentId))
-        .map((item) => ({ value: item.agentId, label: item.agent.name })),
-    [agents.data],
-  );
-  const selectedAgentId = memoryOptions.some((option) => option.value === agentId)
-    ? agentId
-    : (memoryOptions[0]?.value ?? '');
-
   const search = useAsync(
-    () => api.memorySearch(projectId, submitted ?? '', selectedAgentId || undefined, Number(topK)),
-    [projectId, submitted, selectedAgentId, topK],
-    Boolean(submitted) && Boolean(selectedAgentId),
+    () => api.memorySearch(projectId, submitted ?? '', memoryAgentId, Number(topK)),
+    [projectId, submitted, memoryAgentId, topK],
+    Boolean(submitted),
   );
 
   const context = useAsync(
-    () => api.memoryContext(projectId, selectedAgentId || undefined, contextQuery.trim() || undefined),
-    [projectId, selectedAgentId, contextTick],
-    Boolean(selectedAgentId) && detail.project.mnemosConfigured,
+    () => api.memoryContext(projectId, memoryAgentId, contextQuery.trim() || undefined),
+    [projectId, memoryAgentId, contextTick],
+    detail.project.mnemosConfigured,
   );
 
   const runSearch = () => {
@@ -74,10 +61,7 @@ export function ProjectMemoryPage() {
 
   const configured = detail.project.mnemosConfigured;
   const hits = search.data?.hits ?? [];
-  const notReady =
-    agents.error && !agents.data
-      ? agents.error
-      : null;
+  const identity = memoryAgentId || `aiwo_${detail.project.slug.replace(/-/g, '_')}`;
 
   return (
     <div className="ws-page">
@@ -92,42 +76,16 @@ export function ProjectMemoryPage() {
         }
       />
 
-      {notReady ? (
-        <Card>
-          <div style={{ padding: 18 }}>
-            <ErrorState message={notReady} onRetry={() => void agents.refresh()} />
-          </div>
-        </Card>
-      ) : agents.loading && !agents.data ? (
-        <div className="vstack gap-14">
-          <Skeleton h={72} style={{ borderRadius: 14 }} />
-          <Skeleton h={148} style={{ borderRadius: 14 }} />
-          <Skeleton h={280} style={{ borderRadius: 14 }} />
-        </div>
-      ) : !configured ? (
+      {!configured ? (
         <Card>
           <EmptyState
             icon="brain"
             title="尚未配置 Mnemos 集成"
-            description="为项目配置 Mnemos 项目 ID 与 API Key 后，智员执行任务时会自动检索并注入项目记忆。"
+            description="为项目配置 Mnemos 项目 ID 与 API Key 后，任务执行时会自动检索并注入项目记忆。"
             action={
               <Link className="btn btn-sm btn-outline" to={`${base}/settings`}>
                 <Icon name="settings" size={13} />
                 前往设置
-              </Link>
-            }
-          />
-        </Card>
-      ) : !memoryOptions.length ? (
-        <Card>
-          <EmptyState
-            icon="bot"
-            title="暂无可用记忆智员"
-            description="关联智员并为其设置记忆智员 ID（memoryAgentId）后，才能检索记忆与生成任务简报。"
-            action={
-              <Link className="btn btn-sm btn-outline" to={`${base}/agents`}>
-                <Icon name="link" size={13} />
-                关联智员
               </Link>
             }
           />
@@ -143,6 +101,11 @@ export function ProjectMemoryPage() {
                 </>
               }
               desc="在项目记忆库中按语义检索，命中结果按相关度排序。"
+              actions={
+                <span className="tiny dim">
+                  记忆身份 <span className="mono">{identity}</span>
+                </span>
+              }
             />
 
             <div className="toolbar mt-12">
@@ -154,30 +117,14 @@ export function ProjectMemoryPage() {
                   onSubmit={runSearch}
                   className="ws-search"
                 />
-                <Select
-                  value={selectedAgentId}
-                  options={memoryOptions}
-                  onChange={(event) => setAgentId(event.target.value)}
-                />
-                <Select
-                  value={topK}
-                  options={TOP_K_OPTIONS}
-                  onChange={(event) => setTopK(event.target.value)}
-                />
-                <Button
-                  variant="primary"
-                  icon="search"
-                  disabled={!keyword.trim()}
-                  onClick={runSearch}
-                >
+                <Select value={topK} options={TOP_K_OPTIONS} onChange={(event) => setTopK(event.target.value)} />
+                <Button variant="primary" icon="search" disabled={!keyword.trim()} onClick={runSearch}>
                   搜索
                 </Button>
               </div>
               <div className="toolbar-right">
                 <span className="tiny dim">
-                  {submitted
-                    ? `查询「${submitted}」`
-                    : '输入关键词后按回车或点击搜索'}
+                  {submitted ? `查询「${submitted}」` : '输入关键词后按回车或点击搜索'}
                 </span>
               </div>
             </div>
@@ -206,7 +153,7 @@ export function ProjectMemoryPage() {
                 <EmptyState
                   icon="search"
                   title="没有命中记忆"
-                  description="换个说法或放宽关键词；记忆需要智员在完成任务后才会沉淀。"
+                  description="换个说法或放宽关键词；记忆需要任务执行完成后才会沉淀。"
                   compact
                 />
               ) : (
@@ -215,7 +162,7 @@ export function ProjectMemoryPage() {
                     <span className="tiny dim">
                       命中 {fmtInt(hits.length)} 条 · 耗时 {fmtMs(search.data?.tookMs)}
                     </span>
-                    <span className="tiny dim">智员 {selectedAgentId}</span>
+                    <span className="tiny dim mono">{identity}</span>
                   </div>
                   <div className="ws-memory-list">
                     {hits.map((hit) => {
@@ -245,17 +192,11 @@ export function ProjectMemoryPage() {
                           </div>
                           <p className="mem-content">{hit.content}</p>
                           <div className="mem-meta">
-                            {hit.agentId ? (
-                              <span className="hstack gap-4">
-                                <Icon name="bot" size={11} />
-                                {hit.agentId}
-                              </span>
-                            ) : null}
                             {hit.taskId ? (
-                              <span className="hstack gap-4">
+                              <Link className="ws-link" to={`${base}/tasks/${encodeURIComponent(hit.taskId)}`}>
                                 <Icon name="list" size={11} />
                                 {hit.taskId.slice(0, 8)}
-                              </span>
+                              </Link>
                             ) : null}
                             <span className="mono">#{hit.id.slice(0, 8)}</span>
                           </div>
@@ -292,7 +233,7 @@ export function ProjectMemoryPage() {
                   任务简报
                 </>
               }
-              desc="模拟任务下发时注入给智员的记忆上下文，并估算 token 消耗。"
+              desc="模拟任务下发时注入的记忆上下文，并估算 token 消耗。"
               actions={
                 <Button
                   size="sm"

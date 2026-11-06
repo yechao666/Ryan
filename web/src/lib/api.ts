@@ -1,40 +1,38 @@
 import type {
   ActivityEvent,
-  Agent,
-  AgentToken,
-  AgentTokenWithSecret,
+  AssistantSettings,
   AuthResponse,
   Automation,
   AutomationRun,
-  BindAgentInput,
-  CreateAgentInput,
   CreateAutomationInput,
   CreateProjectInput,
   CreateTaskInput,
   DashboardSummary,
+  DshInstance,
+  DshInstanceInput,
   InboundDelivery,
   LiveEvent,
   MemoryContextResult,
   MemorySearchResult,
   Paginated,
   Person,
-  ProjectAgent,
   ProjectMember,
   ProjectSummary,
+  PromptCard,
+  PromptCardInput,
+  RuntimeEvent,
+  SecuritySettings,
+  SystemSettings,
   TaskDetail,
-  TaskMessage,
   Team,
   TeamMember,
   WorkItem,
-  CompleteTaskInput,
-  Instance,
   ProjectRole,
-  RuntimeEvent,
   TeamRole,
   Visibility,
 } from '@shared';
 
-const TOKEN_KEY = 'hive.token';
+const TOKEN_KEY = 'aiwo.token';
 
 export class ApiError extends Error {
   readonly status: number;
@@ -42,6 +40,7 @@ export class ApiError extends Error {
   readonly details?: unknown;
   constructor(status: number, code: string, message: string, details?: unknown) {
     super(message);
+    this.name = 'ApiError';
     this.status = status;
     this.code = code;
     this.details = details;
@@ -105,15 +104,37 @@ export interface TeamDetail {
   projects: ProjectSummary[];
 }
 
-export interface AgentDetail {
-  agent: Agent;
-  projects: ProjectAgent[];
-  tokens: AgentToken[];
-  instances: Instance[];
-}
-
 export interface CreateTaskResult {
   task: WorkItem;
+}
+
+/** 新增 DSH 实例的响应：token 与安装命令只返回一次。 */
+export interface InstanceCreateResult {
+  instance: DshInstance;
+  token: string;
+  command: string;
+}
+
+export interface InstanceTokenResult {
+  token: string;
+  command: string;
+}
+
+export interface InstanceTestResult {
+  ok: boolean;
+  status: string;
+  latencyMs: number | null;
+  pluginVersion?: string;
+  message: string;
+}
+
+export interface SecurityTestResult {
+  ok: boolean;
+  skipped?: boolean;
+  message?: string;
+  status?: number;
+  latencyMs?: number;
+  error?: string;
 }
 
 export const api = {
@@ -127,7 +148,13 @@ export const api = {
   logout(): Promise<{ ok: boolean }> {
     return request('/api/auth/logout', { method: 'POST' });
   },
-  meta(): Promise<{ name: string; version: string; demo: boolean; demoAccounts: { email: string; name: string; title: string; role: string; password: string }[]; demoPassword?: string }> {
+  meta(): Promise<{
+    name: string;
+    version: string;
+    demo: boolean;
+    demoAccounts: { email: string; name: string; title: string; role: string; password: string }[];
+    demoPassword?: string;
+  }> {
     return request('/api/meta');
   },
 
@@ -176,62 +203,83 @@ export const api = {
     return request(`/api/projects/${id}`, { method: 'PATCH', body: JSON.stringify(input) });
   },
   addProjectMember(projectId: string, personId: string, role: ProjectRole): Promise<ProjectMember> {
-    return request(`/api/projects/${projectId}/members`, { method: 'POST', body: JSON.stringify({ personId, role }) });
+    return request(`/api/projects/${projectId}/members`, {
+      method: 'POST',
+      body: JSON.stringify({ personId, role }),
+    });
   },
   removeProjectMember(projectId: string, personId: string): Promise<{ ok: boolean }> {
     return request(`/api/projects/${projectId}/members/${personId}`, { method: 'DELETE' });
   },
 
-  // ---- agents ----
-  agents(scope: 'mine' | 'all' = 'mine'): Promise<Agent[]> {
-    return request(`/api/agents${qs({ scope })}`);
-  },
-  agent(id: string): Promise<AgentDetail> {
-    return request(`/api/agents/${id}`);
-  },
-  createAgent(input: CreateAgentInput): Promise<Agent> {
-    return request('/api/agents', { method: 'POST', body: JSON.stringify(input) });
-  },
-  updateAgent(id: string, input: Partial<CreateAgentInput> & { status?: string }): Promise<Agent> {
-    return request(`/api/agents/${id}`, { method: 'PATCH', body: JSON.stringify(input) });
-  },
-  createAgentToken(id: string, label: string): Promise<AgentTokenWithSecret> {
-    return request(`/api/agents/${id}/tokens`, { method: 'POST', body: JSON.stringify({ label }) });
-  },
-  revokeAgentToken(id: string, tokenId: string): Promise<{ ok: boolean }> {
-    return request(`/api/agents/${id}/tokens/${tokenId}`, { method: 'DELETE' });
-  },
-
-  // ---- project agents ----
-  projectAgents(projectId: string): Promise<ProjectAgent[]> {
-    return request(`/api/projects/${projectId}/agents`);
-  },
-  bindAgent(projectId: string, input: BindAgentInput): Promise<ProjectAgent> {
-    return request(`/api/projects/${projectId}/agents`, { method: 'POST', body: JSON.stringify(input) });
-  },
-  updateProjectAgent(
-    projectId: string,
-    agentId: string,
-    input: { status?: string; role?: string; memoryAgentId?: string },
-  ): Promise<ProjectAgent> {
-    return request(`/api/projects/${projectId}/agents/${agentId}`, { method: 'PATCH', body: JSON.stringify(input) });
-  },
-  unbindAgent(projectId: string, agentId: string): Promise<{ ok: boolean }> {
-    return request(`/api/projects/${projectId}/agents/${agentId}`, { method: 'DELETE' });
-  },
-
   // ---- instances ----
-  instances(): Promise<Instance[]> {
+  instances(): Promise<DshInstance[]> {
     return request('/api/instances');
+  },
+  createInstance(input: DshInstanceInput): Promise<InstanceCreateResult> {
+    return request('/api/instances', { method: 'POST', body: JSON.stringify(input) });
+  },
+  updateInstance(
+    id: string,
+    input: Partial<DshInstanceInput> & { status?: string },
+  ): Promise<DshInstance> {
+    return request(`/api/instances/${id}`, { method: 'PATCH', body: JSON.stringify(input) });
+  },
+  rotateInstanceToken(id: string): Promise<InstanceTokenResult> {
+    return request(`/api/instances/${id}/token`, { method: 'POST' });
+  },
+  testInstance(id: string): Promise<InstanceTestResult> {
+    return request(`/api/instances/${id}/test`, { method: 'POST' });
   },
   revokeInstance(id: string): Promise<{ ok: boolean }> {
     return request(`/api/instances/${id}`, { method: 'DELETE' });
   },
 
+  // ---- prompt cards ----
+  promptCards(params: { projectId?: string; category?: string } = {}): Promise<PromptCard[]> {
+    return request(`/api/prompt-cards${qs({ projectId: params.projectId, category: params.category })}`);
+  },
+  projectPromptCards(projectId: string): Promise<PromptCard[]> {
+    return request(`/api/projects/${encodeURIComponent(projectId)}/prompt-cards`);
+  },
+  createPromptCard(input: PromptCardInput): Promise<PromptCard> {
+    return request('/api/prompt-cards', { method: 'POST', body: JSON.stringify(input) });
+  },
+  updatePromptCard(id: string, input: Partial<PromptCardInput>): Promise<PromptCard> {
+    return request(`/api/prompt-cards/${id}`, { method: 'PATCH', body: JSON.stringify(input) });
+  },
+  deletePromptCard(id: string): Promise<{ ok: boolean }> {
+    return request(`/api/prompt-cards/${id}`, { method: 'DELETE' });
+  },
+
+  // ---- settings ----
+  settings(): Promise<SystemSettings> {
+    return request('/api/settings');
+  },
+  updateSecuritySettings(
+    input: Partial<SecuritySettings> & { apiKey?: string },
+  ): Promise<{ security: SecuritySettings }> {
+    return request('/api/settings/security', { method: 'PATCH', body: JSON.stringify(input) });
+  },
+  updateAssistantSettings(
+    input: Omit<Partial<AssistantSettings>, 'instanceId'> & { instanceId?: string | null },
+  ): Promise<{ assistant: AssistantSettings }> {
+    return request('/api/settings/assistant', { method: 'PATCH', body: JSON.stringify(input) });
+  },
+  testSecurity(): Promise<SecurityTestResult> {
+    return request('/api/settings/security/test', { method: 'POST' });
+  },
+
   // ---- tasks ----
   tasks(params: { projectId?: string; status?: string; type?: string; mine?: boolean; limit?: number } = {}): Promise<WorkItem[]> {
     return request(
-      `/api/tasks${qs({ projectId: params.projectId, status: params.status, type: params.type, mine: params.mine ? '1' : undefined, limit: params.limit })}`,
+      `/api/tasks${qs({
+        projectId: params.projectId,
+        status: params.status,
+        type: params.type,
+        mine: params.mine ? '1' : undefined,
+        limit: params.limit,
+      })}`,
     );
   },
   createTask(projectId: string, input: CreateTaskInput): Promise<WorkItem> {
@@ -240,23 +288,23 @@ export const api = {
   task(id: string): Promise<TaskDetail> {
     return request(`/api/tasks/${id}`);
   },
+  cancelTask(id: string): Promise<WorkItem> {
+    return request(`/api/tasks/${id}/cancel`, { method: 'POST' });
+  },
 
-  assistantChat(input: { message: string; pathname: string; projectId?: string; taskId?: string }): Promise<{
+  // ---- assistant ----
+  assistantChat(input: {
+    message: string;
+    pathname: string;
+    projectId?: string;
+    taskId?: string;
+  }): Promise<{
     reply: string;
     navigate?: string;
     sessionId?: string;
     instance?: string;
   }> {
     return request('/api/assistant/chat', { method: 'POST', body: JSON.stringify(input) });
-  },
-  sendTaskMessage(id: string, content: string): Promise<TaskMessage> {
-    return request(`/api/tasks/${id}/messages`, { method: 'POST', body: JSON.stringify({ content }) });
-  },
-  cancelTask(id: string): Promise<WorkItem> {
-    return request(`/api/tasks/${id}/cancel`, { method: 'POST' });
-  },
-  createTaskFromComplete(id: string, input: CompleteTaskInput): Promise<WorkItem> {
-    return request(`/api/tasks/${id}/complete`, { method: 'POST', body: JSON.stringify(input) });
   },
 
   // ---- automations ----

@@ -102,7 +102,7 @@ function buildRuntimeItems(events: RuntimeEvent[]): {
   return { items, thinkingCount, lastPhase, lastTool };
 }
 
-/** 任务只展示执行过程，不包含人员/智员对话。 */
+/** 任务只展示执行过程，不包含人员对话。 */
 function buildBlocks(events: RuntimeEvent[]): Block[] {
   const { items } = buildRuntimeItems(events);
   if (items.length === 0) return [];
@@ -172,11 +172,11 @@ function ToolRow({ item }: { item: ToolItem }) {
 export function TaskConversation({
   events,
   running,
-  agentName,
+  executorLabel,
 }: {
   events: RuntimeEvent[];
   running: boolean;
-  agentName: string;
+  executorLabel: string;
 }) {
   const { items, thinkingCount, lastPhase, lastTool } = useMemo(() => buildRuntimeItems(events), [events]);
   const blocks = useMemo(() => buildBlocks(events), [events]);
@@ -217,7 +217,7 @@ export function TaskConversation({
     return (
       <div className="ws-chat-empty">
         <span className="ws-rt-typing"><i /><i /><i /></span>
-        任务开始后，智员的输出、思考与工具调用会按时间顺序出现在这里。
+        任务开始后，Aiwo 的输出、思考与工具调用会按时间顺序出现在这里。
       </div>
     );
   }
@@ -239,10 +239,10 @@ export function TaskConversation({
         {blocks.map((block) => {
           return (
             <article className="ws-turn" key={block.id}>
-              <Avatar name={agentName || '智员'} tone="cyan" size="sm" />
+              <Avatar name="Aiwo" tone="violet" size="sm" />
               <div className="ws-turn-body">
                 <div className="ws-chat-head">
-                  <span className="strong small">{agentName || '智员'}</span>
+                  <span className="strong small">{executorLabel || 'Aiwo'}</span>
                   <span className="tiny dim">{fmtDateTime(block.at)}</span>
                   {block.items.filter((item) => item.kind === 'tool').length > 0 ? (
                     <span className="tiny dim">· {block.items.filter((item) => item.kind === 'tool').length} 个工具</span>

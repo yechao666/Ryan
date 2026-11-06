@@ -43,7 +43,7 @@ export function LoginPage() {
     setError(null);
     try {
       await login(email.trim(), password);
-      toast.success('登录成功，欢迎回到 Hive');
+      toast.success('登录成功，欢迎回到 Aiwo');
       navigate('/', { replace: true });
     } catch (cause) {
       const message = cause instanceof Error ? cause.message : '登录失败，请检查邮箱与密码。';
@@ -59,7 +59,7 @@ export function LoginPage() {
       <section className="login-hero">
         <div>
           <div className="cx-login-brand">
-            <div className="brand-mark">H</div>
+            <div className="brand-mark">A</div>
             <div>
               <div className="brand-name">{APP_NAME}</div>
               <div className="brand-sub">{APP_TAGLINE}</div>
@@ -67,13 +67,13 @@ export function LoginPage() {
           </div>
 
           <h1>
-            让智员
+            让每个人员
             <br />
-            真正进入团队工作流
+            都拥有自己的 DSH 执行网络
           </h1>
           <p>
-            人员管理智员，智员在项目中工作。把项目、任务、实例与记忆放进同一个控制台，
-            让每一位数字员工都有清晰的身份与上下文。
+            人员创建任务，DSH 实例执行，提示词卡片沉淀工作方式，项目记忆保留上下文。
+            一个控制台管理众多实例的即时、周期与响应式任务。
           </p>
 
           <div className="login-points cx-login-points">
@@ -102,7 +102,7 @@ export function LoginPage() {
       <section className="login-panel">
         <div className="login-card">
           <div className="cx-login-mobile-brand">
-            <div className="brand-mark">H</div>
+            <div className="brand-mark">A</div>
             <div>
               <div className="brand-name">{APP_NAME}</div>
               <div className="brand-sub">{APP_TAGLINE}</div>
@@ -129,7 +129,7 @@ export function LoginPage() {
                   icon="mail"
                   value={email}
                   autoComplete="username"
-                  placeholder="you@hive.dev"
+                  placeholder="you@aiwo.dev"
                   onChange={(event) => setEmail(event.target.value)}
                 />
               </Field>
@@ -164,7 +164,7 @@ export function LoginPage() {
               ) : null}
 
               <Button type="submit" variant="primary" size="lg" block loading={submitting} icon="arrowRight">
-                {submitting ? '正在登录…' : '登录 Hive'}
+                {submitting ? '正在登录…' : '登录 Aiwo'}
               </Button>
             </form>
 
@@ -217,8 +217,8 @@ export function LoginPage() {
           </Card>
 
           <div className="cx-login-foot">
-            <span>Hive · {APP_TAGLINE}</span>
-            <span className="dim">演示密码：hive-demo</span>
+            <span>Aiwo · {APP_TAGLINE}</span>
+            <span className="dim">演示密码：aiwo-demo</span>
           </div>
         </div>
       </section>

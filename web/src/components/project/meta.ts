@@ -1,13 +1,14 @@
 import {
   ACTIVITY_LABELS,
   AUTOMATION_TRIGGERS,
+  PROMPT_CARD_CATEGORIES,
   PROJECT_ROLES,
   PROJECT_TYPES,
   TASK_STATUSES,
   TASK_TYPES,
   VISIBILITIES,
 } from '@shared';
-import type { TaskSource, TaskStatus, TaskType } from '@shared';
+import type { PromptCardCategory, TaskSource, TaskStatus, TaskType } from '@shared';
 import type { IconName, Tone } from '@ui';
 
 /* ================================================================== */
@@ -89,6 +90,21 @@ export function parseTaskType(value: string | null | undefined): TaskType | 'all
   return found ? found.value : 'all';
 }
 
+/* ------------------------------ 提示词卡片 ------------------------------ */
+
+/** 提示词卡片分类的文案 / 色调 / 用途说明；未知分类回退到「其他」。 */
+export function promptCardCategoryMeta(category?: string): { label: string; tone: Tone; desc: string } {
+  const found = PROMPT_CARD_CATEGORIES.find((item) => item.value === category);
+  if (found) return { label: found.label, tone: found.tone as Tone, desc: found.desc };
+  const fallback = PROMPT_CARD_CATEGORIES.find((item) => item.value === 'other');
+  return { label: fallback?.label ?? '其他', tone: (fallback?.tone as Tone | undefined) ?? 'slate', desc: fallback?.desc ?? '' };
+}
+
+/** 提示词卡片分类下拉（表单与筛选共用）。 */
+export const PROMPT_CARD_CATEGORY_OPTIONS: { value: PromptCardCategory; label: string }[] = PROMPT_CARD_CATEGORIES.map(
+  (item) => ({ value: item.value, label: item.label }),
+);
+
 export const PRIORITY_OPTIONS: { value: string; label: string }[] = [
   { value: '1', label: '低' },
   { value: '2', label: '普通' },
@@ -120,28 +136,30 @@ export interface ActivityMeta {
 
 const ACTIVITY_ICONS: Record<string, IconName> = {
   'task.created': 'plus',
-  'task.claimed': 'bot',
+  'task.claimed': 'server',
   'task.progress': 'activity',
-  'task.message': 'mail',
   'task.completed': 'checkCircle',
   'task.failed': 'xCircle',
+  'task.cancelled': 'x',
+  'task.runtime': 'terminal',
   'instance.online': 'server',
   'instance.offline': 'server',
+  'instance.registered': 'server',
   'project.created': 'folder',
-  'agent.bound': 'link',
 };
 
 const ACTIVITY_TONES: Record<string, Tone> = {
   'task.created': 'violet',
   'task.claimed': 'blue',
   'task.progress': 'cyan',
-  'task.message': 'pink',
   'task.completed': 'green',
   'task.failed': 'red',
-  'instance.online': 'cyan',
+  'task.cancelled': 'slate',
+  'task.runtime': 'cyan',
+  'instance.online': 'green',
   'instance.offline': 'amber',
+  'instance.registered': 'violet',
   'project.created': 'violet',
-  'agent.bound': 'cyan',
 };
 
 export function activityMeta(type: string): ActivityMeta {
@@ -256,15 +274,6 @@ export function deliveryStatusMeta(status: string): { label: string; tone: Tone 
 /** Webhook 事件集合展示文案。 */
 export function webhookEventLabel(event: string): string {
   return WEBHOOK_EVENTS.find((e) => e.value === event)?.label ?? event;
-}
-
-/** 智员头像色调：按名称稳定取色，避免每次渲染跳变。 */
-const AVATAR_TONES: Tone[] = ['violet', 'cyan', 'pink', 'amber', 'lime', 'blue', 'green'];
-
-export function toneForName(name: string): Tone {
-  let hash = 0;
-  for (let i = 0; i < name.length; i += 1) hash = (hash * 31 + name.charCodeAt(i)) % 997;
-  return AVATAR_TONES[hash % AVATAR_TONES.length] ?? 'violet';
 }
 
 /* ================================================================== */

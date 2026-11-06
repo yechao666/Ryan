@@ -1,215 +1,178 @@
-# Hive · 数字员工工作平台
+# Aiwo · 人员 @Aiwo 的 DSH 编排平台
 
-人员管理智员，智员在项目中工作，记忆沉淀在 [Mnemos](../mnemos)。
+Aiwo 是一个管理 **DSH 实例资源** 的团队协作与任务平台。它没有“智员”概念：每个任务的执行者固定显示为 **人员@Aiwo**，由绑定的 DSH 实例真正执行。
 
-Hive 不是"给人用的记忆库"，而是给 **数字员工（DSH 智员）** 用的工作平台：
+参考 Hive 的工程结构，但运行时模型完全不同：
 
-- **人员**：真实的人，登录、组队、管项目、管智员；不需要自己的记忆。
-- **团队**：人员可属于多个团队，团队有负责人；项目有归属团队。
-- **项目**：可见性 `私有 / 团队 / 组织公开`，类型支持 `手动 / GitHub / GitLab`；可接入仓库 Webhook。
-- **智员**：全局身份（`agt_...`）+ 项目内记忆身份（`memory_agent_id`）；一个智员可加入多个项目。
-- **实例**：一台 DSH 运行实例（`ins_...`），注册、心跳、接单、上报进展；离线自动识别。
-- **任务**：队列 + 只读执行过程；每个任务以 `/goal` 启动、一次性执行，任务内不支持对话，结束后不可续聊。
-- **记忆**：智员通过 Mnemos 读写项目共享记忆与项目内私有记忆；任务完成自动写回结论。
-
-## 功能（MVP）
-
-| 模块 | 已实现 |
-| --- | --- |
-| 身份 | 登录/会话、人员、团队与成员、项目角色（owner/maintainer/developer/reporter） |
-| 可见性 | 私有 / 团队 / 组织公开；后端统一鉴权 |
-| 项目提示词 | 项目基本面（目标/规范/约束）随任务注入 DSH 运行时提示词 |
-| 智员 | 全局注册表、能力/模型、项目绑定、`memory_agent_id`、Agent 令牌（一次性 secret） |
-| 实例 | Agent 令牌注册实例、心跳、在线状态、吊销、当前任务 |
-| 任务 | 队列、优先级、租约、领取、进展、取消、完成/失败；每个任务以 `/goal` 启动，执行过程只读，结束即终止 |
-| 任务输出 | 完成后默认展示 Markdown 结论；执行过程在另一个只读 Tab |
-| 任务类型 | 需求 / BUGFIX / 管理 / 运维 / 文档 / 其他；表格视图、类型/状态/关键词筛选、20 条/页分页 |
-| 运行时可视 | 任务详情页实时展示 DSH 会话/步骤/工具调用/工具结果/输出/思考（SSE + 历史兜底） |
-| 全局助手 | 真实 DSH 实例；三列常驻右栏，可折叠、可拖拽调宽；携带完整 URL/taskId |
-| 实时 | SSE 活动流（任务/实例/消息） |
-| 自动化 | 手动 / Webhook / Cron；运行历史；GitHub/GitLab 入站验签与去重 |
-| 记忆 | 项目记忆搜索、任务简报 prompt、任务完成写回 Mnemos |
-| 控制台 | 概览、项目、团队、智员、实例、任务、项目工作区（7 个页签） |
+- **人员**：Aiwo 用户，登录、组队、管项目、管实例。
+- **提示词卡片**：工作流、风格、标准、角色说明；任务/自动化按需引用，内容注入 DSH 提示词。
+- **DSH 实例**：Aiwo 的独立资源；本机或远端，带 token、心跳、绑定项目、当前任务、插件版本。
+- **任务**：项目任务，执行身份 `姓名@Aiwo`；一次性 `/goal`，执行过程只读。
+- **项目 / 团队 / 人员**：与 Hive 一致。
+- **助手**：右侧常驻的 DSH 助手，可读项目/实例/任务/提示词卡片并直接调用 Aiwo 开放 API。
+- **记忆**：项目接入 Mnemos；任务开始注入项目记忆，完成写回结论/决策/经验。
+- **安全检查**：任务与助手输入可经独立 LLM 检查；系统设置里配置 endpoint，空则关闭。
 
 ## 架构
 
+```text
+┌──────────────┐  ┌───────────────────────────┐  ┌─────────────────┐
+│ 导航          │  │ 内容（项目 / 任务详情页）    │  │ Aiwo 助手（DSH） │
+│ 概览/项目/…   │  │ 任务表 / 提示词 / 设置      │  │ 右栏常驻        │
+└──────────────┘  └─────────────┬─────────────┘  └────────┬────────┘
+                                │                         │
+                                ▼                         ▼
+                       ┌──────────────────────────────────────┐
+                       │ Aiwo 控制面（Node 26 + SQLite）        │
+                       │ 人员/团队/项目/卡片/实例/任务/自动化     │
+                       └───────┬──────────────────────┬───────┘
+                               │                      │
+                    运行时协议 │                      │ Mnemos /v1
+                               ▼                      ▼
+                    ┌──────────────────┐      ┌──────────────┐
+                    │ Aiwo 实例代理     │      │ Mnemos 记忆   │
+                    │ 本机 / 远端       │      └──────────────┘
+                    └────────┬─────────┘
+                             │ ACP v1（stdio）
+                             ▼
+                    ┌──────────────────┐
+                    │ dsh --profile acp│
+                    │ 常驻 DSH 实例      │
+                    └──────────────────┘
 ```
-┌───────────── 浏览器 ─────────────┐
-│ React 控制台（Vite, 4401/4400）   │
-└──────────────┬───────────────────┘
-               │ /api（会话 Bearer + SSE）
-┌──────────────▼───────────────────┐        HTTP /v1（Bearer API Key）
-│ Hive 控制面（Node 26 + SQLite）   │ ───────────────────────────────┐
-│ 人员/团队/项目/智员/实例/任务/自动化 │                                │
-└──────────────┬───────────────────┘                          ┌─────▼─────┐
-               │ 运行时协议（Agent/Instance Token）              │  Mnemos   │
-┌──────────────▼───────────────────┐                          │ 记忆系统   │
-│ DSH 实例（每台一个数字员工运行时）  │ ──── 记忆/简报/写回 ────────►│ 4380      │
-└──────────────────────────────────┘                          └───────────┘
+
+### DSH 实例如何接入
+
+1. 管理员在「实例」页新增实例，选择本机/远端、host、端口、workspace、绑定项目。
+2. 创建后拿到**一次性实例 token** 和安装命令。
+3. 在目标主机执行：
+
+```bash
+cd integrations/aiwo-instance
+npm install
+node agent.mjs \
+  --base http://<aiwo-host>:4500 \
+  --token aiwo_ins_xxx \
+  --workspace /srv/aiwo-workspace \
+  --name my-dsh-01
 ```
 
-详细设计见 [`docs/architecture.md`](docs/architecture.md)。
+4. 代理 outbound 注册 → 20s 心跳 → 5s claim → 本地启动常驻 `dsh --profile acp`，通过 ACP 执行任务、上报运行时事件、完成回写。
+5. ACP 不可用时自动回退 `dsh --profile headless --json -`；远端 DSH 只需要安装这个代理，不需要暴露 ACP 端口。
 
-## 界面
-
-| 概览 | 项目工作区 · 任务 |
-| --- | --- |
-| ![概览](docs/screenshots/02-dashboard.png) | ![任务](docs/screenshots/06-project-tasks.png) |
-
-| 任务详情页 · 三列布局 | 项目记忆（Mnemos） |
-| --- | --- |
-| ![任务详情页](docs/screenshots/46-three-columns-task.png) | ![记忆](docs/screenshots/10-project-memory.png) |
-
-| 执行过程（历史） | 执行过程（实时） |
-| --- | --- |
-| ![运行时日志](docs/screenshots/19-runtime-log.png) | ![实时执行](docs/screenshots/20-runtime-live.png) |
-
-| 本地 Git 演示 · 项目记忆（Mnemos） | 统一任务对话（消息 + 工具） |
-| --- | --- |
-| ![本地项目记忆](docs/screenshots/21-local-memory.png) | ![任务对话](docs/screenshots/23-task-conversation.png) |
-
-| 思考过程（预览 + 展开） |
-| --- |
-| ![思考过程](docs/screenshots/24-thinking.png) |
-
-| 任务表格（类型 / 筛选 / 分页） | DSH 系统助手（真实 API 操作） |
-| --- | --- |
-| ![任务表格](docs/screenshots/31-sort-resize.png) | ![DSH 助手](docs/screenshots/39-assistant-write.png) |
-
-| 助手当前任务上下文 |
-| --- |
-| ![助手任务上下文](docs/screenshots/45-assistant-task-context.png) |
-
-| 任务结论（默认，Markdown） | 执行过程（只读） |
-| --- | --- |
-| ![任务结论](docs/screenshots/36-result-tab.png) | ![执行过程](docs/screenshots/37-process-tab.png) |
-
-更多：`docs/screenshots/`（登录、项目、智员、实例、团队、自动化、设置、执行过程、项目记忆、任务对话、思考过程、任务表格、DSH 助手、任务结论等 36 张）。
+> ACP 是 stdio JSON-RPC；远端无法直接 stdio 连接，所以由实例代理 outbound 连 Aiwo，代理在本地驱动 ACP。
 
 ## 快速开始
 
 ```bash
-cd hive
+cd aiwo
 pnpm install
-pnpm seed                 # 演示数据（人员/团队/项目/智员/实例/任务/自动化）
-pnpm dev                  # API: http://127.0.0.1:4400
-pnpm dev:web              # 控制台: http://127.0.0.1:4401（Vite 代理 /api）
-# 或生产模式
-pnpm build && pnpm start  # http://127.0.0.1:4400
+pnpm seed                 # 写入演示数据（data/aiwo.db）
+pnpm build                # 构建 web/dist
+node server/src/main.ts    # http://127.0.0.1:4500
 ```
 
-演示账号（密码 `hive-demo`）：
+开发前端：
+
+```bash
+pnpm dev:web               # http://127.0.0.1:4501，代理 /api → 4500
+```
+
+演示账号（密码 `aiwo-demo`）：
 
 | 邮箱 | 姓名 | 角色 |
 | --- | --- | --- |
-| `lin.wei@hive.dev` | 林薇 | 组织管理员 |
-| `chen.hao@hive.dev` | 陈昊 | 团队负责人（研发一组） |
-| `zhou.ye@hive.dev` | 周野 | 算法工程师 |
-| `su.yan@hive.dev` | 苏妍 | 数据合规 |
+| `lin.wei@aiwo.dev` | 林薇 | 组织管理员 |
+| `chen.hao@aiwo.dev` | 陈昊 | 团队负责人 |
+| `zhou.ye@aiwo.dev` | 周野 | 成员 |
+| `su.yan@aiwo.dev` | 苏妍 | 成员 |
 
-演示运行时令牌（仅用于本地联调，生产请重新签发）：
+演示项目：**本地 Git 演示 · 计算器**（`prj_calc`）。
 
-```text
-Agent:    hive_agt_demo_orion_coder_7f3a2c
-Instance: hive_inst_demo_orion_01_5d9e3b
-```
-
-## 运行时协议（DSH 接单）
+本机实例安装命令（demo token 仅用于本地演示）：
 
 ```bash
-# 1) 用 Agent 令牌注册实例（一次性返回 instance token）
-curl -X POST localhost:4400/api/runtime/instances/register \
-  -H "authorization: Bearer hive_agt_demo_orion_coder_7f3a2c" \
-  -H 'content-type: application/json' \
-  -d '{"name":"orion-dsh-01","host":"dev-mac","workspacePath":"/workspace/orion","version":"dsh 0.2.1"}'
-
-# 2) 心跳 / 领取任务 / 上报 / 完成
-curl -X POST localhost:4400/api/runtime/instances/heartbeat -H "authorization: Bearer <instance token>"
-curl -X POST localhost:4400/api/runtime/tasks/claim        -H "authorization: Bearer <instance token>"
-curl -X POST localhost:4400/api/runtime/tasks/<id>/progress -H "authorization: Bearer <instance token>" \
-  -H 'content-type: application/json' -d '{"message":"已完成查询路径盘点","payload":{"progress":40}}'
-curl -X POST localhost:4400/api/runtime/tasks/<id>/complete -H "authorization: Bearer <instance token>" \
-  -H 'content-type: application/json' \
-  -d '{"status":"done","summary":"查询拆到只读副本，p95 降低 51%","decisions":["写后读主库兜底"],"lessons":["租户维度要进缓存 key"]}'
+node integrations/aiwo-instance/agent.mjs \
+  --base http://127.0.0.1:4500 \
+  --token aiwo_ins_demo_local_7f3a2c \
+  --workspace /Volumes/wd2025/devel/aiworker/aiwo/.run/local-git-demo
 ```
 
-`claim` 返回任务、项目、Agent、`memory`（Mnemos baseUrl/projectId/apiKey/agentId）与历史消息；实例直接用这些配置读写记忆。
+## 任务模型
 
-## Mnemos 集成
+- 任务执行者：`创建人@Aiwo`，没有 agent_id
+- 提示词：`/goal` + 项目提示词 + 引用的提示词卡片 + 任务要求
+- 实例：任务可指定实例，也可由绑定项目的实例自动领取
+- 状态：queued / assigned / running / done / failed / cancelled
+- 执行过程：`session / thinking / text / tool_call / tool_result / status / final`
+- 完成：写任务结果 + Mnemos 项目记忆（配置后）
+- 无任务对话；任务详情页只读展示「结果 / 过程」
 
-项目设置里填 `Mnemos 项目 ID` 与 `API Key`（只存服务端，不回显），随后：
+## 提示词卡片
 
-- 项目「记忆」页可搜索项目记忆、生成任务简报 prompt
-- 任务「完成」会把结论/决策/经验写成项目共享记忆（`visibility=project`，metadata 带 `hiveTaskId`）
-- Agent 的 `memory_agent_id` 决定记忆归属：同一智员在不同项目使用不同 project 内身份
+- scope：组织 / 团队 / 项目
+- category：工作流 / 工作风格 / 工作标准 / 角色说明 / 其他
+- 任务与自动化都可以引用多张卡片；服务端校验卡片可用性
+- 卡片内容只在执行时注入，不复制到任务 prompt 中
 
-演示项目已关联 Mnemos 的 `prj_orion_python` / `prj_atlas_copilot` / `prj_aurora_support`。
+## 系统设置 / 安全检查
 
-## 自动化与仓库 Webhook
+「系统设置」页：
 
-- 自动化触发：`manual`（控制台运行）、`webhook`（GitHub/GitLab 事件）、`cron`（5 段表达式）
-- Webhook 地址：`/api/integrations/github/<projectId>`、`/api/integrations/gitlab/<projectId>`
-- GitHub：`X-Hub-Signature-256` HMAC；GitLab：`X-Gitlab-Token`；按 `delivery id` 去重
-- 事件 → 模板渲染（`{{project}} {{event}} {{title}} {{url}} {{actor}} {{branch}}`）→ 任务入队
+- Endpoint 为空 → 安全检查关闭
+- 填入 OpenAI 兼容的 `/v1/chat/completions` endpoint、model、API key
+- 任务创建、助手对话前调用独立 LLM；返回 `{allowed:false,reason}` 则拦截
+- 安全审计只记录输入 digest，不保存完整输入
+- 助手使用实例可选；未指定时使用默认本地 DSH
 
-## 安全边界（MVP）
+## Mnemos
 
-- 会话令牌、Agent 令牌、实例令牌均只存哈希；secret 只在创建时返回一次
-- 项目可见性 + 项目角色在服务端统一校验（不是前端隐藏）
-- Webhook 验签、原始 body HMAC、delivery 去重、请求体 1MB 上限
-- Mnemos API Key 只存服务端；任何 API 不返回明文
-- 已知限制：SQLite 单机、无 OIDC/SSO、无多副本、Cron 调度为进程内 30s 轮询、任务并发按实例 1 个执行
+项目设置里填写 Mnemos 项目 ID / API Key / 项目记忆身份。任务 claim 时返回项目记忆配置，实例代理拉取上下文；完成后服务端写回结论/决策/经验。
 
-## DSH 数字员工运行时（dsh-hive-runtime）
-
-把一台 DSH 实例接入平台：注册、心跳、自动 claim，并用 `dsh --profile headless` 执行任务、上报结果。
+演示环境可运行：
 
 ```bash
-dsh headless --help                      # 首次准备 headless profile
-cd integrations/dsh-runtime
-pnpm install --ignore-workspace && pnpm build
-dsh plugin --profile desktop add link:$PWD   # 通过 DSH 命令安装
-# 配置写 profile patch 或设置页：baseUrl / agentToken / workspacePath / executionMode=headless
+# Mnemos 需先启动在 http://127.0.0.1:4380
+# 在项目设置中配置 Mnemos 项目 ID / Key
 ```
 
-- 项目提示词会随 claim 注入 headless 提示词（dev/review 两个 worker 已验证）
-- `executionMode=headless`（默认）：每任务 spawn `dsh --profile headless --json -`，NDJSON 进展 + final 结果
-- `command`：交给自定义命令/容器
-- `agent`（可选）：进程内 `agents.create`
-- `echo`：链路联调
-- 测试：`pnpm test:runtime`（8 项）；真实联调 `node integrations/dsh-runtime/scripts/smoke-live.mjs`
-
-详见 [`integrations/dsh-runtime/README.md`](integrations/dsh-runtime/README.md)。
-
-## 验证
+## Git / 测试
 
 ```bash
-pnpm verify          # 类型检查 + 30 个服务端测试 + 控制台构建
-node scripts/smoke.mjs   # 32 项端到端冒烟（需 4400 + Mnemos 4380）
-python3 scripts/shot-pw.py  # 17 张截图（Playwright + 本机 Chrome）
+pnpm test          # 27 个后端测试
+pnpm typecheck
+pnpm build
+pnpm --dir integrations/aiwo-instance test   # 8 个实例代理测试
 ```
 
-- 单测：身份/权限、运行时/队列、cron、模板、Webhook 签名，共 30 项
-- 冒烟：登录与可见性 403、项目/智员/实例、任务创建/消息/领取/进展/完成、Mnemos 检索/写回、自动化、GitLab 验签/去重、SSE
-- 演示数据：4 位人员、3 个团队、5 个项目、5 个智员、3 个实例、5 个任务、3 个自动化
+## 截图
+
+| 概览 | 实例资源 |
+| --- | --- |
+| ![概览](docs/screenshots/01-aiwo-dashboard.png) | ![实例](docs/screenshots/02-aiwo-instances.png) |
+
+| 提示词卡片 | 系统设置 |
+| --- | --- |
+| ![卡片](docs/screenshots/03-aiwo-prompt-cards.png) | ![设置](docs/screenshots/04-aiwo-settings.png) |
+
+| 项目任务 | 任务详情 |
+| --- | --- |
+| ![任务](docs/screenshots/05-aiwo-tasks.png) | ![详情](docs/screenshots/06-aiwo-task-detail.png) |
+
+| 项目概览 | Aiwo 助手（DSH 实例） |
+| --- | --- |
+| ![项目](docs/screenshots/07-aiwo-project.png) | ![助手](docs/screenshots/08-aiwo-assistant.png) |
 
 ## 目录
 
+```text
+aiwo/
+├── server/                  # Aiwo 控制面（Node + node:sqlite）
+├── shared/                  # 前后端契约
+├── web/                     # React 控制台
+├── integrations/
+│   ├── aiwo-instance/       # DSH 实例代理（ACP + headless 回退）
+│   └── assistant/           # DSH 助手 API helper
+├── docs/                    # API / 架构
+└── data/                    # 运行时数据库（gitignored）
 ```
-hive/
-  shared/          # 前后端共享类型/常量
-  server/          # Node 26 + node:sqlite + 原生 http
-    src/http/      # 路由/鉴权/权限/响应
-    src/runtime/   # 实例协议、队列、调度、模板、签名
-    src/memory/    # Mnemos 客户端
-    src/seed/      # 演示数据
-  web/             # React 19 + Vite 控制台
-  docs/            # 设计/接口
-```
-
-## Roadmap
-
-- 人员/团队/项目/智员/实例/任务（MVP）✅
-- DSH 插件接入运行时协议（注册/接单/headless 执行/实时事件/一次性 /goal）✅
-- 审批门禁、配额、审计导出 ⏳
-- Postgres + 多副本 + 队列外置 ⏳

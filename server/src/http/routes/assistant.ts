@@ -3,6 +3,7 @@ import type { Router } from '../router.ts';
 import { requirePerson } from '../auth.ts';
 import { errors } from '../respond.ts';
 import { runAssistantTurn } from '../../assistant/runner.ts';
+import { checkUserInput } from '../../security/check.ts';
 
 const chatSchema = z.object({
   message: z.string().trim().min(1).max(8_000),
@@ -22,6 +23,10 @@ export function registerAssistantRoutes(router: Router): void {
   router.post('/api/assistant/chat', async (rc) => {
     const person = requirePerson(rc);
     const input = await rc.body(chatSchema);
+    const security = await checkUserInput({ db: rc.app.db, personId: person.id, source: 'assistant', content: input.message });
+    if (!security.allowed) {
+      throw errors.badRequest(security.blockedMessage ?? '输入未通过安全检查', { reason: security.reason });
+    }
     const token = bearerToken(rc.req.headers.authorization);
     if (!token) throw errors.unauthorized('助手需要当前人员的登录凭证');
 

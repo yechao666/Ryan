@@ -88,8 +88,8 @@ export function ProjectCard({
 
       <div className="project-metrics">
         <div>
-          <div className="pm-value">{counts.agents}</div>
-          <div className="pm-label">智员</div>
+          <div className="pm-value">{counts.promptCards}</div>
+          <div className="pm-label">提示词</div>
         </div>
         <div>
           <div className="pm-value">{counts.activeTasks}</div>

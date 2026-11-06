@@ -18,10 +18,10 @@ export default defineConfig({
     },
   },
   server: {
-    port: 4401,
+    port: 4501,
     strictPort: true,
     fs: { allow: [root] },
-    proxy: { '/api': { target: 'http://127.0.0.1:4400', changeOrigin: true } },
+    proxy: { '/api': { target: 'http://127.0.0.1:4500', changeOrigin: true } },
   },
   build: { outDir: resolve(here, 'dist'), emptyOutDir: true, target: 'es2022' },
 });

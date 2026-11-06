@@ -1,6 +1,0 @@
-# dsh-hive-runtime bundle patch：把 Hive 数字员工运行时插入 profile。
-#   dsh plugin --profile <name> add link:<本目录>
-# 行 id 同时是设置命名空间：dsh-hive-runtime。
-- insert:
-    - id: dsh-hive-runtime
-      name: 'dsh-hive-runtime'

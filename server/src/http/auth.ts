@@ -13,7 +13,7 @@ import {
   type ProjectRow,
 } from '../lib/access.ts';
 
-const SESSION_PREFIX = 'hive_sess_';
+const SESSION_PREFIX = 'aiwo_sess_';
 
 export function createSession(db: Db, personId: string, ttlHours: number, req: RequestContext): string {
   const token = `${SESSION_PREFIX}${randomToken(24)}`;
@@ -79,54 +79,26 @@ export function requireAdmin(rc: RequestContext): Person {
 }
 
 /** 运行时鉴权：Agent token（注册实例时）或 Instance token（实例运行期）。 */
-export function authenticateAgent(rc: RequestContext): { id: string; name: string; ownerPersonId: string } {
+/** Aiwo 实例令牌：只认证实例本身。 */
+export function authenticateInstance(rc: RequestContext): { id: string; name: string } {
   const header = String(rc.req.headers.authorization ?? '');
   const token = header.startsWith('Bearer ') ? header.slice(7).trim() : '';
   if (!token) throw errors.unauthorized();
   const row = rc.app.db
     .prepare(
-      `SELECT a.id, a.name, a.owner_person_id, a.status, t.id AS token_id
-         FROM agent_tokens t JOIN agents a ON a.id = t.agent_id
-        WHERE t.token_hash = ? AND t.revoked_at IS NULL`,
+      `SELECT id, name, status, revoked_at
+         FROM dsh_instances
+        WHERE token_hash = ?`,
     )
     .get(sha256(token)) as unknown as
-    | { id: string; name: string; owner_person_id: string; status: string; token_id: string }
-    | undefined;
-  if (!row) throw errors.unauthorized('Agent 令牌无效或已吊销');
-  if (row.status === 'retired') throw errors.forbidden('该智员已离职，令牌不可用');
-  rc.app.db.prepare('UPDATE agent_tokens SET last_used_at = ? WHERE id = ?').run(nowIso(), row.token_id);
-  rc.agent = { id: row.id, name: row.name, ownerPersonId: row.owner_person_id, status: row.status };
-  return rc.agent;
-}
-
-export function authenticateInstance(rc: RequestContext): { id: string; agentId: string; name: string } {
-  const header = String(rc.req.headers.authorization ?? '');
-  const token = header.startsWith('Bearer ') ? header.slice(7).trim() : '';
-  if (!token) throw errors.unauthorized();
-  const row = rc.app.db
-    .prepare(
-      `SELECT i.id, i.agent_id, i.name, i.status, i.revoked_at, a.name AS agent_name, a.owner_person_id
-         FROM dsh_instances i JOIN agents a ON a.id = i.agent_id
-        WHERE i.token_hash = ?`,
-    )
-    .get(sha256(token)) as unknown as
-    | {
-        id: string;
-        agent_id: string;
-        name: string;
-        status: string;
-        revoked_at: string | null;
-        agent_name: string;
-        owner_person_id: string;
-      }
+    | { id: string; name: string; status: string; revoked_at: string | null }
     | undefined;
   if (!row || row.revoked_at) throw errors.unauthorized('实例令牌无效或已吊销');
   rc.app.db
     .prepare("UPDATE dsh_instances SET last_seen_at = ?, status = 'online' WHERE id = ?")
     .run(nowIso(), row.id);
-  rc.instance = { id: row.id, agentId: row.agent_id, name: row.name, status: 'online' };
-  rc.agent = { id: row.agent_id, name: row.agent_name, ownerPersonId: row.owner_person_id, status: 'active' };
-  return { id: row.id, agentId: row.agent_id, name: row.name };
+  rc.instance = { id: row.id, name: row.name, status: 'online' };
+  return { id: row.id, name: row.name };
 }
 
 /** 项目访问：读取 / 贡献 / 管理。 */

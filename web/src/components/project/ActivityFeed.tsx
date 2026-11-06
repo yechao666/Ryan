@@ -29,7 +29,7 @@ export function ActivityFeed({
   showTaskLink = false,
   projectId,
   emptyTitle = '暂无活动',
-  emptyDescription = '当项目内创建任务、智员接单或实例上下线时，这里会出现实时记录。',
+  emptyDescription = '当项目内创建任务、实例接单或实例上下线时，这里会出现实时记录。',
 }: ActivityFeedProps) {
   const items = typeof limit === 'number' ? events.slice(0, limit) : events;
 

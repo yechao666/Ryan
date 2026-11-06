@@ -1,23 +1,23 @@
 {
-  "name": "hive",
+  "name": "aiwo",
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "Hive — 数字员工工作平台",
+  "description": "Aiwo — 人员 @Aiwo 的 DSH 编排平台",
   "packageManager": "pnpm@10.4.0",
   "engines": {
     "node": ">=22.18.0"
   },
   "scripts": {
     "dev": "node --watch server/src/main.ts",
-    "dev:web": "pnpm --filter @hive/web run dev",
-    "build": "pnpm --filter @hive/web run build",
+    "dev:web": "pnpm --filter @aiwo/web run dev",
+    "build": "pnpm --filter @aiwo/web run build",
     "start": "node server/src/main.ts",
     "seed": "node server/src/seed/run-seed.ts --force",
     "test": "node --test 'server/src/**/*.test.ts'",
     "typecheck": "tsc -p server/tsconfig.json --noEmit && tsc -p web/tsconfig.json --noEmit",
     "verify": "pnpm run typecheck && pnpm run test && pnpm run build",
-    "test:runtime": "pnpm --dir integrations/dsh-runtime test"
+    "test:runtime": "node --test integrations/aiwo-instance/test/*.mjs"
   },
   "devDependencies": {
     "@types/node": "^24.10.1",
