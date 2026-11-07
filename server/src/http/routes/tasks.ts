@@ -7,6 +7,7 @@ import { canViewProject, getProjectRow, type ProjectRow } from '../../lib/access
 import { recordActivity } from '../../lib/activity.ts';
 import { checkUserInput } from '../../security/check.ts';
 import { generateTaskTitle } from '../../tasks/title.ts';
+import { getDefaultServiceId } from '../../settings/system.ts';
 import type { EventBus } from '../../lib/bus.ts';
 import type { Db } from '../../db/index.ts';
 import { newId, nowIso } from '../../lib/ids.ts';
@@ -340,8 +341,16 @@ export function createTaskRecord(db: Db, bus: EventBus, input: CreateTaskRecordI
       throw errors.badRequest(`服务 ${serviceId} 未绑定当前项目`);
     }
   }
-  // 有项目绑定：只在绑定服务中轮询；无绑定：保持共享池。
-  const allowedServiceIds = explicitServices.length > 0 ? explicitServices : boundServiceIds;
+  // 有项目绑定：只在绑定服务中轮询；无绑定：优先默认服务，未设置则共享池。
+  const configuredDefault = boundServiceIds.length === 0 ? getDefaultServiceId(db) : undefined;
+  const defaultServiceId = configuredDefault
+    ? (rowOf<{ id: string }>(db, 'SELECT id FROM dsh_instances WHERE id = ? AND revoked_at IS NULL', [configuredDefault])?.id ?? null)
+    : null;
+  const allowedServiceIds = explicitServices.length > 0
+    ? explicitServices
+    : boundServiceIds.length > 0
+      ? boundServiceIds
+      : defaultServiceId ? [defaultServiceId] : [];
   let scheduledServiceId: string | null = null;
   if (explicitServices.length === 1) {
     scheduledServiceId = explicitServices[0]!;

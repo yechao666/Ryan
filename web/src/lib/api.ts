@@ -296,6 +296,10 @@ export const api = {
   ): Promise<{ security: SecuritySettings }> {
     return request('/api/settings/security', { method: 'PATCH', body: JSON.stringify(input) });
   },
+  updateDefaultService(serviceId: string | null): Promise<{ defaultServiceId?: string }> {
+    return request('/api/settings/default-service', { method: 'PATCH', body: JSON.stringify({ serviceId }) });
+  },
+
   updateAssistantSettings(
     input: Omit<Partial<AssistantSettings>, 'instanceId'> & { instanceId?: string | null },
   ): Promise<{ assistant: AssistantSettings }> {

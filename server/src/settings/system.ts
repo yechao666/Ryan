@@ -47,17 +47,28 @@ export function publicSecuritySettings(db: Db): SecuritySettings {
   return rest;
 }
 
+export function getDefaultServiceId(db: Db): string | undefined {
+  const stored = getRawSetting<{ serviceId?: unknown }>(db, 'default-service', {});
+  return typeof stored.serviceId === 'string' && stored.serviceId ? stored.serviceId : undefined;
+}
+
+export function setDefaultServiceId(db: Db, serviceId: string | null, updatedBy: string): string | undefined {
+  setRawSetting(db, 'default-service', { serviceId: serviceId ?? '' }, updatedBy);
+  return serviceId ?? undefined;
+}
+
 export function getAssistantSettings(db: Db): AssistantSettings {
   return getRawSetting<AssistantSettings>(db, 'assistant', { enabled: true });
 }
 
 export function getSystemSettings(db: Db): SystemSettings {
-  const row = db.prepare("SELECT updated_at, updated_by FROM system_settings WHERE key IN ('security','assistant') ORDER BY updated_at DESC LIMIT 1").get() as unknown as
+  const row = db.prepare("SELECT updated_at, updated_by FROM system_settings WHERE key IN ('security','assistant','default-service') ORDER BY updated_at DESC LIMIT 1").get() as unknown as
     | { updated_at: string; updated_by: string | null }
     | undefined;
   return {
     security: publicSecuritySettings(db),
     assistant: getAssistantSettings(db),
+    defaultServiceId: getDefaultServiceId(db),
     updatedAt: row?.updated_at,
     updatedBy: row?.updated_by ?? undefined,
   };

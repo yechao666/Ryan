@@ -79,6 +79,7 @@ export function InstancesPage() {
   const toast = useToast();
   const isAdmin = Boolean(person?.isAdmin);
   const instances = useAsync(() => api.instances(), []);
+  const settings = useAsync(() => api.settings(), []);
   // 服务靠心跳更新在线状态，页面每 15s 静默刷新一次资源视图。
   useInterval(() => {
     void instances.refresh();
@@ -98,6 +99,7 @@ export function InstancesPage() {
   const [revoking, setRevoking] = useState(false);
 
   const list = useMemo(() => instances.data ?? [], [instances.data]);
+  const defaultServiceId = settings.data?.defaultServiceId ?? '';
   const online = list.filter((item) => item.status === 'online').length;
   const unconfigured = list.filter((item) => item.status === 'unconfigured').length;
   const offline = list.filter((item) => item.status === 'offline').length;
@@ -159,6 +161,17 @@ export function InstancesPage() {
       toast.error(message);
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  const handleDefault = async (instance: DshInstance) => {
+    try {
+      const isDefault = defaultServiceId === instance.id;
+      await api.updateDefaultService(isDefault ? null : instance.id);
+      toast.success(isDefault ? `已取消默认服务：${instance.name}` : `已设为默认服务：${instance.name}`);
+      await Promise.all([settings.refresh(), instances.refresh()]);
+    } catch (cause) {
+      toast.error(errorMessage(cause, '设置默认服务失败'));
     }
   };
 
@@ -323,6 +336,9 @@ export function InstancesPage() {
                       <Badge size="sm" tone={status.tone as Tone} dot>
                         {status.label}
                       </Badge>
+                      {defaultServiceId === instance.id ? (
+                        <Badge size="sm" tone="green">默认服务</Badge>
+                      ) : null}
                     </div>
                   </div>
                 </div>
@@ -392,6 +408,14 @@ export function InstancesPage() {
                       </Button>
                     </div>
                     <div className="hstack gap-4">
+                      <Button
+                        size="sm"
+                        variant={defaultServiceId === instance.id ? 'ghost' : 'outline'}
+                        icon="star"
+                        onClick={() => void handleDefault(instance)}
+                      >
+                        {defaultServiceId === instance.id ? '取消默认' : '设为默认'}
+                      </Button>
                       <Button size="sm" variant="ghost" icon="key" onClick={() => setRotateTarget(instance)}>
                         轮换 token
                       </Button>

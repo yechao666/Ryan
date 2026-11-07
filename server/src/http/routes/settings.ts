@@ -1,7 +1,8 @@
 import { z } from 'zod';
 import type { Router } from '../router.ts';
 import { requireAdmin, requirePerson } from '../auth.ts';
-import { getAssistantSettings, getSecuritySettings, getSystemSettings, setAssistantSettings, setSecuritySettings } from '../../settings/system.ts';
+import { getAssistantSettings, getSecuritySettings, getSystemSettings, setAssistantSettings, setDefaultServiceId, setSecuritySettings } from '../../settings/system.ts';
+import { errors } from '../respond.ts';
 
 const securityInputSchema = z.object({
   enabled: z.boolean().optional(),
@@ -28,6 +29,19 @@ export function registerSettingsRoutes(router: Router): void {
     const person = requireAdmin(rc);
     const input = await rc.body(securityInputSchema);
     rc.json({ security: setSecuritySettings(rc.app.db, input, person.id) });
+  });
+
+  router.patch('/api/settings/default-service', async (rc) => {
+    const person = requireAdmin(rc);
+    const input = await rc.body(z.object({ serviceId: z.string().min(1).nullable() }));
+    if (input.serviceId) {
+      const service = rc.app.db
+        .prepare('SELECT id FROM dsh_instances WHERE id = ? AND revoked_at IS NULL')
+        .get(input.serviceId) as unknown as { id: string } | undefined;
+      if (!service) throw errors.badRequest('默认 DSH 服务不存在或已吊销');
+    }
+    const defaultServiceId = setDefaultServiceId(rc.app.db, input.serviceId, person.id);
+    rc.json({ defaultServiceId });
   });
 
   router.patch('/api/settings/assistant', async (rc) => {

@@ -101,7 +101,7 @@ node integrations/aiwo-instance/agent.mjs \
 - 任务执行者：`创建人@Aiwo`，没有 agent_id
 - 标题：创建时可留空，由服务端调用 DSH 整理；失败时自动取任务内容首行
 - 提示词：`/goal` + 项目提示词 + 引用的提示词卡片 + 任务要求
-- 服务：项目可绑定多个服务，任务在绑定服务间公平轮询；任务可指定一个或多个允许服务，未指定时按项目绑定调度，项目未绑定时进入共享池
+- 服务：项目可绑定多个服务，任务在绑定服务间公平轮询；项目未绑定时使用默认服务（未设置默认服务则共享池）；任务可指定一个或多个允许服务
 - 状态：queued / assigned / running / done / failed / cancelled
 - 执行过程：`session / thinking / text / tool_call / tool_result / status / final`
 - 完成：写任务结果 + Mnemos 项目记忆（配置后）

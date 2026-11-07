@@ -390,6 +390,8 @@ export interface AssistantSettings {
 export interface SystemSettings {
   security: SecuritySettings;
   assistant: AssistantSettings;
+  /** 项目未绑定服务时使用的默认 DSH 服务。 */
+  defaultServiceId?: string;
   updatedAt?: string;
   updatedBy?: string;
 }

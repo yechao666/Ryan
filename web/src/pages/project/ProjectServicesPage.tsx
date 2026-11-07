@@ -27,6 +27,7 @@ export function ProjectServicesPage() {
   const projectId = detail.project.id;
   const toast = useToast();
   const services = useAsync(() => api.instances(), []);
+  const settings = useAsync(() => api.settings(), []);
   const [serviceIds, setServiceIds] = useState<string[]>(detail.project.serviceIds ?? []);
   const [saving, setSaving] = useState(false);
   const [addOpen, setAddOpen] = useState(false);
@@ -43,6 +44,7 @@ export function ProjectServicesPage() {
   const bound = available.filter((service) => serviceIds.includes(service.id));
   const unbound = available.filter((service) => !serviceIds.includes(service.id));
   const online = bound.filter((service) => service.status === 'online').length;
+  const defaultService = available.find((service) => service.id === settings.data?.defaultServiceId);
 
   const save = async (next: string[], message: string) => {
     setSaving(true);
@@ -119,7 +121,7 @@ export function ProjectServicesPage() {
           <EmptyState
             icon="server"
             title="尚未绑定 DSH 服务"
-            description="绑定服务后，项目任务只在绑定服务间调度；不绑定则进入共享服务池。"
+            description="绑定服务后，项目任务只在绑定服务间调度；不绑定则使用默认服务或共享池。"
             action={<Button size="sm" variant="primary" icon="plus" onClick={openAdd}>添加服务</Button>}
             compact
           />
@@ -159,7 +161,7 @@ export function ProjectServicesPage() {
 
       {serviceIds.length === 0 ? (
         <Callout tone="amber" icon="info">
-          当前项目未绑定服务：任务会进入共享服务池，由任意在线服务领取。
+          当前项目未绑定服务：{defaultService ? `任务将使用默认服务「${defaultService.name}」` : '任务会进入共享服务池，由任意在线服务领取'}。
         </Callout>
       ) : (
         <Callout tone="cyan" icon="info">

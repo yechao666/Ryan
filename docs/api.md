@@ -106,6 +106,7 @@ Aiwo 任务执行者固定为「创建人@Aiwo」；任务不支持对话，只�
 | PATCH | `/api/settings/security` | `{enabled,endpoint,model,apiKey,timeoutMs,blockMessage}`；endpoint 为空即关闭 |
 | POST | `/api/settings/security/test` | 测试安全模型连通性 |
 | PATCH | `/api/settings/assistant` | `{enabled,instanceId,model}` |
+| PATCH | `/api/settings/default-service` | `{serviceId:string|null}` 设置/取消默认 DSH 服务 |
 
 ## 助手
 

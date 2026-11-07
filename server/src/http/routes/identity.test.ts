@@ -277,3 +277,30 @@ test('项目绑定服务：任务只在绑定服务间公平轮询', async () =>
   assert.ok(secondTask.instanceId);
   assert.notEqual(firstTask.instanceId, secondTask.instanceId, '两次任务应轮询到不同服务');
 });
+
+test('默认服务：项目未绑定服务时任务使用默认服务', async () => {
+  const project = ok(await call('/api/projects', {
+    token: tokenLin,
+    method: 'POST',
+    body: { name: '默认服务项目', slug: 'default-service-project', visibility: 'team', ownerTeamId: 'tm_platform', type: 'manual' },
+  }));
+  ok(await call('/api/settings/default-service', {
+    token: tokenLin,
+    method: 'PATCH',
+    body: { serviceId: 'ins_local' },
+  }));
+  const task = ok(await call(`/api/projects/${project.id}/tasks`, {
+    token: tokenLin,
+    method: 'POST',
+    body: { title: '默认服务任务', prompt: 'echo default', type: 'ops' },
+  }));
+  assert.deepEqual(task.allowedServiceIds, ['ins_local']);
+  assert.equal(task.instanceId, 'ins_local');
+  const settings = ok(await call('/api/settings', { token: tokenLin }));
+  assert.equal(settings.defaultServiceId, 'ins_local');
+  ok(await call('/api/settings/default-service', {
+    token: tokenLin,
+    method: 'PATCH',
+    body: { serviceId: null },
+  }));
+});
