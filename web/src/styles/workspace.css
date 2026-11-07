@@ -2096,3 +2096,30 @@
   line-height: 1.7;
 }
 .ws-task-prompt .ws-md { gap: 6px; }
+
+/* 任务详情分区 */
+.ws-detail-panel {
+  --detail-tone: rgba(139, 124, 255, 0.55);
+  --detail-bg: rgba(139, 124, 255, 0.045);
+  padding: 14px;
+  border: 1px solid var(--border-faint);
+  border-left: 3px solid var(--detail-tone);
+  border-radius: 12px;
+  background: linear-gradient(100deg, var(--detail-bg), transparent 55%);
+}
+.ws-detail-panel.is-violet { --detail-tone: rgba(139, 124, 255, 0.7); --detail-bg: rgba(139, 124, 255, 0.07); }
+.ws-detail-panel.is-blue { --detail-tone: rgba(96, 165, 250, 0.7); --detail-bg: rgba(96, 165, 250, 0.06); }
+.ws-detail-panel.is-cyan { --detail-tone: rgba(34, 211, 238, 0.65); --detail-bg: rgba(34, 211, 238, 0.055); }
+.ws-detail-panel.is-amber { --detail-tone: rgba(251, 191, 36, 0.7); --detail-bg: rgba(251, 191, 36, 0.055); }
+.ws-detail-panel.is-green { --detail-tone: rgba(52, 211, 153, 0.7); --detail-bg: rgba(52, 211, 153, 0.055); }
+.ws-detail-panel .section-head { margin-bottom: 4px; }
+.ws-detail-panel .ws-task-prompt {
+  border-color: rgba(139, 124, 255, 0.18);
+  background: rgba(0, 0, 0, 0.18);
+}
+.ws-meta-grid.ws-detail-meta {
+  padding: 12px 14px;
+  border: 1px solid var(--border-faint);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.018);
+}
