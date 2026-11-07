@@ -16,13 +16,16 @@ import {
   Input,
   Modal,
   PageHead,
+  Pagination,
   SearchInput,
   Segmented,
   Select,
   Skeleton,
   Switch,
+  Table,
   Textarea,
   useToast,
+  type Column,
   type Tone,
 } from '@ui';
 import { api } from '../lib/api.ts';
@@ -93,6 +96,8 @@ export function PromptCardsPage() {
   const [category, setCategory] = useState<'all' | PromptCardCategory>('all');
   const [scope, setScope] = useState<'all' | PromptCardScope>('all');
   const [enabledFilter, setEnabledFilter] = useState<EnabledFilter>('all');
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(20);
 
   const [formOpen, setFormOpen] = useState(() => params.get('new') === '1');
   const [editing, setEditing] = useState<PromptCard | null>(null);
@@ -124,6 +129,14 @@ export function PromptCardsPage() {
         .includes(keyword);
     });
   }, [cards.data, search, category, scope, enabledFilter]);
+
+  const totalPages = Math.max(1, Math.ceil(list.length / pageSize));
+  const currentPage = Math.min(page, totalPages);
+  const pagedList = useMemo(
+    () => list.slice((currentPage - 1) * pageSize, currentPage * pageSize),
+    [list, currentPage, pageSize],
+  );
+  useEffect(() => { setPage(1); }, [search, category, scope, enabledFilter, pageSize]);
 
   const scopeOptions = useMemo(
     () =>
@@ -265,6 +278,86 @@ export function PromptCardsPage() {
     setEnabledFilter('all');
   };
 
+  const columns: Column<PromptCard>[] = [
+    {
+      key: 'name',
+      header: '提示卡',
+      render: (card) => {
+        const meta = categoryMeta(card.category);
+        return (
+          <div className="hstack gap-8">
+            <span className={`cx-metric-icon tone-${meta.tone}`}><Icon name="book" size={14} /></span>
+            <div className="vstack gap-2" style={{ minWidth: 0 }}>
+              <span className="strong truncate">{card.name}</span>
+              <span className="tiny dim truncate">{card.description || '暂无说明'}</span>
+            </div>
+          </div>
+        );
+      },
+    },
+    {
+      key: 'category',
+      header: '类别',
+      width: 105,
+      render: (card) => {
+        const meta = categoryMeta(card.category);
+        return <Badge size="sm" tone={meta.tone as Tone}>{meta.label}</Badge>;
+      },
+    },
+    {
+      key: 'scope',
+      header: '范围',
+      width: 150,
+      render: (card) => (
+        <div className="vstack gap-2" style={{ minWidth: 0, alignItems: 'flex-start' }}>
+          <Badge size="sm" tone={card.scope === 'org' ? 'violet' : card.scope === 'team' ? 'cyan' : card.scope === 'project' ? 'blue' : 'slate'}>{scopeMeta(card.scope).label}</Badge>
+          <span className="tiny dim truncate">{cardTarget(card) || '—'}</span>
+        </div>
+      ),
+    },
+    {
+      key: 'content',
+      header: '内容',
+      render: (card) => <span className="prompt-card-preview" title={card.content}>{card.content}</span>,
+    },
+    {
+      key: 'enabled',
+      header: '状态',
+      width: 100,
+      render: (card) => (
+        <div className="hstack gap-6" onClick={(event) => event.stopPropagation()}>
+          <Switch checked={card.enabled} disabled={togglingId === card.id} onChange={() => void handleToggle(card)} />
+          <span className="tiny dim">{card.enabled ? '启用' : '停用'}</span>
+        </div>
+      ),
+      sortValue: (card) => (card.enabled ? 1 : 0),
+    },
+    {
+      key: 'updatedAt',
+      header: '最近更新',
+      width: 135,
+      render: (card) => (
+        <div className="vstack gap-2">
+          <span className="tiny dim">{fmtRelative(card.updatedAt)}</span>
+          <span className="tiny dim truncate">{card.createdByName || '—'}</span>
+        </div>
+      ),
+      sortValue: (card) => Date.parse(card.updatedAt) || 0,
+    },
+    {
+      key: 'actions',
+      header: '操作',
+      width: 96,
+      align: 'right',
+      render: (card) => (
+        <div className="hstack gap-2" style={{ justifyContent: 'flex-end' }} onClick={(event) => event.stopPropagation()}>
+          <IconButton icon="pencil" label={`编辑 ${card.name}`} size="sm" onClick={() => openEdit(card)} />
+          <IconButton icon="trash" label={`删除 ${card.name}`} size="sm" onClick={() => setDeleteTarget(card)} />
+        </div>
+      ),
+    },
+  ];
+
   return (
     <div className="page">
       <PageHead
@@ -321,106 +414,53 @@ export function PromptCardsPage() {
       </div>
 
       {cards.error && !cards.data ? (
-        <ErrorState message={cards.error} onRetry={() => void cards.refresh()} />
-      ) : cards.loading && !cards.data ? (
-        <div className="grid-cards">
-          {[0, 1, 2, 3].map((item) => (
-            <Card className="card-pad" key={item}>
-              <Skeleton h={20} />
-              <div style={{ height: 10 }} />
-              <Skeleton h={12} />
-              <div style={{ height: 8 }} />
-              <Skeleton h={46} />
-              <div style={{ height: 10 }} />
-              <Skeleton h={24} />
-            </Card>
-          ))}
-        </div>
-      ) : list.length === 0 ? (
+        <Card><div style={{ padding: 18 }}><ErrorState message={cards.error} onRetry={() => void cards.refresh()} /></div></Card>
+      ) : (
         <Card>
-          <EmptyState
-            icon="book"
-            title={hasFilter ? '没有匹配的提示卡' : '还没有提示卡'}
-            description={
-              hasFilter
-                ? '试试其他关键词、类别或范围筛选。'
-                : '创建第一张卡片，把可复用的工作方式沉淀下来。'
-            }
-            action={
+          <Table
+            columns={columns}
+            rows={pagedList}
+            rowKey={(card) => card.id}
+            sortable
+            resizable
+            loading={cards.loading && !cards.data}
+            empty={
               hasFilter ? (
-                <Button size="sm" onClick={clearFilters}>
-                  清除筛选
-                </Button>
+                <EmptyState
+                  icon="filter"
+                  title="没有匹配的提示卡"
+                  description="试试其他关键词、类别或范围筛选。"
+                  compact
+                  action={<Button size="sm" onClick={clearFilters}>清除筛选</Button>}
+                />
               ) : (
-                <Button variant="primary" icon="plus" onClick={openCreate}>
-                  新建卡片
-                </Button>
+                <EmptyState
+                  icon="book"
+                  title="还没有提示卡"
+                  description="创建第一张卡片，把可复用的工作方式沉淀下来。"
+                  action={<Button size="sm" variant="primary" icon="plus" onClick={openCreate}>新建卡片</Button>}
+                />
               )
             }
           />
+          {!cards.loading && list.length > 0 ? (
+            <div className="ws-table-foot">
+              <Pagination
+                page={currentPage}
+                totalPages={totalPages}
+                total={list.length}
+                pageSize={pageSize}
+                pageSizeOptions={[
+                  { value: '10', label: '每页 10 行' },
+                  { value: '20', label: '每页 20 行' },
+                  { value: '50', label: '每页 50 行' },
+                ]}
+                onPageSizeChange={setPageSize}
+                onChange={setPage}
+              />
+            </div>
+          ) : null}
         </Card>
-      ) : (
-        <div className="grid-cards">
-          {list.map((card) => {
-            const meta = categoryMeta(card.category);
-            const target = cardTarget(card);
-            return (
-              <Card className="card-pad" key={card.id} style={card.enabled ? undefined : { opacity: 0.72 }}>
-                <div className="row-between" style={{ alignItems: 'flex-start', gap: 10 }}>
-                  <div className="hstack gap-10" style={{ minWidth: 0 }}>
-                    <span className={`cx-metric-icon tone-${meta.tone}`}>
-                      <Icon name="book" size={15} />
-                    </span>
-                    <div style={{ minWidth: 0 }}>
-                      <div className="strong truncate" title={card.name}>
-                        {card.name}
-                      </div>
-                      <div className="tiny dim truncate">{card.description || '暂无说明'}</div>
-                    </div>
-                  </div>
-                  <Switch
-                    checked={card.enabled}
-                    disabled={togglingId === card.id}
-                    onChange={() => void handleToggle(card)}
-                  />
-                </div>
-
-                <p className="small muted clamp-2" style={{ marginTop: 10, whiteSpace: 'pre-wrap' }}>
-                  {card.content}
-                </p>
-
-                <div className="badge-dot-list" style={{ marginTop: 10 }}>
-                  <Badge size="sm" tone={meta.tone as Tone}>
-                    {meta.label}
-                  </Badge>
-                  <Badge size="sm" tone="slate">
-                    {scopeMeta(card.scope).label}
-                  </Badge>
-                  {target ? <span className="tiny dim truncate">{target}</span> : null}
-                  {card.enabled ? null : <Badge size="sm" tone="amber">已停用</Badge>}
-                </div>
-
-                <div
-                  className="row-between"
-                  style={{ marginTop: 12, paddingTop: 10, borderTop: '1px solid var(--border-faint)' }}
-                >
-                  <span className="tiny dim">
-                    {card.createdByName ? `${card.createdByName} · ` : ''}更新 {fmtRelative(card.updatedAt)}
-                  </span>
-                  <div className="hstack gap-4">
-                    <IconButton icon="pencil" label={`编辑 ${card.name}`} size="sm" onClick={() => openEdit(card)} />
-                    <IconButton
-                      icon="trash"
-                      label={`删除 ${card.name}`}
-                      size="sm"
-                      onClick={() => setDeleteTarget(card)}
-                    />
-                  </div>
-                </div>
-              </Card>
-            );
-          })}
-        </div>
       )}
 
       <Modal
