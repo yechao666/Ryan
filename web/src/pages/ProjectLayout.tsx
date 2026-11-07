@@ -129,6 +129,7 @@ export function ProjectLayout() {
   const tabs: TabItem[] = [
     { to: base, label: '概览', end: true },
     { to: `${base}/tasks`, label: '任务', count: counts.tasks || undefined },
+    { to: `${base}/services`, label: '服务', count: counts.instances || undefined },
     { to: `${base}/activity`, label: '活动' },
     { to: `${base}/automations`, label: '自动化' },
     { to: `${base}/memory`, label: '记忆' },

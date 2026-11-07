@@ -18,6 +18,7 @@ import { ProjectActivityPage } from '../pages/project/ProjectActivityPage.tsx';
 import { ProjectAutomationsPage } from '../pages/project/ProjectAutomationsPage.tsx';
 import { ProjectMemoryPage } from '../pages/project/ProjectMemoryPage.tsx';
 import { ProjectSettingsPage } from '../pages/project/ProjectSettingsPage.tsx';
+import { ProjectServicesPage } from '../pages/project/ProjectServicesPage.tsx';
 
 function RequireAuth({ children }: { children: React.ReactNode }) {
   const { person, loading } = useAuth();
@@ -53,6 +54,7 @@ export function AppRoutes() {
           <Route path="activity" element={<ProjectActivityPage />} />
           <Route path="automations" element={<ProjectAutomationsPage />} />
           <Route path="memory" element={<ProjectMemoryPage />} />
+          <Route path="services" element={<ProjectServicesPage />} />
           <Route path="settings" element={<ProjectSettingsPage />} />
         </Route>
         <Route path="/teams" element={<TeamsPage />} />
