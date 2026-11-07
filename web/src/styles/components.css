@@ -2067,3 +2067,39 @@ body.drawer-resizing * {
 .card > .table-wrap {
   border-radius: 0;
 }
+
+.table-pagination {
+  padding: 10px 16px;
+  gap: 12px;
+}
+.table-pagination-info {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+.page-size-control {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--text-dim);
+  font-size: 11px;
+  white-space: nowrap;
+}
+.page-size-select {
+  height: 26px;
+  padding: 0 20px 0 8px;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  background:
+    linear-gradient(45deg, transparent 50%, var(--text-dim) 50%) calc(100% - 11px) 11px / 4px 4px no-repeat,
+    linear-gradient(135deg, var(--text-dim) 50%, transparent 50%) calc(100% - 7px) 11px / 4px 4px no-repeat,
+    var(--surface);
+  color: var(--text-soft);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  appearance: none;
+  cursor: pointer;
+}
+.page-size-select:hover { border-color: var(--border-strong); }
+.page-size-select:focus { outline: 0; border-color: var(--primary-border); }

@@ -927,12 +927,16 @@ export function Pagination({
   total,
   pageSize,
   onChange,
+  pageSizeOptions,
+  onPageSizeChange,
 }: {
   page: number;
   totalPages: number;
   total: number;
   pageSize: number;
   onChange: (page: number) => void;
+  pageSizeOptions?: { value: string; label: string }[];
+  onPageSizeChange?: (size: number) => void;
 }) {
   const pages = useMemo(() => {
     const list: number[] = [];
@@ -942,9 +946,29 @@ export function Pagination({
   }, [page, totalPages]);
 
   return (
-    <div className="between" style={{ padding: '12px 16px' }}>
-      <div className="tiny dim">
-        共 {total.toLocaleString('zh-CN')} 条 · 每页 {pageSize} 条
+    <div className="between table-pagination">
+      <div className="table-pagination-info">
+        <span className="tiny dim">共 {total.toLocaleString('zh-CN')} 条</span>
+        {pageSizeOptions?.length && onPageSizeChange ? (
+          <label className="page-size-control">
+            <span>每页</span>
+            <select
+              className="page-size-select"
+              aria-label="每页显示行数"
+              value={String(pageSize)}
+              onChange={(event) => onPageSizeChange(Number(event.target.value))}
+            >
+              {pageSizeOptions.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.value}
+                </option>
+              ))}
+            </select>
+            <span>行</span>
+          </label>
+        ) : (
+          <span className="tiny dim">每页 {pageSize} 条</span>
+        )}
       </div>
       <div className="hstack gap-4">
         <IconButton icon="chevronLeft" label="上一页" size="sm" disabled={page <= 1} onClick={() => onChange(page - 1)} />

@@ -585,15 +585,15 @@ export function ProjectMemoryPage() {
           />
           {!memories.loading && filtered.length > 0 ? (
             <div className="ws-table-foot">
-              <div className="hstack gap-6">
-                <Select
-                  className="ws-page-size"
-                  value={String(pageSize)}
-                  options={PAGE_SIZE_OPTIONS}
-                  onChange={(event) => setPageSize(Number(event.target.value))}
-                />
-              </div>
-              <Pagination page={currentPage} totalPages={totalPages} total={filtered.length} pageSize={pageSize} onChange={setPage} />
+              <Pagination
+                page={currentPage}
+                totalPages={totalPages}
+                total={filtered.length}
+                pageSize={pageSize}
+                pageSizeOptions={PAGE_SIZE_OPTIONS}
+                onPageSizeChange={setPageSize}
+                onChange={setPage}
+              />
             </div>
           ) : null}
         </Card>
