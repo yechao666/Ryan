@@ -49,7 +49,7 @@ export function TeamDetailPage() {
   );
 
   const [addOpen, setAddOpen] = useState(false);
-  const [addPersonId, setAddPersonId] = useState('');
+  const [addPersonIds, setAddPersonIds] = useState<string[]>([]);
   const [personPickerOpen, setPersonPickerOpen] = useState(false);
   const [addRole, setAddRole] = useState<TeamRole>('member');
   const [addError, setAddError] = useState<string | null>(null);
@@ -58,17 +58,18 @@ export function TeamDetailPage() {
   const [removing, setRemoving] = useState(false);
 
   const persons = useResource<Person[]>(() => api.persons(), [addOpen], addOpen);
+  const teamsForFilter = useResource(() => api.teams(), [addOpen], addOpen);
   const team = data?.team;
   const members = data?.members ?? [];
   const projects = data?.projects ?? [];
   const canManage = Boolean(person?.isAdmin || (team && person?.id === team.leadPersonId));
   const memberIds = new Set(members.map((member) => member.personId));
   const candidates = (persons.data ?? []).filter((item) => !memberIds.has(item.id));
-  const selectedCandidate = candidates.find((item) => item.id === addPersonId);
+  const selectedCandidates = candidates.filter((item) => addPersonIds.includes(item.id));
 
   const openAdd = () => {
     setAddError(null);
-    setAddPersonId('');
+    setAddPersonIds([]);
     setPersonPickerOpen(false);
     setAddRole('member');
     setAddOpen(true);
@@ -77,16 +78,15 @@ export function TeamDetailPage() {
   const handleAdd = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!team) return;
-    const candidate = candidates.find((item) => item.id === addPersonId);
-    if (!candidate) {
-      setAddError('请选择要添加的成员。');
+    if (addPersonIds.length === 0) {
+      setAddError('请至少选择一位成员。');
       return;
     }
     setAdding(true);
     setAddError(null);
     try {
-      await api.addTeamMember(team.id, candidate.id, addRole);
-      toast.success(`${candidate.name} 已加入团队`);
+      await api.addTeamMembers(team.id, addPersonIds, addRole);
+      toast.success(`已添加 ${addPersonIds.length} 位成员`);
       setAddOpen(false);
       await reload();
     } catch (cause) {
@@ -302,14 +302,14 @@ export function TeamDetailPage() {
         open={addOpen}
         onClose={() => setAddOpen(false)}
         title="添加团队成员"
-        description="成员加入后可访问可见性为团队的项目。"
+        description="可一次添加多位成员；加入后可访问团队可见性项目。"
         footer={
           <>
             <Button variant="ghost" onClick={() => setAddOpen(false)}>
               取消
             </Button>
-            <Button variant="primary" type="submit" form="add-team-member-form" loading={adding} icon="plus">
-              添加成员
+            <Button variant="primary" type="submit" form="add-team-member-form" loading={adding} icon="plus" disabled={addPersonIds.length === 0}>
+              添加{addPersonIds.length ? ` ${addPersonIds.length} 人` : '成员'}
             </Button>
           </>
         }
@@ -329,25 +329,41 @@ export function TeamDetailPage() {
                     : undefined
             }
           >
-            {selectedCandidate ? (
-              <div className="ws-pick-item">
-                <Avatar name={selectedCandidate.name} tone={toneFor(selectedCandidate.email)} size="sm" />
-                <div className="ws-pick-main grow">
-                  <span className="ws-pick-name">{selectedCandidate.name}</span>
-                  <span className="tiny dim">{selectedCandidate.title || '—'} · {selectedCandidate.email}</span>
+            {selectedCandidates.length ? (
+              <div className="vstack gap-6">
+                {selectedCandidates.map((candidate) => (
+                  <div className="ws-pick-item" key={candidate.id}>
+                    <Avatar name={candidate.name} tone={toneFor(candidate.email)} size="sm" />
+                    <div className="ws-pick-main grow">
+                      <span className="ws-pick-name">{candidate.name}</span>
+                      <span className="tiny dim">{candidate.title || '—'} · {candidate.email}</span>
+                    </div>
+                    <IconButton
+                      icon="x"
+                      label={`移除 ${candidate.name}`}
+                      size="sm"
+                      onClick={() => setAddPersonIds((current) => current.filter((id) => id !== candidate.id))}
+                    />
+                  </div>
+                ))}
+                <div>
+                  <Button size="sm" variant="outline" icon="users" onClick={() => setPersonPickerOpen(true)}>
+                    继续添加
+                  </Button>
                 </div>
-                <Button size="sm" variant="ghost" icon="users" onClick={() => setPersonPickerOpen(true)}>更换</Button>
               </div>
             ) : (
-              <Button variant="outline" icon="users" onClick={() => setPersonPickerOpen(true)}>选择人员</Button>
+              <Button variant="outline" icon="users" onClick={() => setPersonPickerOpen(true)}>选择人员（可多选）</Button>
             )}
             <PersonPicker
               open={personPickerOpen}
+              multiple
               people={candidates}
-              value={addPersonId}
+              values={addPersonIds}
+              teams={(teamsForFilter.data ?? []).map((item) => ({ id: item.id, name: item.name }))}
               loading={persons.loading && !persons.data}
               onClose={() => setPersonPickerOpen(false)}
-              onSelect={(selected) => setAddPersonId(selected.id)}
+              onSelectMany={(selected) => setAddPersonIds(selected.map((item) => item.id))}
             />
           </Field>
 

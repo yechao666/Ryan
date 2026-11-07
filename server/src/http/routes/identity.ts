@@ -237,7 +237,25 @@ export function registerIdentityRoutes(router: Router): void {
     const rows = rc.app.db
       .prepare('SELECT * FROM persons ORDER BY created_at DESC, name ASC')
       .all() as unknown as PersonRow[];
-    rc.json(rows.map((row) => personFromRow(row)));
+    const memberships = rc.app.db
+      .prepare(
+        `SELECT tm.person_id, tm.team_id, t.name AS team_name
+           FROM team_members tm JOIN teams t ON t.id = tm.team_id
+          ORDER BY t.name ASC`,
+      )
+      .all() as unknown as { person_id: string; team_id: string; team_name: string }[];
+    const byPerson = new Map<string, { ids: string[]; names: string[] }>();
+    for (const row of memberships) {
+      const entry = byPerson.get(row.person_id) ?? { ids: [], names: [] };
+      entry.ids.push(row.team_id);
+      entry.names.push(row.team_name);
+      byPerson.set(row.person_id, entry);
+    }
+    rc.json(rows.map((row) => {
+      const person = personFromRow(row);
+      const teams = byPerson.get(row.id);
+      return teams ? { ...person, teamIds: teams.ids, teamNames: teams.names } : person;
+    }));
   });
 
   // ---- 团队 ---------------------------------------------------------------
@@ -348,6 +366,26 @@ export function registerIdentityRoutes(router: Router): void {
     const member = buildTeamMember(db, team.id, body.personId);
     if (!member) throw errors.internal('团队成员写入失败');
     rc.json(member);
+  });
+
+  router.post('/api/teams/:id/members/bulk', async (rc) => {
+    requirePerson(rc);
+    const team = loadTeamOr404(rc, rc.params.id!);
+    requireTeam(rc, team.id, true);
+    const body = await rc.body(z.object({
+      personIds: z.array(z.string().min(1)).min(1).max(100),
+      role: z.enum(['lead', 'member']).optional(),
+    }));
+    const db = rc.app.db;
+    const personIds = [...new Set(body.personIds)];
+    for (const personId of personIds) assertPersonExists(db, personId);
+    tx(db, () => {
+      for (const personId of personIds) upsertTeamMember(db, team.id, personId, body.role ?? 'member');
+      if (body.role === 'lead' && personIds[0]) {
+        db.prepare('UPDATE teams SET lead_person_id = ? WHERE id = ?').run(personIds[0], team.id);
+      }
+    });
+    rc.json({ ok: true, count: personIds.length });
   });
 
   router.delete('/api/teams/:id/members/:personId', (rc) => {

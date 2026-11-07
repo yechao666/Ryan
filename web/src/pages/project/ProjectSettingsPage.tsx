@@ -414,6 +414,7 @@ export function ProjectSettingsPage() {
           <PersonPicker
             open={personPickerOpen}
             people={availablePersons}
+            teams={(teams.data ?? []).map((team) => ({ id: team.id, name: team.name }))}
             value={newPersonId}
             onClose={() => setPersonPickerOpen(false)}
             onSelect={(selected) => setNewPersonId(selected.id)}

@@ -640,3 +640,20 @@ test('统一认证：OIDC 登录自动创建人员并建立会话', async () => 
     idp.close();
   }
 });
+
+test('团队批量添加成员', async () => {
+  const team = ok(await call('/api/teams', {
+    token: tokenLin,
+    method: 'POST',
+    body: { name: '批量成员团队', slug: 'bulk-member-team' },
+  }));
+  const added = ok(await call(`/api/teams/${team.id}/members/bulk`, {
+    token: tokenLin,
+    method: 'POST',
+    body: { personIds: ['per_zhouye', 'per_suyan'], role: 'member' },
+  }));
+  assert.equal(added.count, 2);
+  const detail = ok(await call(`/api/teams/${team.id}`, { token: tokenLin }));
+  assert.ok(detail.members.some((member: Json) => member.personId === 'per_zhouye'));
+  assert.ok(detail.members.some((member: Json) => member.personId === 'per_suyan'));
+});

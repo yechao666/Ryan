@@ -39,6 +39,8 @@ export interface Person {
   avatarColor: string;
   isAdmin: boolean;
   hasPassword?: boolean;
+  teamIds?: string[];
+  teamNames?: string[];
   createdAt: string;
   lastSeenAt?: string;
 }
