@@ -1,4 +1,4 @@
-/** Aiwo 演示数据：人员 / 团队 / 项目 / 提示词卡片 / DSH 服务 / 任务 / 自动化。 */
+/** Aiwo 演示数据：人员 / 团队 / 项目 / 提示卡 / DSH 服务 / 任务 / 自动化。 */
 import type { DatabaseSync } from 'node:sqlite';
 import { DEMO_PASSWORD } from '../../../shared/src/constants.ts';
 import { hashPassword } from '../lib/password.ts';

@@ -243,7 +243,7 @@ export function ProjectAutomationsPage() {
                   {automation.promptCardIds?.length ? (
                     <span className="chip">
                       <Icon name="book" size={11} />
-                      {automation.promptCardIds.length} 提示词
+                      {automation.promptCardIds.length} 提示卡
                     </span>
                   ) : null}
                   {run ? (

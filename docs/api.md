@@ -18,7 +18,7 @@ Base URL: `http://127.0.0.1:4500`。控制台使用会话 Bearer token；服务�
 
 项目字段：`name,slug,description,ownerTeamId,visibility,type,prompt,repoUrl`。项目不配置工作目录；DSH 插件按项目 ID 在服务本机自动生成。项目记忆由 Aiwo 内置维护。
 
-## 提示词卡片（Aiwo 没有智员，用卡片复用工作流/风格/标准）
+## 提示卡（Aiwo 没有智员，用卡片复用工作流/风格/标准）
 
 | Method | Path | 说明 |
 | --- | --- | --- |

@@ -338,7 +338,7 @@ export function TaskDrawer({ taskId, onClose, onChanged, inline = false }: TaskD
             {task.promptCards?.length > 0 || task.promptCardIds?.length > 0 ? (
               <div className="ws-drawer-section ws-detail-panel is-blue">
                 <SectionHead
-                  title={<><span className="ws-detail-icon"><Icon name="book" size={13} /></span>引用提示词</>}
+                  title={<><span className="ws-detail-icon"><Icon name="book" size={13} /></span>引用提示卡</>}
                   desc={`${task.promptCards?.length || task.promptCardIds?.length || 0} 张卡片会随任务一起注入`}
                 />
                 <div className="ws-prompt-ref-grid">

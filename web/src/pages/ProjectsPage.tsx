@@ -241,7 +241,7 @@ export function ProjectsPage() {
 
           <Field
             label="项目提示词"
-            hint="项目基本面：目标、规范、约束。任务领取时注入项目提示词与提示词卡片。"
+            hint="项目基本面：目标、规范、约束。任务领取时注入项目提示词与提示卡。"
           >
             <Textarea
               rows={4}

@@ -7,7 +7,7 @@ import { Badge, Button, Callout, Checkbox, EmptyState, Field, Icon, Select, Skel
 import { promptCardCategoryMeta } from './meta.ts';
 import { PromptCardDialog } from './PromptCardDialog.tsx';
 
-/** 拉取项目可引用的提示词卡片（组织 / 团队 / 项目级）。 */
+/** 拉取项目可引用的提示卡（组织 / 团队 / 项目级）。 */
 export function useProjectPromptCards(projectId: string, enabled: boolean) {
   return useAsync<PromptCard[]>(() => api.projectPromptCards(projectId), [projectId, enabled], enabled);
 }
@@ -20,7 +20,7 @@ export interface PromptCardPickerProps {
 }
 
 /**
- * 提示词卡片多选：引用可复用的工作流 / 风格 / 标准 / 角色卡片，
+ * 提示卡多选：引用可复用的工作流 / 风格 / 标准 / 角色卡片，
  * 执行任务时与任务提示词一起注入 DSH。
  */
 export function PromptCardPicker({ projectId, open, value, onChange }: PromptCardPickerProps) {
@@ -30,7 +30,7 @@ export function PromptCardPicker({ projectId, open, value, onChange }: PromptCar
 
   return (
     <Field
-      label={`提示词卡片${value.length ? `（已选 ${value.length}）` : ''}`}
+      label={`提示卡${value.length ? `（已选 ${value.length}）` : ''}`}
       hint="卡片内容会作为可复用上下文随任务一起注入；卡片较多时在弹窗中搜索选择。"
     >
       <div className="hstack gap-6 wrap">
@@ -39,7 +39,7 @@ export function PromptCardPicker({ projectId, open, value, onChange }: PromptCar
             <Icon name="book" size={11} />
             {card.name}
           </span>
-        )) : <span className="tiny dim">未引用提示词卡片</span>}
+        )) : <span className="tiny dim">未引用提示卡</span>}
         <Button
           type="button"
           size="sm"
@@ -50,7 +50,7 @@ export function PromptCardPicker({ projectId, open, value, onChange }: PromptCar
           选择卡片
         </Button>
       </div>
-      {cards.error ? <Callout tone="red" icon="alert">加载提示词卡片失败：{cards.error}</Callout> : null}
+      {cards.error ? <Callout tone="red" icon="alert">加载提示卡失败：{cards.error}</Callout> : null}
       <PromptCardDialog
         projectId={projectId}
         open={dialogOpen}

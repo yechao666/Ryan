@@ -44,7 +44,7 @@ export function TaskCard({ task, onClick }: TaskCardProps) {
             {task.instanceName}
           </span>
         ) : null}
-        {cardCount > 0 ? <span className="chip">{cardCount} 提示词</span> : null}
+        {cardCount > 0 ? <span className="chip">{cardCount} 提示卡</span> : null}
         <span className="ws-task-card-stat ws-task-card-time">
           <Icon name="clock" size={11} />
           {fmtRelative(at)}

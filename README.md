@@ -5,7 +5,7 @@ Aiwo 是一个管理 **DSH 服务资源** 的团队协作与任务平台。它�
 参考 Hive 的工程结构，但运行时模型完全不同：
 
 - **人员**：Aiwo 用户，登录、组队、管项目、管服务。
-- **提示词卡片**：工作流、风格、标准、角色说明；任务/自动化按需引用，内容注入 DSH 提示词。
+- **提示卡**：工作流、风格、标准、角色说明；任务/自动化按需引用，内容注入 DSH 提示词。
 - **DSH 服务**：Aiwo 的可调度执行资源；本机或远端，带 token、心跳、当前任务、插件版本；登记时不绑定项目或工作目录。
 - **任务**：项目任务，执行身份 `姓名@Aiwo`；一次性 `/goal`，执行过程只读。DSH 插件按项目 ID 在服务本机生成 `projects/<projectId>` 工作区，同一项目的任务/对话共享该目录。
 - **人员 / 团队**：人员即账号，支持本地密码与多个 OIDC 统一认证；账号、系统设置属于非业务功能。
@@ -18,7 +18,7 @@ Aiwo 是一个管理 **DSH 服务资源** 的团队协作与任务平台。它�
 ```text
 ┌──────────────┐  ┌───────────────────────────┐  ┌─────────────────┐
 │ 导航          │  │ 内容（项目 / 任务详情页）    │  │ Aiwo 助手（DSH） │
-│ 概览/项目/…   │  │ 任务表 / 提示词 / 设置      │  │ 右栏常驻        │
+│ 概览/项目/…   │  │ 任务表 / 提示卡 / 设置      │  │ 右栏常驻        │
 └──────────────┘  └─────────────┬─────────────┘  └────────┬────────┘
                                 │                         │
                                 ▼                         ▼
@@ -99,7 +99,7 @@ node integrations/aiwo-instance/agent.mjs \
 
 - 任务执行者：`创建人@Aiwo`，没有 agent_id
 - 标题：创建时可留空，由服务端调用 DSH 整理；失败时自动取任务内容首行
-- 提示词：`/goal` + 项目提示词 + 引用的提示词卡片 + 任务要求
+- 提示词：`/goal` + 项目提示词 + 引用的提示卡 + 任务要求
 - 服务：项目可绑定多个服务，任务在绑定服务间公平轮询；项目未绑定时使用默认服务（未设置默认服务则共享池）；任务可指定一个或多个允许服务
 - 状态：queued / assigned / running / done / failed / cancelled
 - 执行过程：`session / thinking / text / tool_call / tool_result / status / final`
@@ -107,7 +107,7 @@ node integrations/aiwo-instance/agent.mjs \
 - 完成：任务结果留在任务历史；有决策/经验时写候选记忆，由做梦提升
 - 无任务对话；任务详情页只读展示「结果 / 过程」
 
-## 提示词卡片
+## 提示卡
 
 - scope：组织（全员）/ 团队 / 项目 / 人员（仅本人）
 - category：工作流 / 工作风格 / 工作标准 / 角色说明 / 其他
@@ -200,7 +200,7 @@ pnpm --dir integrations/aiwo-instance test   # 8 个服务代理测试
 | --- | --- |
 | ![概览](docs/screenshots/01-aiwo-dashboard.png) | ![服务](docs/screenshots/02-aiwo-instances.png) |
 
-| 提示词卡片 | 系统设置 |
+| 提示卡 | 系统设置 |
 | --- | --- |
 | ![卡片](docs/screenshots/03-aiwo-prompt-cards.png) | ![设置](docs/screenshots/04-aiwo-settings.png) |
 
@@ -212,7 +212,7 @@ pnpm --dir integrations/aiwo-instance test   # 8 个服务代理测试
 | --- | --- |
 | ![项目](docs/screenshots/07-aiwo-project.png) | ![助手](docs/screenshots/08-aiwo-assistant.png) |
 
-| 助手流式输出 | 新建任务引用提示词 |
+| 助手流式输出 | 新建任务引用提示卡 |
 | --- | --- |
 | ![流式](docs/screenshots/09-aiwo-assistant-streaming.png) | ![新建任务](docs/screenshots/09-aiwo-create-task.png) |
 

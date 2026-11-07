@@ -99,11 +99,11 @@ export function ProjectOverviewPage() {
           hint={waitingCount > 0 ? `${waitingCount} 个等待输入` : `${queuedCount} 个排队中`}
         />
         <Stat
-          label="提示词卡片"
+          label="提示卡"
           value={fmtInt(counts.promptCards)}
           icon="book"
           tone="pink"
-          hint="项目级提示词卡片"
+          hint="项目级提示卡"
         />
         <Stat
           label="DSH 服务"

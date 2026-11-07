@@ -84,7 +84,7 @@ test('Aiwo 基础：登录、仪表盘无智员、实例与项目', async () => 
   assert.equal(instances.find((item: Json) => item.id === 'ins_local').kind, 'local');
 });
 
-test('提示词卡片：项目可引用卡片、创建组织卡片、任务引用写入', async () => {
+test('提示卡：项目可引用卡片、创建组织卡片、任务引用写入', async () => {
   const cards = ok(await call('/api/projects/prj_calc/prompt-cards', { token: tokenLin }));
   assert.equal(cards.length, 4);
 
@@ -112,7 +112,7 @@ test('提示词卡片：项目可引用卡片、创建组织卡片、任务引�
   assert.equal(task.promptCards[0].name, 'AI 测试卡片');
 });
 
-test('运行时：实例领取、返回提示词卡片、完成写回', async () => {
+test('运行时：实例领取、返回提示卡、完成写回', async () => {
   const queued = ok(await call('/api/tasks?projectId=prj_calc&status=queued', { token: tokenLin }));
   const target = queued.find((task: Json) => task.title === 'Aiwo 测试任务');
   assert.ok(target, '找不到测试任务');

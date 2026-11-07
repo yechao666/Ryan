@@ -30,7 +30,7 @@ import { fmtInt, fmtRelative } from '../lib/format.ts';
 import { useAsync, useInterval } from '../lib/hooks.ts';
 
 /**
- * Aiwo 概览：项目、DSH 服务、提示词卡片与任务的总览。
+ * Aiwo 概览：项目、DSH 服务、提示卡与任务的总览。
  * 人员不再拥有「智员」，任务由人员 @Aiwo 直接创建，由 DSH 服务领取执行。
  */
 export function DashboardPage() {
@@ -54,7 +54,7 @@ export function DashboardPage() {
         desc={
           data
             ? `当前有 ${fmtInt(data.tasks.queued)} 个任务排队、${fmtInt(data.tasks.running)} 个正在执行，${fmtInt(online)} 个 DSH 服务在线。`
-            : '项目、DSH 服务、提示词卡片与任务的总览。'
+            : '项目、DSH 服务、提示卡与任务的总览。'
         }
         actions={
           <>
@@ -96,7 +96,7 @@ export function DashboardPage() {
               hint={`${fmtInt(data.tasks.queued)} 个排队 · ${fmtInt(data.tasks.waitingInput)} 个等待输入`}
             />
             <Stat
-              label="提示词卡片"
+              label="提示卡"
               value={promptCards.loading ? '—' : fmtInt(promptCards.data?.length ?? 0)}
               icon="book"
               tone="cyan"
@@ -267,7 +267,7 @@ function ProjectTile({ project, onOpen }: { project: ProjectSummary; onOpen: () 
       <div className="project-metrics">
         <div>
           <div className="pm-value">{counts.promptCards}</div>
-          <div className="pm-label">提示词</div>
+          <div className="pm-label">提示卡</div>
         </div>
         <div>
           <div className="pm-value">{counts.activeTasks}</div>
@@ -310,7 +310,7 @@ function ProjectSection({ projects, onOpen }: { projects: ProjectSummary[]; onOp
             compact
             icon="folder"
             title="还没有可见项目"
-            description="创建第一个项目，把提示词卡片、DSH 服务与任务组织起来。"
+            description="创建第一个项目，把提示卡、DSH 服务与任务组织起来。"
             action={
               <Link to="/projects?new=1" className="btn btn-secondary btn-sm">
                 新建项目
@@ -420,7 +420,7 @@ function PromptCardSection({
         <div>
           <div className="card-title">
             <Icon name="book" size={15} />
-            提示词卡片
+            提示卡
           </div>
           <div className="card-sub">{loading ? '正在加载…' : `共 ${cards.length} 张可复用卡片`}</div>
         </div>
@@ -432,7 +432,7 @@ function PromptCardSection({
       <div className="card-body">
         {error ? (
           <div className="vstack" style={{ gap: 8, padding: '4px 0' }}>
-            <div className="tiny muted">提示词卡片加载失败：{error}</div>
+            <div className="tiny muted">提示卡加载失败：{error}</div>
             <Button size="sm" variant="ghost" icon="refresh" onClick={onRetry}>
               重试
             </Button>
@@ -471,7 +471,7 @@ function PromptCardSection({
           <EmptyState
             compact
             icon="book"
-            title="还没有提示词卡片"
+            title="还没有提示卡"
             description="把工作流、风格、标准沉淀成卡片，任务引用后即可复用。"
             action={
               <Link to="/prompt-cards?new=1" className="btn btn-secondary btn-sm">
@@ -629,7 +629,7 @@ function QuickLinks() {
   const links: { to: string; icon: IconName; tone: Tone; label: string }[] = [
     { to: '/projects?new=1', icon: 'plus', tone: 'violet', label: '新建项目' },
     { to: '/instances?new=1', icon: 'server', tone: 'green', label: '新增服务' },
-    { to: '/prompt-cards?new=1', icon: 'book', tone: 'cyan', label: '提示词卡片' },
+    { to: '/prompt-cards?new=1', icon: 'book', tone: 'cyan', label: '提示卡' },
     { to: '/tasks', icon: 'list', tone: 'amber', label: '查看任务' },
   ];
   return (

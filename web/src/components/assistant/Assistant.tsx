@@ -44,7 +44,7 @@ interface Conversation {
 }
 
 const WELCOME =
-  '我是 Aiwo 系统助手，运行在 DSH 服务中。可以读取项目、任务、服务与提示词卡片，并通过 Aiwo API 直接创建任务、配置服务或查询状态。';
+  '我是 Aiwo 系统助手，运行在 DSH 服务中。可以读取项目、任务、服务与提示卡，并通过 Aiwo API 直接创建任务、配置服务或查询状态。';
 const STORAGE_CONVERSATIONS = 'aiwo.assistant.conversations.v1';
 const STORAGE_ACTIVE = 'aiwo.assistant.activeConversation.v1';
 
@@ -196,7 +196,7 @@ export function Assistant() {
   const taskId = new URLSearchParams(search).get('task') ?? undefined;
   const fullPath = `${pathname}${search}`;
   const pageTitle =
-    (pathname.startsWith('/prompt-cards') && '提示词卡片') ||
+    (pathname.startsWith('/prompt-cards') && '提示卡') ||
     (pathname.startsWith('/settings') && '系统设置') ||
     (pathname.startsWith('/instances') && 'DSH 服务') ||
     (pathname.startsWith('/tasks') && '全局任务') ||

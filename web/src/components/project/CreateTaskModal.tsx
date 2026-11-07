@@ -19,7 +19,7 @@ interface FormErrors {
   prompt?: string;
 }
 
-/** 新建任务弹窗：填写目标与提示词，可选提示词卡片与 DSH 服务。 */
+/** 新建任务弹窗：填写目标与提示词，可选提示卡与 DSH 服务。 */
 export function CreateTaskModal({ open, onClose, onCreated }: CreateTaskModalProps) {
   const { detail } = useProject();
   const projectId = detail.project.id;
@@ -102,7 +102,7 @@ export function CreateTaskModal({ open, onClose, onCreated }: CreateTaskModalPro
         label="任务内容"
         required
         error={errors.prompt}
-        hint="写清背景、验收标准与相关文件，会与项目提示词、提示词卡片一起下发给 Aiwo。"
+        hint="写清背景、验收标准与相关文件，会与项目提示词、提示卡一起下发给 Aiwo。"
       >
         <Textarea
           rows={6}

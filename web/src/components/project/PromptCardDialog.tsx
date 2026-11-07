@@ -25,7 +25,7 @@ export interface PromptCardDialogProps {
   onClose: () => void;
 }
 
-/** 大量提示词卡片的专用选择对话框：搜索 + 分类/范围筛选。 */
+/** 大量提示卡的专用选择对话框：搜索 + 分类/范围筛选。 */
 export function PromptCardDialog({ projectId, open, value, onChange, onClose }: PromptCardDialogProps) {
   const cards = useAsync<PromptCard[]>(() => api.projectPromptCards(projectId), [projectId, open], open);
   const [draft, setDraft] = useState<string[]>(value);
@@ -67,7 +67,7 @@ export function PromptCardDialog({ projectId, open, value, onChange, onClose }: 
       open={open}
       onClose={onClose}
       size="lg"
-      title="选择提示词卡片"
+      title="选择提示卡"
       description="可按名称搜索，按分类或适用范围筛选；可多选。"
       footer={
         <>
@@ -117,11 +117,11 @@ export function PromptCardDialog({ projectId, open, value, onChange, onClose }: 
             {[0, 1, 2, 3].map((item) => <Skeleton key={item} h={54} />)}
           </div>
         ) : cards.error ? (
-          <Callout tone="red" icon="alert">加载提示词卡片失败：{cards.error}</Callout>
+          <Callout tone="red" icon="alert">加载提示卡失败：{cards.error}</Callout>
         ) : filtered.length === 0 ? (
           <EmptyState
             icon="book"
-            title={cards.data?.length ? '没有匹配的卡片' : '暂无可引用的提示词卡片'}
+            title={cards.data?.length ? '没有匹配的卡片' : '暂无可引用的提示卡'}
             description={cards.data?.length ? '调整搜索或筛选条件。' : '组织、团队、项目或个人级卡片会出现在这里。'}
             compact
           />

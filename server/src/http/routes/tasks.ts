@@ -362,7 +362,7 @@ export function createTaskRecord(db: Db, bus: EventBus, input: CreateTaskRecordI
       `SELECT id, scope, project_id, team_id, person_id FROM prompt_cards WHERE enabled = 1 AND id IN (${placeholders})`,
       cardIds,
     );
-    if (found.length !== cardIds.length) throw errors.badRequest('引用的提示词卡片不存在或已停用');
+    if (found.length !== cardIds.length) throw errors.badRequest('引用的提示卡不存在或已停用');
     if (
       found.some(
         (card) =>
@@ -371,7 +371,7 @@ export function createTaskRecord(db: Db, bus: EventBus, input: CreateTaskRecordI
           (card.scope === 'person' && card.person_id !== effectiveCreatedBy),
       )
     ) {
-      throw errors.badRequest('引用的提示词卡片不在当前项目可用范围内');
+      throw errors.badRequest('引用的提示卡不在当前项目可用范围内');
     }
   }
 

@@ -77,7 +77,7 @@ function errorMessage(cause: unknown, fallback: string): string {
 }
 
 /**
- * 提示词卡片：工作流 / 风格 / 标准 / 角色等可复用上下文。
+ * 提示卡：工作流 / 风格 / 标准 / 角色等可复用上下文。
  * 卡片可由任务引用，实际内容会注入 DSH 的任务提示词。
  */
 export function PromptCardsPage() {
@@ -175,15 +175,15 @@ export function PromptCardsPage() {
       return;
     }
     if (!form.content.trim()) {
-      setFormError('请填写提示词内容。');
+      setFormError('请填写提示卡内容。');
       return;
     }
     if (form.scope === 'project' && !form.projectId) {
-      setFormError('项目级提示词需要选择项目。');
+      setFormError('项目级提示卡需要选择项目。');
       return;
     }
     if (form.scope === 'team' && !form.teamId) {
-      setFormError('团队级提示词需要选择团队。');
+      setFormError('团队级提示卡需要选择团队。');
       return;
     }
 
@@ -207,7 +207,7 @@ export function PromptCardsPage() {
           content: base.content,
           enabled: base.enabled,
         });
-        toast.success(`提示词卡片「${base.name}」已更新`);
+        toast.success(`提示卡「${base.name}」已更新`);
       } else {
         await api.createPromptCard({
           ...base,
@@ -215,12 +215,12 @@ export function PromptCardsPage() {
           projectId: form.scope === 'project' ? form.projectId : undefined,
           teamId: form.scope === 'team' ? form.teamId : undefined,
         });
-        toast.success(`提示词卡片「${base.name}」已创建`);
+        toast.success(`提示卡「${base.name}」已创建`);
       }
       closeForm();
       await cards.refresh();
     } catch (cause) {
-      const message = errorMessage(cause, editing ? '更新提示词卡片失败' : '创建提示词卡片失败');
+      const message = errorMessage(cause, editing ? '更新提示卡失败' : '创建提示卡失败');
       setFormError(message);
       toast.error(message);
     } finally {
@@ -246,11 +246,11 @@ export function PromptCardsPage() {
     setDeleting(true);
     try {
       await api.deletePromptCard(deleteTarget.id);
-      toast.success(`提示词卡片「${deleteTarget.name}」已删除`);
+      toast.success(`提示卡「${deleteTarget.name}」已删除`);
       setDeleteTarget(null);
       await cards.refresh();
     } catch (cause) {
-      toast.error(errorMessage(cause, '删除提示词卡片失败'));
+      toast.error(errorMessage(cause, '删除提示卡失败'));
     } finally {
       setDeleting(false);
     }
@@ -268,12 +268,12 @@ export function PromptCardsPage() {
   return (
     <div className="page">
       <PageHead
-        eyebrow="提示词 · Prompt Cards"
-        title="提示词卡片"
+        eyebrow="提示卡 · Prompt Cards"
+        title="提示卡"
         desc="把工作流、工作风格、质量标准与角色说明沉淀成卡片；任务引用后，卡片内容会注入 DSH 提示词。"
         actions={
           <>
-            <IconButton icon="refresh" label="刷新提示词卡片" onClick={() => void cards.refresh()} />
+            <IconButton icon="refresh" label="刷新提示卡" onClick={() => void cards.refresh()} />
             <Button variant="primary" icon="plus" onClick={openCreate}>
               新建卡片
             </Button>
@@ -340,7 +340,7 @@ export function PromptCardsPage() {
         <Card>
           <EmptyState
             icon="book"
-            title={hasFilter ? '没有匹配的提示词卡片' : '还没有提示词卡片'}
+            title={hasFilter ? '没有匹配的提示卡' : '还没有提示卡'}
             description={
               hasFilter
                 ? '试试其他关键词、类别或范围筛选。'
@@ -426,7 +426,7 @@ export function PromptCardsPage() {
       <Modal
         open={formOpen}
         onClose={closeForm}
-        title={editing ? '编辑提示词卡片' : '新建提示词卡片'}
+        title={editing ? '编辑提示卡' : '新建提示卡'}
         description={
           editing
             ? '卡片范围创建后不可修改；可更新名称、类别、说明、内容与启用状态。'
@@ -549,7 +549,7 @@ export function PromptCardsPage() {
           </Field>
 
           <Field
-            label="提示词内容"
+            label="提示卡内容"
             htmlFor="prompt-card-content"
             required
             hint="任务引用后作为上下文注入 DSH 提示词；建议写清步骤、标准与禁止事项。"
@@ -580,7 +580,7 @@ export function PromptCardsPage() {
         onClose={() => setDeleteTarget(null)}
         onConfirm={() => void handleDelete()}
         loading={deleting}
-        title="删除提示词卡片"
+        title="删除提示卡"
         description={
           deleteTarget
             ? `确认删除「${deleteTarget.name}」？引用该卡片的任务不会被回滚，但后续任务将无法再选择它。`

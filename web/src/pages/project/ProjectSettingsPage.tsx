@@ -421,7 +421,7 @@ export function ProjectSettingsPage() {
             />
           )}
         </Field>
-        <Field label="项目角色" required hint="所有者可删除项目，维护者可管理服务、提示词与自动化，开发者可创建任务，观察者只读。">
+        <Field label="项目角色" required hint="所有者可删除项目，维护者可管理服务、提示卡与自动化，开发者可创建任务，观察者只读。">
           <Select
             value={newRole}
             options={PROJECT_ROLE_OPTIONS}

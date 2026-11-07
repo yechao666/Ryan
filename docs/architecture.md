@@ -8,7 +8,7 @@
 控制台创建任务（executor=人员@Aiwo）
   → work_items(queued)
   → 服务代理 claim（服务 token）
-  → 组装 /goal prompt（项目 + 提示词卡片 + 任务）
+  → 组装 /goal prompt（项目 + 提示卡 + 任务）
   → dsh --profile acp（常驻，JSON-RPC stdio）
   → session/update 事件
   → /api/runtime/tasks/:id/events（批量）

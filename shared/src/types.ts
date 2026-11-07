@@ -27,7 +27,7 @@ export type EventType =
   | 'instance.registered'
   | 'project.created';
 
-/** 可管理、可被任务引用的提示词卡片。 */
+/** 可管理、可被任务引用的提示卡。 */
 export type PromptCardCategory = 'workflow' | 'style' | 'standard' | 'role' | 'other';
 export type PromptCardScope = 'org' | 'team' | 'project' | 'person';
 
@@ -111,7 +111,7 @@ export interface ProjectMember {
   addedAt: string;
 }
 
-/** 提示词卡片：只作为任务/自动化的可引用上下文，不等于执行角色。 */
+/** 提示卡：只作为任务/自动化的可引用上下文，不等于执行角色。 */
 export interface PromptCard {
   id: string;
   name: string;

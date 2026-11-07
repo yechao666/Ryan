@@ -19,7 +19,7 @@ const NAV_GROUPS: { label: string; items: NavItem[] }[] = [
       { to: '/projects', label: '项目', icon: 'folder' },
       { to: '/tasks', label: '任务', icon: 'list' },
       { to: '/teams', label: '团队', icon: 'users' },
-      { to: '/prompt-cards', label: '提示词卡片', icon: 'book' },
+      { to: '/prompt-cards', label: '提示卡', icon: 'book' },
     ],
   },
   {
@@ -80,7 +80,7 @@ export function Shell() {
         </nav>
         <div className="sidebar-hint">
           <div className="sidebar-hint__title">工作方式</div>
-          <p>人员 @Aiwo 创建项目与任务，提示词卡片定义工作方式，DSH 服务负责执行；安全检查组拦截高风险输入。</p>
+          <p>人员 @Aiwo 创建项目与任务，提示卡定义工作方式，DSH 服务负责执行；安全检查组拦截高风险输入。</p>
         </div>
         <div className="sidebar-footer">
           <div className="sidebar-account-label">账户</div>

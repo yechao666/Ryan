@@ -200,15 +200,15 @@ export function registerPromptCardRoutes(router: Router): void {
       now,
     );
     const row = rowOf<PromptCardRow>(rc.app.db, `${SELECT} WHERE c.id = ?`, [id]);
-    if (!row) throw errors.internal('提示词卡片创建后读取失败');
+    if (!row) throw errors.internal('提示卡创建后读取失败');
     rc.json(mapCard(row), 201);
   });
 
   router.patch('/api/prompt-cards/:id', async (rc) => {
     const person = requirePerson(rc);
     const row = rowOf<PromptCardRow>(rc.app.db, `${SELECT} WHERE c.id = ?`, [rc.params.id]);
-    if (!row) throw errors.notFound('提示词卡片不存在');
-    if (!canEditCard(rc.app.db, person, row)) throw errors.forbidden('无权修改该提示词卡片');
+    if (!row) throw errors.notFound('提示卡不存在');
+    if (!canEditCard(rc.app.db, person, row)) throw errors.forbidden('无权修改该提示卡');
     const input = await rc.body(cardPatchSchema);
     const now = nowIso();
     rc.app.db.prepare(
@@ -223,15 +223,15 @@ export function registerPromptCardRoutes(router: Router): void {
       row.id,
     );
     const updated = rowOf<PromptCardRow>(rc.app.db, `${SELECT} WHERE c.id = ?`, [row.id]);
-    if (!updated) throw errors.internal('提示词卡片更新后读取失败');
+    if (!updated) throw errors.internal('提示卡更新后读取失败');
     rc.json(mapCard(updated));
   });
 
   router.delete('/api/prompt-cards/:id', (rc) => {
     const person = requirePerson(rc);
     const row = rowOf<PromptCardRow>(rc.app.db, `${SELECT} WHERE c.id = ?`, [rc.params.id]);
-    if (!row) throw errors.notFound('提示词卡片不存在');
-    if (!canEditCard(rc.app.db, person, row)) throw errors.forbidden('无权删除该提示词卡片');
+    if (!row) throw errors.notFound('提示卡不存在');
+    if (!canEditCard(rc.app.db, person, row)) throw errors.forbidden('无权删除该提示卡');
     rc.app.db.prepare('DELETE FROM prompt_cards WHERE id = ?').run(row.id);
     rc.json({ ok: true });
   });

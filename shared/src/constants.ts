@@ -27,8 +27,8 @@ export const TEAM_ROLES: { value: TeamRole; label: string }[] = [
 
 export const PROJECT_ROLES: { value: ProjectRole; label: string; desc: string }[] = [
   { value: 'owner', label: '项目负责人', desc: '全部权限，可删除项目' },
-  { value: 'maintainer', label: '维护者', desc: '管理实例、提示词卡片与成员' },
-  { value: 'developer', label: '开发者', desc: '创建任务、引用提示词卡片' },
+  { value: 'maintainer', label: '维护者', desc: '管理实例、提示卡与成员' },
+  { value: 'developer', label: '开发者', desc: '创建任务、引用提示卡' },
   { value: 'reporter', label: '观察者', desc: '只读' },
 ];
 

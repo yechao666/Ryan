@@ -90,9 +90,9 @@ export function parseTaskType(value: string | null | undefined): TaskType | 'all
   return found ? found.value : 'all';
 }
 
-/* ------------------------------ 提示词卡片 ------------------------------ */
+/* ------------------------------ 提示卡 ------------------------------ */
 
-/** 提示词卡片分类的文案 / 色调 / 用途说明；未知分类回退到「其他」。 */
+/** 提示卡分类的文案 / 色调 / 用途说明；未知分类回退到「其他」。 */
 export function promptCardCategoryMeta(category?: string): { label: string; tone: Tone; desc: string } {
   const found = PROMPT_CARD_CATEGORIES.find((item) => item.value === category);
   if (found) return { label: found.label, tone: found.tone as Tone, desc: found.desc };
@@ -100,7 +100,7 @@ export function promptCardCategoryMeta(category?: string): { label: string; tone
   return { label: fallback?.label ?? '其他', tone: (fallback?.tone as Tone | undefined) ?? 'slate', desc: fallback?.desc ?? '' };
 }
 
-/** 提示词卡片分类下拉（表单与筛选共用）。 */
+/** 提示卡分类下拉（表单与筛选共用）。 */
 export const PROMPT_CARD_CATEGORY_OPTIONS: { value: PromptCardCategory; label: string }[] = PROMPT_CARD_CATEGORIES.map(
   (item) => ({ value: item.value, label: item.label }),
 );

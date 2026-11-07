@@ -190,7 +190,7 @@ export function ProjectLayout() {
             </span>
             <span className="ws-project-meta-item">
               <Icon name="book" size={13} />
-              {counts.promptCards} 提示词卡片
+              {counts.promptCards} 提示卡
             </span>
             <span className="ws-project-meta-item">
               <Icon name="server" size={13} />

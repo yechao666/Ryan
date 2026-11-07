@@ -35,7 +35,7 @@ interface FormErrors {
 
 const TRIGGER_OPTIONS = AUTOMATION_TRIGGERS.map((item) => ({ value: item.value, label: item.label }));
 
-/** 新建 / 编辑自动化弹窗：触发规则 + 提示词卡片 + 可选 DSH 服务。 */
+/** 新建 / 编辑自动化弹窗：触发规则 + 提示卡 + 可选 DSH 服务。 */
 export function AutomationForm({ open, automation, onClose, onSaved }: AutomationFormProps) {
   const { detail } = useProject();
   const projectId = detail.project.id;

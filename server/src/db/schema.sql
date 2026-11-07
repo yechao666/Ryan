@@ -113,7 +113,7 @@ CREATE TABLE IF NOT EXISTS project_members (
   PRIMARY KEY (project_id, person_id)
 );
 
--- 可管理、可被任务引用的提示词卡片
+-- 可管理、可被任务引用的提示卡
 -- Aiwo 内置项目记忆
 CREATE TABLE IF NOT EXISTS project_memories (
   id          TEXT PRIMARY KEY,

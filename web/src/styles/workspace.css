@@ -527,7 +527,7 @@
   gap: 10px;
 }
 
-/* 任务详情：基本信息 / 引用提示词 / 任务输出等区块之间留出呼吸感 */
+/* 任务详情：基本信息 / 引用提示卡 / 任务输出等区块之间留出呼吸感 */
 .ws-meta-grid + .ws-drawer-section,
 .ws-drawer-section + .ws-drawer-section {
   margin-top: 22px;
@@ -1874,7 +1874,7 @@
   margin-top: 10px;
 }
 
-/* 任务详情：引用提示词卡片 */
+/* 任务详情：引用提示卡 */
 
 .ws-prompt-ref-grid {
   display: grid;
@@ -1936,7 +1936,7 @@
   }
 }
 
-/* 提示词卡片选择弹窗 */
+/* 提示卡选择弹窗 */
 .ws-prompt-dialog-list {
   max-height: 48vh;
   overflow-y: auto;
