@@ -326,7 +326,7 @@ export function TaskDrawer({ taskId, onClose, onChanged, inline = false }: TaskD
 
             <div className="ws-drawer-section ws-detail-panel is-violet">
               <SectionHead
-                title={<><Icon name="book" size={14} />任务内容</>}
+                title={<><span className="ws-detail-icon"><Icon name="book" size={13} /></span>任务内容</>}
                 desc="创建任务时填写的目标、背景与验收标准"
                 actions={<CopyButton value={task.prompt.replace(/^\/goal\s*/i, '')} label="复制内容" />}
               />
@@ -338,7 +338,7 @@ export function TaskDrawer({ taskId, onClose, onChanged, inline = false }: TaskD
             {task.promptCards?.length > 0 || task.promptCardIds?.length > 0 ? (
               <div className="ws-drawer-section ws-detail-panel is-blue">
                 <SectionHead
-                  title={<><Icon name="book" size={14} />引用提示词</>}
+                  title={<><span className="ws-detail-icon"><Icon name="book" size={13} /></span>引用提示词</>}
                   desc={`${task.promptCards?.length || task.promptCardIds?.length || 0} 张卡片会随任务一起注入`}
                 />
                 <div className="ws-prompt-ref-grid">
@@ -384,7 +384,7 @@ export function TaskDrawer({ taskId, onClose, onChanged, inline = false }: TaskD
             {memoryOpen ? (
               <div className="ws-drawer-section ws-detail-panel is-cyan">
                 <SectionHead
-                  title={<><Icon name="brain" size={14} />记忆简报</>}
+                  title={<><span className="ws-detail-icon"><Icon name="brain" size={13} /></span>记忆简报</>}
                   desc={memoryAgentId ? `项目记忆身份 ${memoryAgentId} · 最近记忆/洞见摘要` : '最近记忆/洞见摘要'}
                 />
                 {memory.loading && !memory.data ? (
@@ -431,7 +431,7 @@ export function TaskDrawer({ taskId, onClose, onChanged, inline = false }: TaskD
             {task.allowedServiceNames?.length ? (
               <div className="ws-drawer-section ws-detail-panel is-amber">
                 <SectionHead
-                  title={<><Icon name="server" size={14} />服务调度范围</>}
+                  title={<><span className="ws-detail-icon"><Icon name="server" size={13} /></span>服务调度范围</>}
                   desc={`任务只会在这些服务上运行${task.instanceName ? `；当前：${task.instanceName}` : ''}`}
                 />
                 <div className="badge-dot-list">
@@ -447,7 +447,7 @@ export function TaskDrawer({ taskId, onClose, onChanged, inline = false }: TaskD
 
             <div className="ws-drawer-section ws-detail-panel is-green">
               <SectionHead
-                title={<><Icon name="terminal" size={14} />任务输出</>}
+                title={<><span className="ws-detail-icon"><Icon name="terminal" size={13} /></span>任务输出</>}
                 desc="完成后默认展示结果；过程只读"
                 actions={
                   <Badge tone={isActiveTask(task.status) ? 'green' : 'slate'} size="sm" dot>
