@@ -2135,3 +2135,74 @@
   border-radius: 14px;
   background: var(--surface);
 }
+
+/* DSH 服务：概览条与资源卡分层 */
+.service-summary-strip {
+  display: flex;
+  align-items: stretch;
+  gap: 18px;
+  padding: 12px 16px;
+  border-color: var(--border);
+  background: rgba(0, 0, 0, 0.16);
+}
+.service-summary-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding-right: 18px;
+  border-right: 1px solid var(--border-faint);
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.service-summary-items {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+  flex: 1;
+}
+.service-summary-item {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  min-width: 0;
+  padding: 2px 4px;
+}
+.service-summary-item > div {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  line-height: 1.25;
+}
+.service-summary-item strong {
+  font-size: 17px;
+  font-variant-numeric: tabular-nums;
+}
+.service-summary-item span {
+  font-size: 11px;
+  color: var(--text-soft);
+}
+.service-summary-item em {
+  margin-top: 2px;
+  color: var(--text-dim);
+  font-size: 10px;
+  font-style: normal;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.service-card {
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.022), rgba(255, 255, 255, 0.006));
+  border-color: var(--border);
+}
+@media (max-width: 1000px) {
+  .service-summary-strip { flex-direction: column; gap: 10px; }
+  .service-summary-label { border-right: 0; padding-right: 0; }
+  .service-summary-items { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+.service-grid { grid-template-columns: repeat(auto-fill, minmax(330px, 1fr)); }
+
+.service-card .row-between { flex-wrap: wrap; gap: 8px; }
+.service-card .row-between > .hstack { flex-wrap: wrap; }

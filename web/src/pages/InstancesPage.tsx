@@ -20,7 +20,6 @@ import {
   SectionHead,
   Select,
   Skeleton,
-  Stat,
   useToast,
   type Tone,
 } from '@ui';
@@ -270,17 +269,35 @@ export function InstancesPage() {
         </Callout>
       ) : null}
 
-      <div className="kpi-grid">
-        <Stat label="在线服务" value={online} icon="server" tone="green" hint="心跳正常，可领取任务" />
-        <Stat label="待接入" value={unconfigured} icon="package" tone="amber" hint="已创建，等待安装通讯插件" />
-        <Stat label="离线 / 异常" value={offline + abnormal} icon="alert" tone="red" hint={`离线 ${offline} · 异常 ${abnormal}`} />
-        <Stat label="服务总数" value={list.length} icon="layers" tone="violet" hint={`${revoked} 个已吊销`} />
-      </div>
+      <Card className="service-summary-strip">
+        <div className="service-summary-label">
+          <Icon name="activity" size={14} />
+          服务概览
+        </div>
+        <div className="service-summary-items">
+          <div className="service-summary-item">
+            <span className="cx-metric-icon tone-green"><Icon name="server" size={14} /></span>
+            <div><strong>{online}</strong><span>在线服务</span><em>心跳正常，可领取任务</em></div>
+          </div>
+          <div className="service-summary-item">
+            <span className="cx-metric-icon tone-amber"><Icon name="package" size={14} /></span>
+            <div><strong>{unconfigured}</strong><span>待接入</span><em>等待安装通讯插件</em></div>
+          </div>
+          <div className="service-summary-item">
+            <span className="cx-metric-icon tone-red"><Icon name="alert" size={14} /></span>
+            <div><strong>{offline + abnormal}</strong><span>离线 / 异常</span><em>离线 {offline} · 异常 {abnormal}</em></div>
+          </div>
+          <div className="service-summary-item">
+            <span className="cx-metric-icon tone-violet"><Icon name="layers" size={14} /></span>
+            <div><strong>{list.length}</strong><span>服务总数</span><em>{revoked} 个已吊销</em></div>
+          </div>
+        </div>
+      </Card>
 
       {instances.error && !instances.data ? (
         <ErrorState message={instances.error} onRetry={() => void instances.refresh()} />
       ) : instances.loading && !instances.data ? (
-        <div className="grid-cards">
+        <div className="grid-cards service-grid">
           {[0, 1, 2].map((item) => (
             <Card className="card-pad" key={item}>
               <Skeleton h={22} />
@@ -309,14 +326,14 @@ export function InstancesPage() {
           />
         </Card>
       ) : (
-        <div className="grid-cards">
+        <div className="grid-cards service-grid">
           {list.map((instance) => {
             const status = instanceStatusMeta(instance.status);
             const kind = instanceKindMeta(instance.kind);
             const disabled = instance.status === 'revoked';
             return (
               <Card
-                className="card-pad"
+                className="card-pad service-card"
                 key={instance.id}
                 style={disabled ? { opacity: 0.68 } : undefined}
               >
