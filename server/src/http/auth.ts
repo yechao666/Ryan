@@ -79,7 +79,7 @@ export function requireAdmin(rc: RequestContext): Person {
 }
 
 /** 运行时鉴权：Agent token（注册服务时）或 Instance token（服务运行期）。 */
-/** Aiwo 服务令牌：只认证服务本身。 */
+/** Ryan 服务令牌：只认证服务本身。 */
 export function authenticateInstance(rc: RequestContext): { id: string; name: string } {
   const header = String(rc.req.headers.authorization ?? '');
   const token = header.startsWith('Bearer ') ? header.slice(7).trim() : '';

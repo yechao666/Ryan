@@ -2,10 +2,12 @@ import { mkdirSync, readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 import { fileURLToPath } from 'node:url';
+import { hashPassword } from '../lib/password.ts';
+import { DEMO_PASSWORD } from '../../../shared/src/constants.ts';
 
 const here = dirname(fileURLToPath(import.meta.url));
 export type Db = DatabaseSync;
-export const SCHEMA_VERSION = 10;
+export const SCHEMA_VERSION = 12;
 
 export function openDatabase(dbPath: string): Db {
   if (dbPath !== ':memory:') mkdirSync(dirname(dbPath), { recursive: true });
@@ -59,6 +61,39 @@ export function migrate(db: Db): void {
     db.exec("ALTER TABLE project_memories ADD COLUMN status TEXT NOT NULL DEFAULT 'durable'");
     // 旧的任务结果记录属于任务历史，不是持久项目知识：一次性归档。
     db.exec("UPDATE project_memories SET status = 'archived' WHERE source = 'task'");
+  }
+  // v10 -> v11：品牌从 Aiwo 切换为 Ryan，演示账号域名与密码同步迁移。
+  const legacyPersons = db
+    .prepare("SELECT id, email FROM persons WHERE email LIKE '%@aiwo.dev'")
+    .all() as unknown as { id: string; email: string }[];
+  const demoLocals = new Set(['lin.wei', 'chen.hao', 'zhou.ye', 'su.yan']);
+  for (const person of legacyPersons) {
+    const [local, domain] = person.email.split('@');
+    const email = `${local}@ryan.dev`;
+    const collision = db.prepare('SELECT id FROM persons WHERE email = ? AND id <> ?').get(email, person.id);
+    if (!collision) db.prepare('UPDATE persons SET email = ? WHERE id = ?').run(email, person.id);
+    if (domain === 'aiwo.dev' && demoLocals.has(local ?? '')) {
+      db.prepare('UPDATE persons SET password_hash = ?, password_set = 1 WHERE id = ?').run(hashPassword(DEMO_PASSWORD), person.id);
+    }
+  }
+  // v11 -> v12：清理演示/历史数据中的旧品牌文案。
+  const legacyTextColumns: [string, string[]][] = [
+    ['projects', ['name', 'description', 'prompt']],
+    ['teams', ['name', 'description']],
+    ['project_memories', ['title', 'content']],
+    ['prompt_cards', ['name', 'description', 'content']],
+    ['work_items', ['title', 'prompt', 'result', 'error']],
+    ['task_events', ['message', 'payload']],
+    ['automations', ['name', 'prompt_template']],
+    ['activity_events', ['actor', 'summary']],
+    ['runtime_events', ['payload']],
+    ['memory_briefs', ['text']],
+    ['memory_dream_runs', ['summary', 'error']],
+  ];
+  for (const [table, columns] of legacyTextColumns) {
+    for (const column of columns) {
+      db.exec(`UPDATE ${table} SET ${column} = replace(${column}, 'Aiwo', 'Ryan') WHERE ${column} LIKE '%Aiwo%'`);
+    }
   }
   db.prepare("INSERT OR REPLACE INTO meta (key, value) VALUES ('schema_version', ?)").run(String(SCHEMA_VERSION));
 }

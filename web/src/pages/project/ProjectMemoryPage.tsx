@@ -419,7 +419,7 @@ export function ProjectMemoryPage() {
     <div className="ws-page">
       <PageHead
         title="项目记忆"
-        desc="Aiwo 内置项目记忆；任务领取时注入最近的记忆简报（默认 500 字），更多背景由 DSH 按需检索。"
+        desc="Ryan 内置项目记忆；任务领取时注入最近的记忆简报（默认 500 字），更多背景由 DSH 按需检索。"
         actions={
           <div className="hstack gap-6">
             <Button variant="ghost" icon="refresh" loading={memories.loading} onClick={() => void memories.refresh()}>

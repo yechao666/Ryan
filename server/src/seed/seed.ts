@@ -1,4 +1,4 @@
-/** Aiwo 演示数据：人员 / 团队 / 项目 / 提示卡 / DSH 服务 / 任务 / 自动化。 */
+/** Ryan 演示数据：人员 / 团队 / 项目 / 提示卡 / DSH 服务 / 任务 / 自动化。 */
 import type { DatabaseSync } from 'node:sqlite';
 import { DEMO_PASSWORD } from '../../../shared/src/constants.ts';
 import { hashPassword } from '../lib/password.ts';
@@ -14,14 +14,14 @@ export const DEMO_TOKENS = {
 } as const;
 
 const PEOPLE = [
-  { id: 'per_linwei', email: 'lin.wei@aiwo.dev', name: '林薇', title: '平台负责人', color: 'violet', admin: 1 },
-  { id: 'per_chenhao', email: 'chen.hao@aiwo.dev', name: '陈昊', title: '研发一组负责人', color: 'cyan', admin: 0 },
-  { id: 'per_zhouye', email: 'zhou.ye@aiwo.dev', name: '周野', title: '算法工程师', color: 'green', admin: 0 },
-  { id: 'per_suyan', email: 'su.yan@aiwo.dev', name: '苏妍', title: '数据合规', color: 'amber', admin: 0 },
+  { id: 'per_linwei', email: 'lin.wei@ryan.dev', name: '林薇', title: '平台负责人', color: 'violet', admin: 1 },
+  { id: 'per_chenhao', email: 'chen.hao@ryan.dev', name: '陈昊', title: '研发一组负责人', color: 'cyan', admin: 0 },
+  { id: 'per_zhouye', email: 'zhou.ye@ryan.dev', name: '周野', title: '算法工程师', color: 'green', admin: 0 },
+  { id: 'per_suyan', email: 'su.yan@ryan.dev', name: '苏妍', title: '数据合规', color: 'amber', admin: 0 },
 ] as const;
 
 const TEAMS = [
-  { id: 'tm_platform', name: '平台组', slug: 'platform', desc: '负责 Aiwo 平台、DSH 服务与基础设施。', lead: 'per_linwei' },
+  { id: 'tm_platform', name: '平台组', slug: 'platform', desc: '负责 Ryan 平台、DSH 服务与基础设施。', lead: 'per_linwei' },
   { id: 'tm_rnd', name: '研发一组', slug: 'rnd-one', desc: '业务系统与交付。', lead: 'per_chenhao' },
 ] as const;
 
@@ -66,7 +66,7 @@ export function seedDatabase(db: DatabaseSync): void {
     'prj_calc',
     'calculator-demo',
     '本地 Git 演示 · 计算器',
-    'Aiwo 的本地 Git 演示项目：开发、测试、审查与合并。',
+    'Ryan 的本地 Git 演示项目：开发、测试、审查与合并。',
     'tm_platform',
     'per_linwei',
     'team',

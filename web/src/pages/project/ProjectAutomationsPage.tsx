@@ -165,7 +165,7 @@ export function ProjectAutomationsPage() {
     <div className="ws-page">
       <PageHead
         title="自动化"
-        desc="仓库事件、定时任务或手动操作都能自动生成 Aiwo 任务，并复用项目提示词与记忆。"
+        desc="仓库事件、定时任务或手动操作都能自动生成 Ryan 任务，并复用项目提示词与记忆。"
         actions={
           <>
             <Button variant="ghost" icon="refresh" onClick={() => void automations.refresh()}>
@@ -195,7 +195,7 @@ export function ProjectAutomationsPage() {
           <EmptyState
             icon="zap"
             title="还没有自动化"
-            description="创建自动化，让仓库事件或定时计划自动驱动 Aiwo 执行任务。"
+            description="创建自动化，让仓库事件或定时计划自动驱动 Ryan 执行任务。"
             action={
               <Button size="sm" variant="primary" icon="plus" onClick={openCreate}>
                 新建自动化

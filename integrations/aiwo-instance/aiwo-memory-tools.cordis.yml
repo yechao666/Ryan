@@ -1,4 +1,4 @@
-# 任务执行 profile：注册 Aiwo 项目记忆工具。
+# 任务执行 profile：注册 Ryan 项目记忆工具。
 # 工具通过当前服务 token 访问 runtime 记忆 API，只能操作当前任务所属项目。
 - insert:
     - id: aiwo-memory-tools

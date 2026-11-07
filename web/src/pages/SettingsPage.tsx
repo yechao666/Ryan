@@ -368,7 +368,7 @@ export function SettingsPage() {
               <Card className="card-pad">
                 <SectionHead
                   title="助手配置"
-                  desc="助手运行在服务端本地 DSH 服务中，可调用 Aiwo 开放 API。"
+                  desc="助手运行在服务端本地 DSH 服务中，可调用 Ryan 开放 API。"
                   actions={
                     <Badge size="sm" tone={settings.data.assistant.enabled ? 'green' : 'slate'} dot>
                       {settings.data.assistant.enabled ? '已启用' : '已停用'}

@@ -1,5 +1,5 @@
 /**
- * Aiwo 运行时 HTTP 客户端。
+ * Ryan 运行时 HTTP 客户端。
  * 服务 token 只放在 Authorization 头里，绝不出现在日志/错误信息中。
  */
 export class ApiError extends Error {
@@ -15,7 +15,7 @@ export class ApiError extends Error {
 
 const USER_AGENT = 'aiwo-instance/0.1';
 
-export class AiwoApi {
+export class RyanApi {
   /**
    * @param {{baseUrl: string, token: string, timeoutMs?: number, logger?: import('./log.mjs').Logger}} options
    */
@@ -48,7 +48,7 @@ export class AiwoApi {
       throw new ApiError(
         0,
         timedOut ? 'TIMEOUT' : 'NETWORK_ERROR',
-        timedOut ? `请求 ${method} ${path} 超时（${timeoutMs}ms）` : `无法连接 Aiwo ${this.baseUrl}：${error instanceof Error ? error.message : String(error)}`,
+        timedOut ? `请求 ${method} ${path} 超时（${timeoutMs}ms）` : `无法连接 Ryan ${this.baseUrl}：${error instanceof Error ? error.message : String(error)}`,
         undefined,
         undefined,
       );
@@ -71,7 +71,7 @@ export class AiwoApi {
       throw new ApiError(
         response.status,
         err?.code ?? 'HTTP_ERROR',
-        err?.message ? String(err.message) : `Aiwo 返回 ${response.status}`,
+        err?.message ? String(err.message) : `Ryan 返回 ${response.status}`,
         err?.requestId,
         payload,
       );

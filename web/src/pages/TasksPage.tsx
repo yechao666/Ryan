@@ -216,7 +216,7 @@ export function TasksPage() {
       key: 'executor',
       header: '执行人',
       width: 150,
-      render: (task) => <span className="truncate">{task.executorLabel || 'Aiwo'}</span>,
+      render: (task) => <span className="truncate">{task.executorLabel || 'Ryan'}</span>,
     },
     {
       key: 'instance',

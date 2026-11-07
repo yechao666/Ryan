@@ -102,7 +102,7 @@ export function CreateTaskModal({ open, onClose, onCreated }: CreateTaskModalPro
         label="任务内容"
         required
         error={errors.prompt}
-        hint="写清背景、验收标准与相关文件，会与项目提示词、提示卡一起下发给 Aiwo。"
+        hint="写清背景、验收标准与相关文件，会与项目提示词、提示卡一起下发给 Ryan。"
       >
         <Textarea
           rows={6}

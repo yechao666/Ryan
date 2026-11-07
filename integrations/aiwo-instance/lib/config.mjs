@@ -107,14 +107,14 @@ function readCli(argv) {
 }
 
 export function usage() {
-  return `Aiwo DSH 服务代理 v${PLUGIN_VERSION}
+  return `Ryan DSH 服务代理 v${PLUGIN_VERSION}
 
 用法：
-  node agent.mjs --base <Aiwo URL> --token <服务 token> [options]
+  node agent.mjs --base <Ryan URL> --token <服务 token> [options]
 
 必填：
-  --base <url>              Aiwo 服务地址（默认 http://127.0.0.1:4500）
-  --token <token>           Aiwo 服务 token（aiwo_ins_...；管理端创建）
+  --base <url>              Ryan 服务地址（默认 http://127.0.0.1:4500）
+  --token <token>           Ryan 服务 token（aiwo_ins_...；管理端创建）
   --workspace <dir>         无项目时的回退工作区（默认当前目录）
   --workspace-root <dir>    按项目 ID 自动生成工作区的根目录
                             （默认 ~/.aiwo/workspaces，目录为 projects/<projectId>）

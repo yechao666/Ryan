@@ -130,7 +130,7 @@ export function AutomationForm({ open, automation, onClose, onSaved }: Automatio
       onClose={onClose}
       size="lg"
       title={automation ? '编辑自动化' : '新建自动化'}
-      description="把仓库事件、定时任务或人工操作转换成 Aiwo 任务。"
+      description="把仓库事件、定时任务或人工操作转换成 Ryan 任务。"
       footer={
         <>
           <Button variant="ghost" onClick={onClose}>

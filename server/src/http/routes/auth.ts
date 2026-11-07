@@ -50,7 +50,7 @@ export function registerAuthRoutes(router: Router): void {
 
   router.get('/api/meta', (rc) => {
     rc.json({
-      name: 'Aiwo',
+      name: 'Ryan',
       version: APP_VERSION,
       demo: rc.app.env.demoMode,
       demoAccounts: DEMO_ACCOUNTS,

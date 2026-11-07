@@ -30,8 +30,8 @@ import { fmtInt, fmtRelative } from '../lib/format.ts';
 import { useAsync, useInterval } from '../lib/hooks.ts';
 
 /**
- * Aiwo 概览：项目、DSH 服务、提示卡与任务的总览。
- * 人员不再拥有「智员」，任务由人员 @Aiwo 直接创建，由 DSH 服务领取执行。
+ * Ryan 概览：项目、DSH 服务、提示卡与任务的总览。
+ * 人员不再拥有「智员」，任务由人员 @Ryan 直接创建，由 DSH 服务领取执行。
  */
 export function DashboardPage() {
   const { person } = useAuth();

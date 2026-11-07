@@ -86,7 +86,7 @@ export async function serveStatic(app: AppContext, rc: RequestContext): Promise<
   if (!dist || !existsSync(distRoot) || !statSync(distRoot).isDirectory()) {
     sendJson(rc.res, rc.requestId, 200, {
       ok: false,
-      app: 'Aiwo',
+      app: 'Ryan',
       message: '前端静态资源尚未构建，当前仅提供 API 服务。',
       hint: '运行 `pnpm run build` 生成 web/dist 后刷新页面；或使用 `pnpm run dev:web` 启动前端开发服务器。',
       apiHealth: '/api/health',

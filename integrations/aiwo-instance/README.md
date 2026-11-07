@@ -1,10 +1,10 @@
-# aiwo-instance — Aiwo DSH 服务代理
+# aiwo-instance — Ryan DSH 服务代理
 
-把一台安装了 **DSH** 的机器接入 **Aiwo**：代理 outbound 连接 Aiwo 运行时，领取任务后用
+把一台安装了 **DSH** 的机器接入 **Ryan**：代理 outbound 连接 Ryan 运行时，领取任务后用
 DSH 的 **ACP** 模式执行；ACP 不可用时自动回退 **headless**。适合本地与远端（远端无需暴露端口）。
 
 ```
-Aiwo 控制台 ──创建任务──► Aiwo API ◄── register / heartbeat / claim / events / complete ── aiwo-instance
+Ryan 控制台 ──创建任务──► Ryan API ◄── register / heartbeat / claim / events / complete ── aiwo-instance
                                                                                             │
                                                                         常驻 `dsh --profile acp`（ACP v1 stdio）
                                                                         └─ 不可用时回退 `dsh --profile headless --json -`
@@ -19,9 +19,9 @@ Aiwo 控制台 ──创建任务──► Aiwo API ◄── register / heartbe
 | `lib/headless.mjs` | headless 回退执行器（`dsh --profile headless --json -`） |
 | `lib/prompt.mjs` | 提示词组装（`/goal` 开头 + 项目提示词 + 引用卡片 + 执行者） |
 | `lib/events.mjs` | 运行时事件批量上报（100 条/批，1s 节流） |
-| `lib/http.mjs` | Aiwo 运行时 API 客户端（服务 token 鉴权） |
+| `lib/http.mjs` | Ryan 运行时 API 客户端（服务 token 鉴权） |
 | `lib/credentials.mjs` | 从 `$DSH_HOME/.credentials.yaml` 注入 headless 所需 `DEEPSEEK_API_KEY` |
-| `test/smoke.mjs` | mock Aiwo + fake ACP/headless 冒烟测试（不依赖真实 DSH） |
+| `test/smoke.mjs` | mock Ryan + fake ACP/headless 冒烟测试（不依赖真实 DSH） |
 | `scripts/install-local.sh` | 本地安装依赖并启动 |
 
 ## 前置
@@ -36,12 +36,12 @@ Aiwo 控制台 ──创建任务──► Aiwo API ◄── register / heartbe
 
   `acp` 是 DSH 自带 profile；首次启动时 `$DSH_HOME` 需要可写（DSH 会创建 profile 目录）。
   若 `DSH_HOME` 不可写或 profile 不存在，代理会记录原因并回退 headless。
-- 一个 Aiwo **服务 token**（`aiwo_ins_...`）：Aiwo 控制台 → 服务 → 创建/重置 token；
+- 一个 Ryan **服务 token**（`aiwo_ins_...`）：Ryan 控制台 → 服务 → 创建/重置 token；
   页面会给出可直接复制的启动命令。
 
-## 从 Aiwo 下载代理包（远端推荐）
+## 从 Ryan 下载代理包（远端推荐）
 
-服务 token 可以直接拉取代理包，不需要先克隆 Aiwo 仓库：
+服务 token 可以直接拉取代理包，不需要先克隆 Ryan 仓库：
 
 ```bash
 TOKEN=aiwo_ins_xxx
@@ -97,7 +97,7 @@ curl -s -X POST http://127.0.0.1:4500/api/runtime/instances/heartbeat \
 # 期望：{"ok":true,"instance":{...,"status":"online"},"pending":N}
 ```
 
-Aiwo 控制台服务页应显示 `online`，`pluginVersion` 为 `0.1.0`。
+Ryan 控制台服务页应显示 `online`，`pluginVersion` 为 `0.1.0`。
 
 ## 环境变量
 
@@ -105,7 +105,7 @@ Aiwo 控制台服务页应显示 `online`，`pluginVersion` 为 `0.1.0`。
 
 | 变量 | 默认 | 说明 |
 | --- | --- | --- |
-| `AIWO_BASE_URL` | `http://127.0.0.1:4500` | Aiwo 地址（`--base`） |
+| `AIWO_BASE_URL` | `http://127.0.0.1:4500` | Ryan 地址（`--base`） |
 | `AIWO_INSTANCE_TOKEN` / `AIWO_TOKEN` | 空（必填） | 服务 token（`--token`） |
 | `AIWO_WORKSPACE` | 当前目录 | 无项目 ID 时的回退工作区（`--workspace`） |
 | `AIWO_WORKSPACE_ROOT` | `~/.aiwo/workspaces` | 按项目 ID 自动生成 `projects/<projectId>` 的根目录（`--workspace-root`） |
@@ -155,7 +155,7 @@ Aiwo 控制台服务页应显示 `online`，`pluginVersion` 为 `0.1.0`。
 
 ## 远端安装
 
-远端只需要能 outbound 访问 Aiwo，无需开放入站端口：
+远端只需要能 outbound 访问 Ryan，无需开放入站端口：
 
 ```bash
 # 方式 A：直接拷贝目录（含 package-lock.json）
@@ -177,7 +177,7 @@ ssh user@host 'cd /opt && tar xzf aiwo-instance-0.1.0.tgz && cd package && npm c
 
 ```ini
 [Unit]
-Description=Aiwo DSH instance agent
+Description=Ryan DSH instance agent
 After=network-online.target
 Wants=network-online.target
 
@@ -239,7 +239,7 @@ launchctl load ~/Library/LaunchAgents/com.aiwo.instance.plist
 
 | 现象 | 处理 |
 | --- | --- |
-| 注册 401 / 心跳 401 | token 错误或已吊销：Aiwo 服务页重置 token 后重启代理 |
+| 注册 401 / 心跳 401 | token 错误或已吊销：Ryan 服务页重置 token 后重启代理 |
 | claim 一直 204 | 共享调度池没有 queued 任务，或当前服务已有任务在跑（单任务串行） |
 | 日志 `回退 headless` | `dsh --profile acp` 不可用：检查 `$DSH_HOME` 可写、`dsh --profile acp --help`、`npm install` 是否完成 |
 | headless 报 `MISSING_CREDENTIAL` | 导出 `DEEPSEEK_API_KEY`，或确认 `$DSH_HOME/.credentials.yaml` 的 `refs.DEEPSEEK_API_KEY` |
@@ -254,7 +254,7 @@ node test/smoke.mjs        # 8 个用例：提示词/claim/ACP/权限/回退/失
 node --check agent.mjs && node --check lib/*.mjs
 ```
 
-冒烟测试使用 mock Aiwo HTTP + `test/fixtures/fake-dsh.mjs`，不需要真实 DSH/Aiwo，也不会消耗模型额度。
+冒烟测试使用 mock Ryan HTTP + `test/fixtures/fake-dsh.mjs`，不需要真实 DSH/Ryan，也不会消耗模型额度。
 
 ## 安全
 

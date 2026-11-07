@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# 本地安装并启动 Aiwo DSH 实例代理。
+# 本地安装并启动 Ryan DSH 实例代理。
 #
 # 用法：
 #   bash scripts/install-local.sh --base http://127.0.0.1:4500 --token aiwo_ins_xxx --workspace /srv/aiwo-workspace

@@ -1,5 +1,5 @@
 /**
- * claim 响应解析：只依赖 Aiwo 运行时协议字段，缺字段时给出明确错误。
+ * claim 响应解析：只依赖 Ryan 运行时协议字段，缺字段时给出明确错误。
  */
 
 export function normalizeClaim(raw) {

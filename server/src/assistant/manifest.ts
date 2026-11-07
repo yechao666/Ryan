@@ -1,13 +1,13 @@
 /** 助手使用的稳定 API 清单；不从源码解析，随开放 API 一起维护。 */
 export function assistantApiManifest() {
   return {
-    name: 'Aiwo API',
+    name: 'Ryan API',
     version: 1,
     auth: 'Authorization: Bearer <当前人员会话 token>',
     basePath: '/api',
     notes: [
       '所有人员态接口使用当前登录人员 token；服务运行时接口使用服务 token。',
-      '任务执行者固定为人员@Aiwo；DSH 服务是共享调度资源。',
+      '任务执行者固定为人员@Ryan；DSH 服务是共享调度资源。',
       '项目工作区由 DSH 服务按项目 ID 自动生成，API 不接收工作目录。',
       '账号就是人员；本地密码与统一认证都属于账号能力。',
     ],
@@ -87,7 +87,7 @@ export function assistantApiManifest() {
       { method: 'GET', path: '/api/tasks', summary: '任务列表', query: { projectId: 'string?', status: 'string?', type: 'string?', mine: '0|1?', limit: 'number?' } },
       {
         method: 'POST', path: '/api/projects/:id/tasks',
-        summary: '创建任务；执行者由服务端固定为创建人@Aiwo',
+        summary: '创建任务；执行者由服务端固定为创建人@Ryan',
         body: { title: 'string', prompt: 'string', promptCardIds: 'string[]?', instanceId: 'string?', type: 'feature|bugfix|management|ops|docs|other?', priority: 'number?', source: 'human|automation|webhook|api?' },
       },
       { method: 'GET', path: '/api/tasks/:id', summary: '任务详情、事件与记忆配置' },

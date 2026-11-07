@@ -1,4 +1,4 @@
-# Aiwo 助手集成
+# Ryan 助手集成
 
 ## 安全边界
 
@@ -18,7 +18,7 @@
 aiwo_api({ method: "GET"|"POST"|"PATCH"|"DELETE", path: "/api/...", body?: object })
 ```
 
-它只能访问当前 Aiwo 服务的同源 `/api/` 路径；认证 token 从 `HIVE_AUTH_FILE` 读取，模型不能传入或看到明文 token。
+它只能访问当前 Ryan 服务的同源 `/api/` 路径；认证 token 从 `HIVE_AUTH_FILE` 读取，模型不能传入或看到明文 token。
 
 ## API 契约
 
@@ -28,7 +28,7 @@ aiwo_api({ method: "GET"|"POST"|"PATCH"|"DELETE", path: "/api/...", body?: objec
 aiwo_api({ method: "GET", path: "/api/assistant/manifest" })
 ```
 
-`/api/assistant/manifest` 是唯一 API 定义来源。助手不需要、也不应该读取 Aiwo 源码或数据库。
+`/api/assistant/manifest` 是唯一 API 定义来源。助手不需要、也不应该读取 Ryan 源码或数据库。
 
 ## 文件
 
@@ -43,4 +43,4 @@ aiwo_api({ method: "GET", path: "/api/assistant/manifest" })
 dsh --profile headless --patch integrations/assistant/restricted.cordis.yml --json
 ```
 
-工作目录默认是 `~/.aiwo/assistant`，不是 Aiwo 源码目录；如需指定，使用 `AIWO_ASSISTANT_WORKSPACE`。
+工作目录默认是 `~/.aiwo/assistant`，不是 Ryan 源码目录；如需指定，使用 `AIWO_ASSISTANT_WORKSPACE`。

@@ -74,7 +74,7 @@ function errorMessage(cause: unknown, fallback: string): string {
 }
 
 /**
- * Aiwo DSH 服务资源：本机 / 远端服务的创建、接入、测试、token 轮换与吊销。
+ * Ryan DSH 服务资源：本机 / 远端服务的创建、接入、测试、token 轮换与吊销。
  * 服务是任务的执行者；创建时的一次性 token 与安装命令只展示一次。
  */
 export function InstancesPage() {
@@ -445,7 +445,7 @@ export function InstancesPage() {
         title="DSH 服务"
         desc={
           <>
-            服务是 Aiwo 的执行资源：本机或远端 DSH 通过服务代理接入，领取任务并回传执行过程。
+            服务是 Ryan 的执行资源：本机或远端 DSH 通过服务代理接入，领取任务并回传执行过程。
             <button type="button" className="ws-inline-link" onClick={() => setGuideOpen(true)}>
               如何接入 DSH 服务？
             </button>
@@ -658,7 +658,7 @@ export function InstancesPage() {
                 onChange={(event) => update('name', event.target.value)}
               />
             </Field>
-            <Field label="类型" htmlFor="instance-kind" hint="本机由 Aiwo 拉起代理；远端需安装通讯插件。">
+            <Field label="类型" htmlFor="instance-kind" hint="本机由 Ryan 拉起代理；远端需安装通讯插件。">
               <Select
                 id="instance-kind"
                 value={form.kind}
@@ -724,7 +724,7 @@ export function InstancesPage() {
             <Field label="服务名称" required>
               <Input value={editForm.name} autoFocus onChange={(event) => updateEdit('name', event.target.value)} />
             </Field>
-            <Field label="类型" hint="本机由 Aiwo 拉起代理；远端需安装通讯插件。">
+            <Field label="类型" hint="本机由 Ryan 拉起代理；远端需安装通讯插件。">
               <Select value={editForm.kind} options={kindOptions} onChange={(event) => updateEdit('kind', event.target.value as InstanceKind)} />
             </Field>
           </div>

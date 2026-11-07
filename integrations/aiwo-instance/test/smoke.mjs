@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
- * 冒烟测试：mock Aiwo HTTP + fake dsh（ACP / headless）。
- * 不依赖真实 Aiwo / DSH / 网络。
+ * 冒烟测试：mock Ryan HTTP + fake dsh（ACP / headless）。
+ * 不依赖真实 Ryan / DSH / 网络。
  *
  * 运行：node test/smoke.mjs（或 npm test）
  */
@@ -38,11 +38,11 @@ function makeClaim(overrides = {}) {
       slug: 'demo',
       prompt: '项目提示词：只改必要文件，测试必须实际运行。',
       type: 'local',
-      repoUrl: '/tmp/aiwo-demo-repo',
+      repoUrl: '/tmp/ryan-demo-repo',
       memoryAgentId: 'agent_demo',
       ...overrides.project,
     },
-    executor: { personId: 'per_1', name: '张三', label: '张三@Aiwo', ...overrides.executor },
+    executor: { personId: 'per_1', name: '张三', label: '张三@Ryan', ...overrides.executor },
     promptCards: [
       { id: 'c1', name: '功能开发工作流', category: 'workflow', content: '卡片内容：先阅读项目提示词。' },
       ...(overrides.promptCards ?? []),
@@ -216,7 +216,7 @@ await testCase('提示词组装：/goal 开头 + 项目/卡片/任务/执行者'
   const prompt = buildPrompt(claim);
   assert.ok(prompt.startsWith('/goal'), 'prompt 必须以 /goal 开头');
   assert.equal((prompt.match(/\/goal/g) ?? []).length, 1, '只应有一个 /goal 标记');
-  const order = ['项目提示词', '卡片内容', '完成冒烟测试', '张三@Aiwo'];
+  const order = ['项目提示词', '卡片内容', '完成冒烟测试', '张三@Ryan'];
   let cursor = -1;
   for (const text of order) {
     const index = prompt.indexOf(text);
@@ -231,7 +231,7 @@ await testCase('claim 解析：保留字段 / 缺字段报错 / 去 /goal', () =
   assert.equal(claim.task.id, 'tsk_smoke');
   assert.equal(claim.project.prompt.includes('项目提示词'), true);
   assert.equal(claim.promptCards.length, 1);
-  assert.equal(claim.executor.label, '张三@Aiwo');
+  assert.equal(claim.executor.label, '张三@Ryan');
   assert.equal(stripGoalPrefix('/goal 做点什么'), '做点什么');
   assert.equal(stripGoalPrefix('/goal'), '');
   assert.equal(stripGoalPrefix('没有前缀'), '没有前缀');
@@ -282,7 +282,7 @@ await testCase('ACP：claim → 提示词 → session/update → complete(done)'
 
     const sentPrompt = readFileSync(promptFile, 'utf8');
     assert.ok(sentPrompt.startsWith('/goal'), 'stdin 提示词必须以 /goal 开头');
-    for (const text of ['项目提示词', '卡片内容', '完成冒烟测试', '张三@Aiwo']) {
+    for (const text of ['项目提示词', '卡片内容', '完成冒烟测试', '张三@Ryan']) {
       assert.ok(sentPrompt.includes(text), `stdin 提示词应包含：${text}`);
     }
   } finally {

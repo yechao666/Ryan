@@ -42,7 +42,7 @@ function ok(result: { status: number; body: Json | null }): Json {
 }
 
 async function login(email: string): Promise<string> {
-  const result = ok(await call('/api/auth/login', { method: 'POST', body: { email, password: 'aiwo-demo' } }));
+  const result = ok(await call('/api/auth/login', { method: 'POST', body: { email, password: 'ryan-demo' } }));
   return result.token as string;
 }
 
@@ -61,8 +61,8 @@ before(async () => {
   const address = server.address();
   assert.ok(address && typeof address === 'object');
   base = `http://127.0.0.1:${address.port}`;
-  tokenLin = await login('lin.wei@aiwo.dev');
-  tokenChen = await login('chen.hao@aiwo.dev');
+  tokenLin = await login('lin.wei@ryan.dev');
+  tokenChen = await login('chen.hao@ryan.dev');
 });
 
 after(() => {
@@ -70,11 +70,11 @@ after(() => {
   if (tempDir) rmSync(tempDir, { recursive: true, force: true });
 });
 
-test('Aiwo 基础：登录、仪表盘无智员、实例与项目', async () => {
+test('Ryan 基础：登录、仪表盘无智员、实例与项目', async () => {
   assert.ok(tokenLin);
   const dash = ok(await call('/api/dashboard', { token: tokenLin }));
   assert.equal(dash.person.name, '林薇');
-  assert.equal(dash.agents, undefined, 'Aiwo 不应返回 agents');
+  assert.equal(dash.agents, undefined, 'Ryan 不应返回 agents');
   assert.ok(Array.isArray(dash.instances));
   assert.equal(dash.projects.length, 1);
   assert.equal(dash.projects[0].counts.promptCards, 4);
@@ -99,7 +99,7 @@ test('提示卡：项目可引用卡片、创建组织卡片、任务引用写�
     token: tokenLin,
     method: 'POST',
     body: {
-      title: 'Aiwo 测试任务',
+      title: 'Ryan 测试任务',
       prompt: '只回复 AIWO_OK',
       priority: 99,
       promptCardIds: [created.id],
@@ -107,14 +107,14 @@ test('提示卡：项目可引用卡片、创建组织卡片、任务引用写�
       type: 'ops',
     },
   }));
-  assert.equal(task.executorLabel, '林薇@Aiwo');
+  assert.equal(task.executorLabel, '林薇@Ryan');
   assert.deepEqual(task.promptCardIds, [created.id]);
   assert.equal(task.promptCards[0].name, 'AI 测试卡片');
 });
 
 test('运行时：实例领取、返回提示卡、完成写回', async () => {
   const queued = ok(await call('/api/tasks?projectId=prj_calc&status=queued', { token: tokenLin }));
-  const target = queued.find((task: Json) => task.title === 'Aiwo 测试任务');
+  const target = queued.find((task: Json) => task.title === 'Ryan 测试任务');
   assert.ok(target, '找不到测试任务');
 
   const claimed = ok(await call('/api/runtime/tasks/claim', {
@@ -122,7 +122,7 @@ test('运行时：实例领取、返回提示卡、完成写回', async () => {
     method: 'POST',
   }));
   assert.equal(claimed.task.id, target.id);
-  assert.equal(claimed.executor.label, '林薇@Aiwo');
+  assert.equal(claimed.executor.label, '林薇@Ryan');
   assert.equal(claimed.promptCards[0].name, 'AI 测试卡片');
 
   const completed = ok(await call(`/api/runtime/tasks/${target.id}/complete`, {
@@ -212,9 +212,9 @@ test('运行时：实例可查询任务状态，控制台取消后代理可感�
   })).status, 409);
 });
 
-test('自动化任务也固定由人员@Aiwo 执行', async () => {
+test('自动化任务也固定由人员@Ryan 执行', async () => {
   const run = ok(await call('/api/automations/aut_demo_daily/run', { token: tokenLin, method: 'POST' }));
-  assert.equal(run.task.executorLabel, '林薇@Aiwo');
+  assert.equal(run.task.executorLabel, '林薇@Ryan');
   assert.ok(run.task.createdBy);
 });
 
@@ -254,7 +254,7 @@ test('多实例调度：两个实例分别领取不同任务，不会抢同一�
 
 test('助手 manifest：包含稳定 API 清单，不泄露凭证', async () => {
   const manifest = ok(await call('/api/assistant/manifest', { token: tokenLin }));
-  assert.equal(manifest.name, 'Aiwo API');
+  assert.equal(manifest.name, 'Ryan API');
   assert.ok(Array.isArray(manifest.endpoints));
   assert.ok(manifest.endpoints.some((item: Json) => item.method === 'POST' && item.path === '/api/projects/:id/tasks'));
   assert.ok(manifest.endpoints.some((item: Json) => item.path === '/api/assistant/manifest'));
@@ -523,12 +523,12 @@ test('账号体系：管理员创建账号、本地登录、改密与统一认�
   const created = ok(await call('/api/settings/accounts', {
     token: tokenLin,
     method: 'POST',
-    body: { name: '新同事', email: 'new.person@aiwo.dev', password: 'new-password', title: '工程师' },
+    body: { name: '新同事', email: 'new.person@ryan.dev', password: 'new-password', title: '工程师' },
   }));
-  assert.equal(created.email, 'new.person@aiwo.dev');
+  assert.equal(created.email, 'new.person@ryan.dev');
   const newLogin = ok(await call('/api/auth/login', {
     method: 'POST',
-    body: { email: 'new.person@aiwo.dev', password: 'new-password' },
+    body: { email: 'new.person@ryan.dev', password: 'new-password' },
   }));
   const newToken = newLogin.token as string;
   const account = ok(await call('/api/account', { token: newToken }));
@@ -548,7 +548,7 @@ test('账号体系：管理员创建账号、本地登录、改密与统一认�
   }));
   const relogin = ok(await call('/api/auth/login', {
     method: 'POST',
-    body: { email: 'new.person@aiwo.dev', password: 'changed-password' },
+    body: { email: 'new.person@ryan.dev', password: 'changed-password' },
   }));
   assert.equal(relogin.person.name, '新同事 B');
 
@@ -568,7 +568,7 @@ test('账号体系：管理员创建账号、本地登录、改密与统一认�
   }));
   const afterDelete = await call('/api/auth/login', {
     method: 'POST',
-    body: { email: 'new.person@aiwo.dev', password: 'changed-password' },
+    body: { email: 'new.person@ryan.dev', password: 'changed-password' },
   });
   assert.equal(afterDelete.status, 401);
 });
@@ -598,7 +598,7 @@ test('统一认证：OIDC 登录自动创建人员并建立会话', async () => 
       return;
     }
     if (url.pathname === '/userinfo') {
-      res.end(JSON.stringify({ sub: 'sso-subject-1', email: 'sso.user@aiwo.dev', name: 'SSO 用户' }));
+      res.end(JSON.stringify({ sub: 'sso-subject-1', email: 'sso.user@ryan.dev', name: 'SSO 用户' }));
       return;
     }
     res.statusCode = 404;
@@ -632,7 +632,7 @@ test('统一认证：OIDC 登录自动创建人员并建立会话', async () => 
     assert.ok(location.startsWith('/login#token='));
     const token = decodeURIComponent(location.slice('/login#token='.length));
     const me = ok(await call('/api/auth/me', { token }));
-    assert.equal(me.person.email, 'sso.user@aiwo.dev');
+    assert.equal(me.person.email, 'sso.user@ryan.dev');
     const account = ok(await call('/api/account', { token }));
     assert.equal(account.hasPassword, false);
     assert.equal(account.identities[0].providerSlug, 'oidc-sso');

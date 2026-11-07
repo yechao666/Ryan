@@ -145,7 +145,7 @@ export function ProjectOverviewPage() {
                 <EmptyState
                   icon="list"
                   title="当前没有正在执行的任务"
-                  description="创建任务后，在线 DSH 服务会从共享调度池领取并交给 Aiwo 执行。"
+                  description="创建任务后，在线 DSH 服务会从共享调度池领取并交给 Ryan 执行。"
                   action={
                     <Link className="btn btn-sm btn-outline" to={`${base}/tasks?new=1`}>
                       <Icon name="plus" size={13} />
@@ -173,7 +173,7 @@ export function ProjectOverviewPage() {
                         <span className="ws-working-main">
                           <span className="ws-working-title truncate">{task.title}</span>
                           <span className="tiny dim ws-working-sub">
-                            {task.executorLabel || 'Aiwo'}
+                            {task.executorLabel || 'Ryan'}
                             {task.instanceName ? ` · ${task.instanceName}` : ''} · {fmtRelative(at)}
                           </span>
                         </span>
@@ -251,7 +251,7 @@ export function ProjectOverviewPage() {
                 <EmptyState
                   icon="list"
                   title="还没有任务"
-                  description="创建第一个任务，由 DSH 服务交给 Aiwo 执行。"
+                  description="创建第一个任务，由 DSH 服务交给 Ryan 执行。"
                   action={
                     <Link className="btn btn-sm btn-outline" to={`${base}/tasks?new=1`}>
                       <Icon name="plus" size={13} />
@@ -277,7 +277,7 @@ export function ProjectOverviewPage() {
                         <span className="ws-working-main">
                           <span className="ws-working-title truncate">{task.title}</span>
                           <span className="tiny dim ws-working-sub">
-                            {task.executorLabel || 'Aiwo'}
+                            {task.executorLabel || 'Ryan'}
                             {task.instanceName ? ` · ${task.instanceName}` : ''} · {fmtRelative(task.createdAt)}
                           </span>
                         </span>

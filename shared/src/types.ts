@@ -1,5 +1,5 @@
 /**
- * Aiwo 共享契约：以 DSH 服务为资源，人员 @Aiwo 直接执行项目任务。
+ * Ryan 共享契约：以 DSH 服务为资源，人员 @Ryan 直接执行项目任务。
  * 前后端唯一事实来源；HTTP JSON 均为 camelCase。
  */
 
@@ -84,7 +84,7 @@ export interface Project {
   /** 项目绑定的 DSH 服务；空表示共享池。 */
   serviceIds?: string[];
   serviceNames?: string[];
-  /** Aiwo 内部项目记忆身份（aiwo_<slug>）。 */
+  /** Ryan 内部项目记忆身份（aiwo_<slug>）。 */
   memoryAgentId?: string;
   createdAt: string;
   updatedAt: string;
@@ -205,7 +205,7 @@ export interface WorkItem {
   projectId: string;
   projectName: string;
   executorPersonId?: string;
-  /** 展示名，固定为「姓名@Aiwo」。 */
+  /** 展示名，固定为「姓名@Ryan」。 */
   executorLabel: string;
   source: TaskSource;
   type: TaskType;

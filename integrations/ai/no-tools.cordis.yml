@@ -1,4 +1,4 @@
-# 供 Aiwo 内部 DSH 摘要任务使用：只生成文本，不允许调用工具。
+# 供 Ryan 内部 DSH 摘要任务使用：只生成文本，不允许调用工具。
 - id: tool-bash
   disabled: true
 - id: tool-pwsh

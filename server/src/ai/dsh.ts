@@ -1,5 +1,5 @@
 /**
- * Aiwo 内部 AI 任务的本地 DSH 调用器。
+ * Ryan 内部 AI 任务的本地 DSH 调用器。
  * 只使用本机 dsh headless，不允许工具调用，不依赖外部 Mnemos/摘要服务。
  */
 import { spawn } from 'node:child_process';

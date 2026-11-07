@@ -62,7 +62,7 @@ export async function generateSuggestions(db: Db, input: SuggestionInput): Promi
     ? (db.prepare('SELECT title, status FROM work_items WHERE id = ?').get(input.taskId) as unknown as { title: string; status: string } | undefined)
     : undefined;
   const prompt = [
-    '你是 Aiwo 的助手。请根据当前界面上下文，生成 3 条用户接下来可能让助手执行的中文任务建议。',
+    '你是 Ryan 的助手。请根据当前界面上下文，生成 3 条用户接下来可能让助手执行的中文任务建议。',
     '每条不超过 24 个中文字符，必须具体、可执行；不要解释，不要编号，不要 Markdown。',
     '只输出 JSON 字符串数组，例如 ["建议一","建议二","建议三"]。',
     '',

@@ -65,7 +65,7 @@ async function generate(db: Db, projectId: string, maxChars: number, fallback: M
     return fallback;
   }
   const prompt = [
-    `你是 Aiwo 的项目记忆整理器。请把下面的最近项目记忆/洞见整理成一段不超过 ${maxChars} 个字符的中文记忆简报。`,
+    `你是 Ryan 的项目记忆整理器。请把下面的最近项目记忆/洞见整理成一段不超过 ${maxChars} 个字符的中文记忆简报。`,
     '只保留跨任务可复用的决策、约定、领域事实、架构关系、踩坑、流程；删去任务流水、重复内容和一次性细节。',
     '直接输出简报正文，不要标题、不要 Markdown 代码块、不要解释，不要调用工具。',
     '',

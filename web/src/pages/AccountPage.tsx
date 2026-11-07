@@ -125,7 +125,7 @@ export function AccountPage() {
     <div className="page">
       <PageHead
         title="账号"
-        desc="账号就是 Aiwo 的人员身份；可以维护资料、本地密码，并绑定多个统一认证。"
+        desc="账号就是 Ryan 的人员身份；可以维护资料、本地密码，并绑定多个统一认证。"
       />
 
       {account.loading && !account.data ? (

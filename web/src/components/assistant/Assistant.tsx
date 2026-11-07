@@ -45,7 +45,7 @@ interface Conversation {
 }
 
 const WELCOME =
-  '我是 Aiwo 系统助手，运行在 DSH 服务中。可以读取项目、任务、服务与提示卡，并通过 Aiwo API 直接创建任务、配置服务或查询状态。';
+  '我是 Ryan 系统助手，运行在 DSH 服务中。可以读取项目、任务、服务与提示卡，并通过 Ryan API 直接创建任务、配置服务或查询状态。';
 const STORAGE_CONVERSATIONS = 'aiwo.assistant.conversations.v1';
 const STORAGE_ACTIVE = 'aiwo.assistant.activeConversation.v1';
 
@@ -215,7 +215,7 @@ export function Assistant() {
     (pathname.startsWith('/projects') && '项目') ||
     (pathname.startsWith('/teams') && '团队') ||
     (pathname === '/' && '概览') ||
-    'Aiwo';
+    'Ryan';
 
   const [open, setOpen] = useState(() => localStorage.getItem('aiwo.assistant.open') !== '0');
   const [width, setWidth] = useState(() => {
@@ -587,17 +587,17 @@ export function Assistant() {
   return (
     <div className={`cx-assistant ${open ? 'is-open' : ''}`} style={open ? { width } : undefined}>
       {open ? (
-        <section className="cx-assistant-panel" aria-label="Aiwo 助手">
+        <section className="cx-assistant-panel" aria-label="Ryan 助手">
           <span className="cx-assistant-resize" title="拖动调整宽度" onPointerDown={beginResize} />
           <header className="cx-assistant-head">
             <div className="cx-assistant-brand">
               <span className="cx-assistant-brand__mark">A</span>
               <div style={{ minWidth: 0 }}>
                 <div className="cx-assistant-brand__title">
-                  Aiwo 助手
+                  Ryan 助手
                   <Badge size="sm" tone="cyan">DSH 服务</Badge>
                 </div>
-                <div className="cx-assistant-brand__sub">{active?.title && active.title !== '新会话' ? active.title : '人员 @Aiwo · 可直接调用 Aiwo API'}</div>
+                <div className="cx-assistant-brand__sub">{active?.title && active.title !== '新会话' ? active.title : '人员 @Ryan · 可直接调用 Ryan API'}</div>
               </div>
             </div>
             <div className="cx-assistant-head-actions">
@@ -756,7 +756,7 @@ export function Assistant() {
             <Textarea
               rows={2}
               value={input}
-              placeholder="描述你想让 Aiwo 做的事，例如：创建任务、查看服务、生成自动化…"
+              placeholder="描述你想让 Ryan 做的事，例如：创建任务、查看服务、生成自动化…"
               onChange={(event) => setInput(event.target.value)}
               onKeyDown={(event) => {
                 if (event.key === 'Enter' && !event.shiftKey) {
@@ -798,7 +798,7 @@ export function Assistant() {
           </form>
         </section>
       ) : (
-        <button type="button" className="cx-assistant-fab" title="打开 Aiwo 助手" onClick={() => setOpen(true)}>
+        <button type="button" className="cx-assistant-fab" title="打开 Ryan 助手" onClick={() => setOpen(true)}>
           <span className="cx-assistant-fab__icon"><Icon name="sparkles" size={18} /></span>
           <span className="cx-assistant-fab__label">助手</span>
         </button>

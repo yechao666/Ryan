@@ -1,4 +1,4 @@
--- Aiwo schema v1：以 DSH 实例为资源，人员 @Aiwo 直接执行任务。
+-- Ryan schema v1：以 DSH 实例为资源，人员 @Ryan 直接执行任务。
 PRAGMA journal_mode = WAL;
 PRAGMA foreign_keys = ON;
 PRAGMA synchronous = NORMAL;
@@ -114,7 +114,7 @@ CREATE TABLE IF NOT EXISTS project_members (
 );
 
 -- 可管理、可被任务引用的提示卡
--- Aiwo 内置项目记忆
+-- Ryan 内置项目记忆
 CREATE TABLE IF NOT EXISTS project_memories (
   id          TEXT PRIMARY KEY,
   project_id  TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,

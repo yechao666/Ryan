@@ -1,5 +1,5 @@
 /**
- * Aiwo 助手唯一工具：通过 HTTP 调用 Aiwo 开放 API。
+ * Ryan 助手唯一工具：通过 HTTP 调用 Ryan 开放 API。
  *
  * 不注册 bash、文件读写、搜索、web_fetch、subagent 等工具；
  * 认证 token 从 HIVE_AUTH_FILE 读取，不接受模型传入。
@@ -29,13 +29,13 @@ export function apply(ctx) {
     tools.register({
       name: 'aiwo_api',
       description:
-        '通过 HTTP 访问 Aiwo 开放 API。只能访问当前 Aiwo 服务的 /api 路径；不要尝试执行命令或读取文件。' +
+        '通过 HTTP 访问 Ryan 开放 API。只能访问当前 Ryan 服务的 /api 路径；不要尝试执行命令或读取文件。' +
         '先 GET /api/assistant/manifest 获取接口清单。',
       parameters: {
         type: 'object',
         properties: {
           method: { type: 'string', enum: ['GET', 'POST', 'PATCH', 'DELETE'], description: 'HTTP method' },
-          path: { type: 'string', description: 'Aiwo API path starting with /api' },
+          path: { type: 'string', description: 'Ryan API path starting with /api' },
           body: { type: 'object', description: 'JSON request body for POST/PATCH' },
         },
         required: ['method', 'path'],

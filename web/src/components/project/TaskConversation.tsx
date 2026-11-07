@@ -217,7 +217,7 @@ export function TaskConversation({
     return (
       <div className="ws-chat-empty">
         <span className="ws-rt-typing"><i /><i /><i /></span>
-        任务开始后，Aiwo 的输出、思考与工具调用会按时间顺序出现在这里。
+        任务开始后，Ryan 的输出、思考与工具调用会按时间顺序出现在这里。
       </div>
     );
   }
@@ -239,10 +239,10 @@ export function TaskConversation({
         {blocks.map((block) => {
           return (
             <article className="ws-turn" key={block.id}>
-              <Avatar name="Aiwo" tone="violet" size="sm" />
+              <Avatar name="Ryan" tone="violet" size="sm" />
               <div className="ws-turn-body">
                 <div className="ws-chat-head">
-                  <span className="strong small">{executorLabel || 'Aiwo'}</span>
+                  <span className="strong small">{executorLabel || 'Ryan'}</span>
                   <span className="tiny dim">{fmtDateTime(block.at)}</span>
                   {block.items.filter((item) => item.kind === 'tool').length > 0 ? (
                     <span className="tiny dim">· {block.items.filter((item) => item.kind === 'tool').length} 个工具</span>

@@ -243,7 +243,7 @@ export function TaskDrawer({ taskId, onClose, onChanged, inline = false }: TaskD
         onClose={() => setConfirmCancel(false)}
         onConfirm={() => void handleCancel()}
         title="取消任务"
-        description={`确认取消「${task?.title ?? ''}」？Aiwo 将停止执行该任务，操作不可撤销。`}
+        description={`确认取消「${task?.title ?? ''}」？Ryan 将停止执行该任务，操作不可撤销。`}
         confirmLabel="取消任务"
         loading={cancelling}
       />
@@ -312,7 +312,7 @@ export function TaskDrawer({ taskId, onClose, onChanged, inline = false }: TaskD
               <MetaItem label="执行人">
                 <span className="hstack gap-6">
                   <Icon name="user" size={12} />
-                  {task.executorLabel || 'Aiwo'}
+                  {task.executorLabel || 'Ryan'}
                 </span>
               </MetaItem>
               <MetaItem label="服务">{task.instanceName || '自动分配'}</MetaItem>
@@ -530,7 +530,7 @@ export function TaskDrawer({ taskId, onClose, onChanged, inline = false }: TaskD
             <h1 className="ws-task-page-title">{task?.title ?? '任务详情'}</h1>
             <div className="tiny dim">
               {task
-                ? `#${task.id.slice(0, 12)} · ${taskSourceLabel(task.source)} · ${task.executorLabel || 'Aiwo'}`
+                ? `#${task.id.slice(0, 12)} · ${taskSourceLabel(task.source)} · ${task.executorLabel || 'Ryan'}`
                 : '正在加载任务…'}
             </div>
           </div>
@@ -555,7 +555,7 @@ export function TaskDrawer({ taskId, onClose, onChanged, inline = false }: TaskD
         title={task ? task.title : '任务详情'}
         subtitle={
           task
-            ? `#${task.id.slice(0, 8)} · ${taskSourceLabel(task.source)} · ${task.executorLabel || 'Aiwo'}`
+            ? `#${task.id.slice(0, 8)} · ${taskSourceLabel(task.source)} · ${task.executorLabel || 'Ryan'}`
             : '正在加载任务…'
         }
       >

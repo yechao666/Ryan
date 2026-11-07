@@ -1,4 +1,4 @@
-# Aiwo 助手受限 profile：没有 shell、文件读写、搜索、web、subagent。
+# Ryan 助手受限 profile：没有 shell、文件读写、搜索、web、subagent。
 - id: tool-bash
   disabled: true
 - id: tool-pwsh

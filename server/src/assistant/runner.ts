@@ -49,7 +49,7 @@ function profile(): string {
 }
 
 function workspace(): string {
-  // 助手只在自己的运行目录中工作，不再把 Aiwo 源码仓库作为 cwd。
+  // 助手只在自己的运行目录中工作，不再把 Ryan 源码仓库作为 cwd。
   return process.env.HIVE_DSH_WORKSPACE || join(homedir(), '.aiwo', 'assistant');
 }
 
@@ -71,8 +71,8 @@ async function deepseekKey(): Promise<string> {
 
 function buildPrompt(input: AssistantTurn): string {
   return [
-    '你是 Aiwo 平台内置的 DSH 系统助手，运行在一个真实的 DSH headless 服务中。',
-    'Aiwo 没有智员概念：任务执行者固定为「人员@Aiwo」。你的职责是直接帮助当前人员操作系统，而不是只给出操作步骤。',
+    '你是 Ryan 平台内置的 DSH 系统助手，运行在一个真实的 DSH headless 服务中。',
+    'Ryan 没有智员概念：任务执行者固定为「人员@Ryan」。你的职责是直接帮助当前人员操作系统，而不是只给出操作步骤。',
     '',
     `当前人员：${input.personName}（${input.personId}）`,
     `当前页面：${input.pathname}`,
@@ -83,7 +83,7 @@ function buildPrompt(input: AssistantTurn): string {
     '确定后输出 HIVE_NAVIGATE: /projects/<projectId>/tasks/<taskId>。不确定或有多个候选项时先向用户确认。',
     '任务详情页路径格式：/projects/:projectId/tasks/:taskId（不要使用 ?task= 查询参数）。',
     '',
-    '你只有一个工具：aiwo_api。它只能通过 HTTP 访问当前 Aiwo 服务的 /api 路径。',
+    '你只有一个工具：aiwo_api。它只能通过 HTTP 访问当前 Ryan 服务的 /api 路径。',
     '你没有 shell、文件读写、文件搜索、web_fetch、skill、subagent 等工具；不要尝试执行命令或读取文件。',
     'API 契约只来自稳定 manifest，不通过阅读源码推断接口。',
     '第一步调用 aiwo_api GET /api/assistant/manifest 获取完整接口清单；manifest 是唯一的 API 定义来源。',
@@ -116,7 +116,7 @@ function extractNavigation(text: string): { reply: string; navigate?: string } {
 async function runAssistantTurnOnce(input: AssistantTurn): Promise<AssistantResult> {
   const apiKey = await deepseekKey();
   if (!apiKey) {
-    throw new Error('Aiwo 助手缺少 DEEPSEEK_API_KEY：请在服务器环境中配置，或写入 ~/.dsh/.credentials.yaml');
+    throw new Error('Ryan 助手缺少 DEEPSEEK_API_KEY：请在服务器环境中配置，或写入 ~/.dsh/.credentials.yaml');
   }
   const prompt = buildPrompt(input);
   const cwd = input.workspace || workspace();

@@ -27,8 +27,8 @@ function RequireAuth({ children }: { children: React.ReactNode }) {
   if (loading) {
     return (
       <div className="boot-screen">
-        <div className="brand-mark">A</div>
-        <div className="boot-screen__text">正在加载 Aiwo…</div>
+        <div className="brand-mark">R</div>
+        <div className="boot-screen__text">正在加载 Ryan…</div>
       </div>
     );
   }

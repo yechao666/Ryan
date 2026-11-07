@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "Aiwo DSH 实例代理：outbound 连接 Aiwo 运行时，用 DSH ACP（headless 回退）执行任务",
+  "description": "Ryan DSH 实例代理：outbound 连接 Ryan 运行时，用 DSH ACP（headless 回退）执行任务",
   "bin": {
     "aiwo-instance": "./agent.mjs"
   },

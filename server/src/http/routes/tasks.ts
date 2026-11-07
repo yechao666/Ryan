@@ -142,7 +142,7 @@ function serviceNamesForTask(db: Db, ids: string[]): string[] {
 
 export function executorLabel(name: string | null | undefined): string {
   const value = String(name ?? '').trim();
-  return value ? `${value}@Aiwo` : 'Aiwo';
+  return value ? `${value}@Ryan` : 'Ryan';
 }
 
 export function mapWorkItem(row: TaskRow): WorkItem {
@@ -320,11 +320,11 @@ export function createTaskRecord(db: Db, bus: EventBus, input: CreateTaskRecordI
     [input.projectId],
   );
   if (!project) throw errors.notFound('项目不存在');
-  // Aiwo 的执行者永远是人员：自动化/Webhook 没有显式创建人时落到项目负责人。
+  // Ryan 的执行者永远是人员：自动化/Webhook 没有显式创建人时落到项目负责人。
   const effectiveCreatedBy = input.createdBy ?? project.owner_person_id ?? null;
-  if (!effectiveCreatedBy) throw errors.conflict('项目没有负责人，无法确定 人员@Aiwo 执行者');
+  if (!effectiveCreatedBy) throw errors.conflict('项目没有负责人，无法确定 人员@Ryan 执行者');
   const creator = rowOf<{ name: string }>(db, 'SELECT name FROM persons WHERE id = ?', [effectiveCreatedBy]);
-  if (!creator) throw errors.conflict('任务创建人不存在，无法确定 人员@Aiwo 执行者');
+  if (!creator) throw errors.conflict('任务创建人不存在，无法确定 人员@Ryan 执行者');
   const boundServiceIds = projectServiceIds(db, input.projectId);
   const explicitServices = [...new Set(input.instanceIds ?? (input.instanceId ? [input.instanceId] : []))];
   for (const serviceId of explicitServices) {
@@ -611,7 +611,7 @@ export function registerTaskRoutes(router: Router): void {
     const task = getTaskRow(rc.app.db, rc.params.id);
     if (!task) throw errors.notFound('任务不存在');
     requireProject(rc, task.project_id, 'view');
-    throw errors.conflict('Aiwo 任务不支持对话，只展示执行过程');
+    throw errors.conflict('Ryan 任务不支持对话，只展示执行过程');
   });
 
   router.post('/api/tasks/:id/cancel', (rc) => {

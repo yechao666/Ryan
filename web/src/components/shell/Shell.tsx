@@ -46,7 +46,7 @@ export function Shell() {
     <div className="shell">
       <aside className="sidebar">
         <div className="sidebar-brand">
-          <div className="brand-mark">A</div>
+          <div className="brand-mark">R</div>
           <div>
             <div className="brand-name">{APP_NAME}</div>
             <div className="brand-sub">{APP_TAGLINE}</div>
@@ -74,7 +74,7 @@ export function Shell() {
         </nav>
         <div className="sidebar-hint">
           <div className="sidebar-hint__title">工作方式</div>
-          <p>人员 @Aiwo 创建项目与任务，提示卡定义工作方式，DSH 服务负责执行；安全检查组拦截高风险输入。</p>
+          <p>人员 @Ryan 创建项目与任务，提示卡定义工作方式，DSH 服务负责执行；安全检查组拦截高风险输入。</p>
         </div>
         <div className="sidebar-footer">
           <div className="sidebar-account-label">账户</div>

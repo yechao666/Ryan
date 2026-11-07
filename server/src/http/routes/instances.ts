@@ -148,7 +148,7 @@ export function registerInstanceRoutes(router: Router): void {
     rc.json({ token, command: installCommand(base, token) });
   });
 
-  // 本机服务：由 Aiwo 直接启动本地服务代理（轮换 token 后以环境变量注入）。
+  // 本机服务：由 Ryan 直接启动本地服务代理（轮换 token 后以环境变量注入）。
   router.post('/api/instances/:id/start', async (rc) => {
     requireAdmin(rc);
     const row = getInstanceRow(rc.app.db, rc.params.id);

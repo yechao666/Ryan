@@ -44,7 +44,7 @@ export function LoginPage() {
     setError(null);
     try {
       await login(email.trim(), password);
-      toast.success('登录成功，欢迎回到 Aiwo');
+      toast.success('登录成功，欢迎回到 Ryan');
       navigate('/', { replace: true });
     } catch (cause) {
       const message = cause instanceof Error ? cause.message : '登录失败，请检查邮箱与密码。';
@@ -60,7 +60,7 @@ export function LoginPage() {
       <section className="login-hero">
         <div>
           <div className="cx-login-brand">
-            <div className="brand-mark">A</div>
+            <div className="brand-mark">R</div>
             <div>
               <div className="brand-name">{APP_NAME}</div>
               <div className="brand-sub">{APP_TAGLINE}</div>
@@ -93,7 +93,7 @@ export function LoginPage() {
         </div>
 
         <div className="row-between cx-login-hero__foot">
-          <span className="tiny dim">数字员工工作平台 · 本地演示环境</span>
+          <span className="tiny dim">瑞安网络安全 · DSH 编排平台 · 本地演示环境</span>
           <Badge size="sm" tone="slate">
             v{APP_VERSION}
           </Badge>
@@ -103,7 +103,7 @@ export function LoginPage() {
       <section className="login-panel">
         <div className="login-card">
           <div className="cx-login-mobile-brand">
-            <div className="brand-mark">A</div>
+            <div className="brand-mark">R</div>
             <div>
               <div className="brand-name">{APP_NAME}</div>
               <div className="brand-sub">{APP_TAGLINE}</div>
@@ -130,7 +130,7 @@ export function LoginPage() {
                   icon="mail"
                   value={email}
                   autoComplete="username"
-                  placeholder="you@aiwo.dev"
+                  placeholder="you@ryan.dev"
                   onChange={(event) => setEmail(event.target.value)}
                 />
               </Field>
@@ -165,7 +165,7 @@ export function LoginPage() {
               ) : null}
 
               <Button type="submit" variant="primary" size="lg" block loading={submitting} icon="arrowRight">
-                {submitting ? '正在登录…' : '登录 Aiwo'}
+                {submitting ? '正在登录…' : '登录 Ryan'}
               </Button>
             </form>
 
@@ -240,8 +240,8 @@ export function LoginPage() {
           </Card>
 
           <div className="cx-login-foot">
-            <span>Aiwo · {APP_TAGLINE}</span>
-            <span className="dim">演示密码：aiwo-demo</span>
+            <span>Ryan（瑞安）· 网络安全 DSH 编排平台</span>
+            <span className="dim">演示密码：ryan-demo</span>
           </div>
         </div>
       </section>

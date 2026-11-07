@@ -13,11 +13,12 @@ import type {
   DemoAccount,
 } from './types.ts';
 
-export const APP_NAME = 'Aiwo';
-export const APP_TAGLINE = '人员 @Aiwo 的 DSH 编排平台';
-export const APP_VERSION = '0.1.0';
+export const APP_NAME = 'Ryan';
+export const APP_NAME_CN = '瑞安';
+export const APP_TAGLINE = '瑞安 · DSH 编排平台';
+export const APP_VERSION = '0.12.0';
 export const DEFAULT_SERVER_PORT = 4500;
-export const DEMO_PASSWORD = 'aiwo-demo';
+export const DEMO_PASSWORD = 'ryan-demo';
 export const PAGE_SIZE = 20;
 
 export const TEAM_ROLES: { value: TeamRole; label: string }[] = [
@@ -91,8 +92,8 @@ export const PROMPT_CARD_SCOPES: { value: PromptCardScope; label: string; desc: 
 ];
 
 export const INSTANCE_KINDS: { value: InstanceKind; label: string; tone: string; desc: string }[] = [
-  { value: 'local', label: '本机 DSH', tone: 'cyan', desc: '由 Aiwo 在本机拉起服务代理' },
-  { value: 'remote', label: '远端 DSH', tone: 'violet', desc: '远端需安装 Aiwo 通讯插件' },
+  { value: 'local', label: '本机 DSH', tone: 'cyan', desc: '由 Ryan 在本机拉起服务代理' },
+  { value: 'remote', label: '远端 DSH', tone: 'violet', desc: '远端需安装 Ryan 通讯插件' },
 ];
 
 export const INSTANCE_STATUSES: { value: InstanceStatus; label: string; tone: string }[] = [
@@ -118,10 +119,10 @@ export const AUTOMATION_TRIGGERS: { value: AutomationTrigger; label: string; des
 ];
 
 export const DEMO_ACCOUNTS: DemoAccount[] = [
-  { email: 'lin.wei@aiwo.dev', name: '林薇', title: '平台负责人', role: '组织管理员', password: DEMO_PASSWORD },
-  { email: 'chen.hao@aiwo.dev', name: '陈昊', title: '研发一组负责人', role: '团队负责人', password: DEMO_PASSWORD },
-  { email: 'zhou.ye@aiwo.dev', name: '周野', title: '算法工程师', role: '成员', password: DEMO_PASSWORD },
-  { email: 'su.yan@aiwo.dev', name: '苏妍', title: '数据合规', role: '成员', password: DEMO_PASSWORD },
+  { email: 'lin.wei@ryan.dev', name: '林薇', title: '平台负责人', role: '组织管理员', password: DEMO_PASSWORD },
+  { email: 'chen.hao@ryan.dev', name: '陈昊', title: '研发一组负责人', role: '团队负责人', password: DEMO_PASSWORD },
+  { email: 'zhou.ye@ryan.dev', name: '周野', title: '算法工程师', role: '成员', password: DEMO_PASSWORD },
+  { email: 'su.yan@ryan.dev', name: '苏妍', title: '数据合规', role: '成员', password: DEMO_PASSWORD },
 ];
 
 /** 任务状态分组（看板） */

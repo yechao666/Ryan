@@ -8,7 +8,7 @@ export interface TaskCardProps {
   onClick: (task: WorkItem) => void;
 }
 
-/** 看板任务卡：标题、执行人（姓名@Aiwo）、服务、状态、来源、优先级与时间。 */
+/** 看板任务卡：标题、执行人（姓名@Ryan）、服务、状态、来源、优先级与时间。 */
 export function TaskCard({ task, onClick }: TaskCardProps) {
   const status = taskStatusMeta(task.status);
   const priority = priorityMeta(task.priority);
@@ -31,7 +31,7 @@ export function TaskCard({ task, onClick }: TaskCardProps) {
       </div>
       <div className="ws-task-card-agent">
         <Icon name="user" size={12} />
-        <span className="truncate">{task.executorLabel || 'Aiwo'}</span>
+        <span className="truncate">{task.executorLabel || 'Ryan'}</span>
         <Badge tone={status.tone} size="sm" dot>
           {status.label}
         </Badge>

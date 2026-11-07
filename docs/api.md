@@ -1,4 +1,4 @@
-# Aiwo API
+# Ryan API
 
 Base URL: `http://127.0.0.1:4500`。控制台使用会话 Bearer token；服务运行时使用 `aiwo_ins_...` token；助手使用当前人员 token。
 
@@ -16,9 +16,9 @@ Base URL: `http://127.0.0.1:4500`。控制台使用会话 Bearer token；服务�
 | GET/PATCH/DELETE | `/api/projects/:id` | 项目详情 / 更新 / 删除 |
 | POST/DELETE | `/api/projects/:id/members` | 项目成员 |
 
-项目字段：`name,slug,description,ownerTeamId,visibility,type,prompt,repoUrl`。项目不配置工作目录；DSH 插件按项目 ID 在服务本机自动生成。项目记忆由 Aiwo 内置维护。
+项目字段：`name,slug,description,ownerTeamId,visibility,type,prompt,repoUrl`。项目不配置工作目录；DSH 插件按项目 ID 在服务本机自动生成。项目记忆由 Ryan 内置维护。
 
-## 提示卡（Aiwo 没有智员，用卡片复用工作流/风格/标准）
+## 提示卡（Ryan 没有智员，用卡片复用工作流/风格/标准）
 
 | Method | Path | 说明 |
 | --- | --- | --- |
@@ -66,7 +66,7 @@ node integrations/aiwo-instance/agent.mjs --base http://<aiwo>:4500 --token aiwo
 | POST | `/api/projects/:id/tasks` | `{title?,prompt,type,promptCardIds,instanceIds,priority}`；title 留空时由 AI 整理，prompt 是任务内容；instanceIds 为空时按项目绑定公平调度 |
 | POST | `/api/tasks/:id/cancel` | 取消任务 |
 
-Aiwo 任务执行者固定为「创建人@Aiwo」；任务不支持对话，只展示执行过程。
+Ryan 任务执行者固定为「创建人@Ryan」；任务不支持对话，只展示执行过程。
 
 ## 运行时（服务代理使用）
 
@@ -98,7 +98,7 @@ Aiwo 任务执行者固定为「创建人@Aiwo」；任务不支持对话，只�
 
 创建：`{name,triggerType:'cron'|'webhook'|'manual',triggerConfig,promptTemplate,promptCardIds,instanceId,enabled}`。
 
-## 记忆（Aiwo 内置）
+## 记忆（Ryan 内置）
 
 | Method | Path | 说明 |
 | --- | --- | --- |

@@ -1,6 +1,6 @@
 /**
  * headless 回退执行器：`dsh --profile headless --json -`，任务经 stdin 传入，
- * 逐行解析 NDJSON 运行事件并映射为 Aiwo 运行时事件。
+ * 逐行解析 NDJSON 运行事件并映射为 Ryan 运行时事件。
  */
 import { spawn } from 'node:child_process';
 import { createInterface } from 'node:readline';

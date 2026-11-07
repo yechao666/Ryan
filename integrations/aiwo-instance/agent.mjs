@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 /**
- * Aiwo DSH 服务代理。
+ * Ryan DSH 服务代理。
  *
- * - outbound 连接 Aiwo 运行时：注册 → 心跳 → 轮询 claim → 执行 → 上报事件 → complete
+ * - outbound 连接 Ryan 运行时：注册 → 心跳 → 轮询 claim → 执行 → 上报事件 → complete
  * - 执行优先用常驻 `dsh --profile acp` 子进程（ACP v1 over stdio），
  *   ACP 不可用时自动回退 `dsh --profile headless --json -`
  * - 单任务串行；SIGINT/SIGTERM 优雅停止
@@ -12,7 +12,7 @@ import { join } from 'node:path';
 import { spawn } from 'node:child_process';
 import { parseConfig, usage, PLUGIN_VERSION } from './lib/config.mjs';
 import { createLogger, sleep } from './lib/log.mjs';
-import { AiwoApi, ApiError } from './lib/http.mjs';
+import { RyanApi, ApiError } from './lib/http.mjs';
 import { normalizeClaim } from './lib/claim.mjs';
 import { buildPrompt } from './lib/prompt.mjs';
 import { EventPump } from './lib/events.mjs';
@@ -23,7 +23,7 @@ import { buildDshEnv } from './lib/credentials.mjs';
 
 const MAX_SUMMARY = 20_000;
 
-/** 从最终输出中提取「决策 / 经验」小节，供 Aiwo 写回项目记忆。 */
+/** 从最终输出中提取「决策 / 经验」小节，供 Ryan 写回项目记忆。 */
 function extractSection(text, labels) {
   const lines = String(text ?? '').split(/\r?\n/);
   const heading = new RegExp(`^#{1,6}\\s*(?:${labels})\\s*[:：]?\\s*$`);
@@ -76,7 +76,7 @@ class Agent {
   constructor(config) {
     this.config = config;
     this.logger = createLogger({ verbose: config.verbose });
-    this.api = new AiwoApi({ baseUrl: config.base, token: config.token, logger: this.logger });
+    this.api = new RyanApi({ baseUrl: config.base, token: config.token, logger: this.logger });
     this.mode = config.forceHeadless ? 'headless' : 'acp';
     this.runner = null;
     this.instance = null;
@@ -197,7 +197,7 @@ class Agent {
   async run() {
     mkdirSync(this.config.workspace, { recursive: true });
     this.logger.info(
-      `Aiwo 服务代理 v${PLUGIN_VERSION} 启动：base=${this.config.base} workspace=${this.config.workspace} mode=${this.mode} poll=${this.config.pollMs}ms heartbeat=${this.config.heartbeatMs}ms`,
+      `Ryan 服务代理 v${PLUGIN_VERSION} 启动：base=${this.config.base} workspace=${this.config.workspace} mode=${this.mode} poll=${this.config.pollMs}ms heartbeat=${this.config.heartbeatMs}ms`,
     );
 
     const dshVersion = await this.probeDshVersion();

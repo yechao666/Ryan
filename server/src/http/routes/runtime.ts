@@ -1,6 +1,6 @@
 /**
- * Aiwo 运行时 API：DSH 服务注册、心跳、领单、进展、完成与运行时事件。
- * 鉴权只用服务 token；任务的执行者固定为创建人 @Aiwo。
+ * Ryan 运行时 API：DSH 服务注册、心跳、领单、进展、完成与运行时事件。
+ * 鉴权只用服务 token；任务的执行者固定为创建人 @Ryan。
  */
 import { execFile } from 'node:child_process';
 import { createReadStream, mkdirSync } from 'node:fs';
@@ -189,7 +189,7 @@ async function buildAgentPackage(): Promise<string> {
 }
 
 export function registerRuntimeRoutes(router: Router): void {
-  // 服务注册：token 由 Aiwo 管理端预先创建；插件首次上线时更新资源信息。
+  // 服务注册：token 由 Ryan 管理端预先创建；插件首次上线时更新资源信息。
   router.post('/api/runtime/instances/register', async (rc) => {
     const instance = authenticateInstance(rc);
     const input = await rc.body(registerSchema);
@@ -422,7 +422,7 @@ export function registerRuntimeRoutes(router: Router): void {
 
   router.post('/api/runtime/tasks/:id/messages', (rc) => {
     authenticateInstance(rc);
-    throw errors.conflict('Aiwo 任务不支持对话，只展示执行过程');
+    throw errors.conflict('Ryan 任务不支持对话，只展示执行过程');
   });
 
   router.post('/api/runtime/tasks/:id/complete', async (rc) => {
@@ -448,7 +448,7 @@ export function registerRuntimeRoutes(router: Router): void {
       projectId: task.project_id,
       projectName: task.project_name ?? undefined,
       type: input.status === 'done' ? 'task.completed' : 'task.failed',
-      actor: (task.executor_name ?? '') + '@Aiwo',
+      actor: (task.executor_name ?? '') + '@Ryan',
       summary: truncateSummary(input.summary),
       taskId: task.id,
     });

@@ -230,7 +230,7 @@ export function ProjectTasksPage() {
       key: 'executor',
       header: '执行人',
       width: 150,
-      render: (row) => <span className="truncate">{row.executorLabel || 'Aiwo'}</span>,
+      render: (row) => <span className="truncate">{row.executorLabel || 'Ryan'}</span>,
     },
     {
       key: 'instance',
@@ -307,7 +307,7 @@ export function ProjectTasksPage() {
     <div className="ws-page">
       <PageHead
         title="任务"
-        desc="新建任务后由共享调度池中的 DSH 服务领取并交给 Aiwo 执行；支持按类型、状态与关键词筛选，点击行查看执行详情。"
+        desc="新建任务后由共享调度池中的 DSH 服务领取并交给 Ryan 执行；支持按类型、状态与关键词筛选，点击行查看执行详情。"
       />
 
       <div className="toolbar">
@@ -410,7 +410,7 @@ export function ProjectTasksPage() {
                 <EmptyState
                   icon="list"
                   title="还没有任务"
-                  description="创建第一个任务，由共享调度池中的 DSH 服务交给 Aiwo 执行。"
+                  description="创建第一个任务，由共享调度池中的 DSH 服务交给 Ryan 执行。"
                   action={
                     <Button
                       size="sm"

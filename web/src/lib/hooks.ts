@@ -97,7 +97,7 @@ export function useMediaQuery(query: string): boolean {
 export function useDocumentTitle(title: string): void {
   useEffect(() => {
     const previous = document.title;
-    document.title = `${title} · Aiwo`;
+    document.title = `${title} · Ryan`;
     return () => {
       document.title = previous;
     };
