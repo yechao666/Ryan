@@ -124,6 +124,7 @@ export function ProjectMemoryPage() {
 
   const brief = useAsync(() => api.memoryBrief(projectId), [projectId], true);
   const [briefMax, setBriefMax] = useState('500');
+  const [briefExpanded, setBriefExpanded] = useState(false);
 
   useEffect(() => {
     if (brief.data) setBriefMax(String(brief.data.maxChars));
@@ -417,79 +418,64 @@ export function ProjectMemoryPage() {
         }
       />
 
-      <div className="kpi-grid">
-        <Card className="card-pad">
-          <div className="pm-label">记忆总数</div>
-          <div className="pm-value">{fmtInt(summary.total)}</div>
-          <div className="card-sub">项目 <span className="mono">{projectId}</span></div>
-        </Card>
-        <Card className="card-pad">
-          <div className="pm-label">决策</div>
-          <div className="pm-value">{fmtInt(summary.decisions)}</div>
-          <div className="card-sub">架构、方案与约定</div>
-        </Card>
-        <Card className="card-pad">
-          <div className="pm-label">洞见</div>
-          <div className="pm-value">{fmtInt(summary.insights)}</div>
-          <div className="card-sub">做梦提升的高层知识</div>
-        </Card>
-        <Card className="card-pad">
-          <div className="pm-label">最近更新</div>
-          <div className="pm-value" style={{ fontSize: 18 }}>{summary.latest ? fmtRelative(summary.latest) : '—'}</div>
-          <div className="card-sub">记忆身份 <span className="mono">{identity}</span></div>
-        </Card>
-      </div>
-
-      <Card className="card-pad ws-memory-dream-card">
-        <SectionHead
-          title={<><Icon name="sparkles" size={14} />记忆做梦</>}
-          desc="增量巩固：只处理上次做梦后新增的候选记忆，归纳为有效洞见；不会重跑旧记忆，也不会执行任务。"
-          actions={
-            <div className="hstack gap-6">
-              <Button size="sm" variant="ghost" icon="settings" onClick={openSettings}>
-                设置
-              </Button>
-              <Button size="sm" variant="primary" icon="sparkles" loading={dreaming} onClick={() => void runDreamNow()}>
-                立即做梦
-              </Button>
+      <Card className="card-pad ws-memory-brief-card">
+        <div className="ws-memory-brief-head">
+          <div className="ws-memory-brief-title">
+            <span className="ws-memory-brief-icon"><Icon name="sparkles" size={16} /></span>
+            <div>
+              <div className="hstack gap-6">
+                <strong>记忆简报</strong>
+                <Badge size="sm" tone="cyan">本机 DSH</Badge>
+              </div>
+              <div className="tiny dim mt-2">只取最近持久记忆/洞见，任务领取时注入 DSH 上下文。</div>
             </div>
-          }
-        />
-        <div className="ws-dream-status-grid mt-12">
-          <div>
-            <span className="pm-label">状态</span>
-            <Badge tone={dream.data?.settings.enabled ? 'green' : 'slate'} dot>
-              {dream.data?.settings.enabled ? '已启用' : '已停用'}
-            </Badge>
           </div>
-          <div>
-            <span className="pm-label">周期</span>
-            <strong>{dream.data?.settings.enabled ? intervalLabel(dream.data.settings.intervalMinutes) : '—'}</strong>
-          </div>
-          <div>
-            <span className="pm-label">待整理</span>
-            <strong>{dream.data?.pendingCount ?? 0} 条</strong>
-          </div>
-          <div>
-            <span className="pm-label">上次做梦</span>
-            <span>{dream.data?.settings.lastAt ? fmtRelative(dream.data.settings.lastAt) : '尚未做梦'}</span>
+          <div className="hstack gap-4">
+            <span className="tiny dim">上限 {brief.data?.maxChars ?? 500} 字</span>
+            <Button size="sm" variant="ghost" icon="settings" onClick={openSettings}>设置</Button>
+            <Button size="sm" variant="ghost" icon="refresh" onClick={() => void brief.refresh()}>刷新</Button>
           </div>
         </div>
-        {dream.error ? <Callout tone="red" icon="alert">{dream.error}</Callout> : null}
-        {dream.data?.lastRun ? (
-          <div className="ws-dream-last-run">
-            <div className="hstack gap-6 wrap">
-              <span className="tiny dim">最近一次</span>
-              <Badge size="sm" tone={dream.data.lastRun.status === 'completed' ? 'green' : dream.data.lastRun.status === 'failed' ? 'red' : 'slate'}>
-                {dream.data.lastRun.status}
-              </Badge>
-              <span className="tiny dim">输入 {dream.data.lastRun.inputCount} 条 · 产出 {dream.data.lastRun.insightCount} 条洞见</span>
-            </div>
-            {dream.data.lastRun.summary ? (
-              <p className="tiny dim clamp-2" style={{ margin: '6px 0 0' }}>{dream.data.lastRun.summary}</p>
+        <div className={`ws-memory-brief-body${briefExpanded ? ' is-expanded' : ''}`}>
+          {brief.loading && !brief.data ? (
+            <Skeleton h={72} />
+          ) : brief.error ? (
+            <ErrorState message={brief.error} onRetry={() => void brief.refresh()} />
+          ) : (
+            brief.data?.text || '（当前还没有可用的持久记忆）'
+          )}
+        </div>
+        <div className="ws-memory-brief-foot">
+          <span className="tiny dim">
+            {brief.loading ? '正在生成本地记忆简报…' : `${brief.data?.count ?? 0} 条最近记忆 · 上限 ${brief.data?.maxChars ?? 500} 字`}
+          </span>
+          <div className="hstack gap-4">
+            {brief.data?.text ? (
+              <Button size="sm" variant="ghost" onClick={() => setBriefExpanded((value) => !value)}>
+                {briefExpanded ? '收起' : '展开全文'}
+              </Button>
             ) : null}
+            <CopyButton value={brief.data?.text ?? ''} label="复制简报" />
           </div>
-        ) : null}
+        </div>
+      </Card>
+
+      <Card className="card-pad ws-memory-status-strip">
+        <div className="ws-memory-metrics">
+          <div><strong>{fmtInt(summary.total)}</strong><span>记忆</span></div>
+          <div><strong>{fmtInt(summary.decisions)}</strong><span>决策</span></div>
+          <div><strong>{fmtInt(summary.insights)}</strong><span>洞见</span></div>
+          <div><strong>{dream.data?.pendingCount ?? 0}</strong><span>待整理</span></div>
+        </div>
+        <div className="ws-memory-dream-inline">
+          <Badge tone={dream.data?.settings.enabled ? 'green' : 'slate'} dot>
+            {dream.data?.settings.enabled ? '做梦已启用' : '做梦已停用'}
+          </Badge>
+          <span className="tiny dim">每 {dream.data?.settings.enabled ? intervalLabel(dream.data.settings.intervalMinutes) : '—'} · 上次 {dream.data?.settings.lastAt ? fmtRelative(dream.data.settings.lastAt) : '尚未'}</span>
+          <Button size="sm" variant="ghost" icon="settings" onClick={openSettings}>设置</Button>
+          <Button size="sm" variant="primary" icon="sparkles" loading={dreaming} onClick={() => void runDreamNow()}>立即做梦</Button>
+        </div>
+        {dream.error ? <Callout tone="red" icon="alert">{dream.error}</Callout> : null}
       </Card>
 
       <div className="toolbar">
@@ -590,39 +576,6 @@ export function ProjectMemoryPage() {
           ) : null}
         </Card>
       )}
-
-      <Card className="card-pad">
-        <SectionHead
-          title={<><Icon name="sparkles" size={14} />记忆简报</>}
-          desc="只取最近的持久记忆/洞见，由本机 DSH 归纳成有字数上限的上下文，任务领取时注入。"
-          actions={
-            <div className="hstack gap-6">
-              <span className="tiny dim">上限 {brief.data?.maxChars ?? 500} 字</span>
-              <Button size="sm" variant="ghost" icon="settings" onClick={openSettings}>
-                设置
-              </Button>
-              <Button size="sm" variant="ghost" icon="refresh" onClick={() => void brief.refresh()}>
-                刷新
-              </Button>
-            </div>
-          }
-        />
-        <div className="mt-12">
-          {brief.loading && !brief.data ? (
-            <Skeleton h={140} style={{ borderRadius: 12 }} />
-          ) : brief.error ? (
-            <ErrorState message={brief.error} onRetry={() => void brief.refresh()} />
-          ) : (
-            <>
-              <CodeBlock title="memory brief" code={brief.data?.text || '（当前还没有可用的持久记忆）'} />
-              <div className="ws-mem-foot">
-                <span className="tiny dim">{brief.data?.count ?? 0} 条最近记忆 · 上限 {brief.data?.maxChars ?? 500} 字</span>
-                <CopyButton value={brief.data?.text ?? ''} label="复制简报" />
-              </div>
-            </>
-          )}
-        </div>
-      </Card>
 
       <Modal
         open={settingsOpen}
