@@ -1942,3 +1942,10 @@
   overflow-y: auto;
   padding-right: 2px;
 }
+
+.ws-memory-hit.active {
+  border-color: rgba(139, 124, 255, 0.5);
+  background: rgba(139, 124, 255, 0.1);
+  cursor: pointer;
+}
+.ws-memory-hit[role='button'] { cursor: pointer; }

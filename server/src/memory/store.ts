@@ -68,11 +68,15 @@ function mapHit(row: ProjectMemoryRow, score: number, signals: Record<string, nu
     content: row.content,
     score: Number(score.toFixed(4)),
     category: row.category,
+    source: row.source,
     visibility: 'project',
     agentId,
     createdAt: row.created_at,
+    updatedAt: row.updated_at,
+    metadata: parseJson(row.metadata),
     signals,
   };
+  if (row.title) hit.title = row.title;
   if (row.task_id) hit.taskId = row.task_id;
   return hit;
 }

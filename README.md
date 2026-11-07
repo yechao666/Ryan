@@ -131,7 +131,7 @@ node integrations/aiwo-instance/agent.mjs \
 - 任务创建后可手动添加项目记忆；
 - 任务 claim 时，按任务标题/内容检索项目记忆，生成 memory context 注入 DSH prompt；
 - 任务完成后，结论/决策/经验自动写回为 `task_result` 记忆；
-- 记忆中心支持检索、上下文简报、手动新增与删除；
+- 记忆浏览器支持概览统计、内容搜索、类型/来源筛选、详情查看、上下文简报、手动新增与删除；
 - 不需要配置 Mnemos 服务地址、项目 ID 或 API Key。
 
 ## Git / 测试

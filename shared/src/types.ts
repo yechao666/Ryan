@@ -297,13 +297,17 @@ export interface AutomationRun {
 
 export interface MemoryHit {
   id: string;
+  title?: string;
   content: string;
   score: number;
   category: string;
+  source?: string;
   visibility: string;
   agentId?: string;
   taskId?: string;
   createdAt: string;
+  updatedAt?: string;
+  metadata?: Record<string, unknown>;
   signals?: Record<string, number>;
 }
 
