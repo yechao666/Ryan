@@ -111,6 +111,6 @@ Aiwo 任务执行者固定为「创建人@Aiwo」；任务不支持对话，只�
 | --- | --- | --- |
 | POST | `/api/assistant/chat` | `{message,pathname,projectId?,taskId?}` → `{reply,navigate?,sessionId?,instance}` |
 | POST | `/api/assistant/chat/stream` | 同上请求体，SSE 返回 `meta/status/thinking/tool/text/done/error`；文本逐段下发 |
-| GET | `/api/assistant/manifest` | 助手使用的稳定 API 清单；助手不通过源码推断接口 |
+| GET | `/api/assistant/manifest` | 助手使用的稳定 API 清单与前端路由表；包含任务查询到 `HIVE_NAVIGATE` 的规则 |
 
 助手运行在 DSH headless 服务中，使用当前人员 token 调用上面的开放 API。

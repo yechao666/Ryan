@@ -239,5 +239,8 @@ test('助手 manifest：包含稳定 API 清单，不泄露凭证', async () => 
   assert.ok(Array.isArray(manifest.endpoints));
   assert.ok(manifest.endpoints.some((item: Json) => item.method === 'POST' && item.path === '/api/projects/:id/tasks'));
   assert.ok(manifest.endpoints.some((item: Json) => item.path === '/api/assistant/manifest'));
+  assert.equal(manifest.navigation.directive, 'HIVE_NAVIGATE: <站内绝对路径>');
+  assert.ok(manifest.navigation.routes.some((item: Json) => item.path === '/projects/:projectId/tasks/:taskId'));
+  assert.ok(manifest.navigation.taskLookup.length >= 2);
   assert.equal(JSON.stringify(manifest).includes('Bearer aiwo'), false);
 });
