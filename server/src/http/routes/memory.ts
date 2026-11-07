@@ -130,6 +130,16 @@ export function registerMemoryRoutes(router: Router): void {
     rc.json(memory, 201);
   });
 
+  router.delete('/api/projects/:id/memories', async (rc) => {
+    const project = requireProject(rc, rc.params.id, 'manage');
+    const input = await rc.body(z.object({ ids: z.array(z.string().min(1)).min(1).max(200) }));
+    let deleted = 0;
+    for (const id of [...new Set(input.ids)]) {
+      if (deleteMemory(rc.app.db, project.id, id)) deleted += 1;
+    }
+    rc.json({ deleted });
+  });
+
   router.delete('/api/projects/:id/memories/:memoryId', (rc) => {
     const project = requireProject(rc, rc.params.id, 'manage');
     if (!deleteMemory(rc.app.db, project.id, rc.params.memoryId)) {

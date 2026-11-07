@@ -112,6 +112,8 @@ export function ProjectMemoryPage() {
 
   const [deleteTarget, setDeleteTarget] = useState<MemoryHit | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [selectedKeys, setSelectedKeys] = useState<Set<string>>(new Set());
+  const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
 
   const [dreamEnabled, setDreamEnabled] = useState(true);
   const [dreamInterval, setDreamInterval] = useState('24');
@@ -155,7 +157,10 @@ export function ProjectMemoryPage() {
     });
   }, [all, keyword, category, source, statusFilter]);
 
-  useEffect(() => { setPage(1); }, [keyword, category, source, statusFilter]);
+  useEffect(() => {
+    setPage(1);
+    setSelectedKeys(new Set());
+  }, [keyword, category, source, statusFilter]);
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const currentPage = Math.min(page, totalPages);
   const paged = useMemo(
@@ -216,11 +221,31 @@ export function ProjectMemoryPage() {
       await api.deleteProjectMemory(projectId, deleteTarget.id);
       toast.success('记忆已删除');
       if (detailTarget?.id === deleteTarget.id) setDetailTarget(null);
+      setSelectedKeys((current) => { const next = new Set(current); next.delete(deleteTarget.id); return next; });
       setDeleteTarget(null);
       await memories.refresh();
       await brief.refresh();
     } catch (cause) {
       toast.error(cause instanceof Error ? cause.message : '删除记忆失败');
+    } finally {
+      setDeleting(false);
+    }
+  };
+
+  const confirmBulkDelete = async () => {
+    const ids = [...selectedKeys];
+    if (ids.length === 0) return;
+    setDeleting(true);
+    try {
+      await api.deleteProjectMemories(projectId, ids);
+      toast.success(`已删除 ${ids.length} 条记忆`);
+      setBulkDeleteOpen(false);
+      setSelectedKeys(new Set());
+      if (detailTarget && ids.includes(detailTarget.id)) setDetailTarget(null);
+      await memories.refresh();
+      await brief.refresh();
+    } catch (cause) {
+      toast.error(cause instanceof Error ? cause.message : '批量删除记忆失败');
     } finally {
       setDeleting(false);
     }
@@ -497,6 +522,26 @@ export function ProjectMemoryPage() {
           {memories.loading && memories.data ? <span className="tiny dim">更新中…</span> : null}
         </div>
         <div className="toolbar-right">
+          {filtered.length > 0 ? (
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={() => {
+                if (selectedKeys.size >= filtered.length) {
+                  setSelectedKeys(new Set());
+                } else {
+                  setSelectedKeys(new Set(filtered.map((hit) => hit.id)));
+                }
+              }}
+            >
+              {selectedKeys.size > 0 ? `取消选择（${selectedKeys.size}）` : '全选'}
+            </Button>
+          ) : null}
+          {selectedKeys.size > 0 ? (
+            <Button size="sm" variant="danger" icon="trash" onClick={() => setBulkDeleteOpen(true)}>
+              删除选中（{selectedKeys.size}）
+            </Button>
+          ) : null}
           {hasFilters ? <Button size="sm" variant="ghost" onClick={clearFilters}>清除筛选</Button> : null}
         </div>
       </div>
@@ -511,6 +556,12 @@ export function ProjectMemoryPage() {
             sortable
             resizable
             rowKey={(row) => row.id}
+            selectedKeys={selectedKeys}
+            onToggleKey={(key) => setSelectedKeys((current) => {
+              const next = new Set(current);
+              if (next.has(key)) next.delete(key); else next.add(key);
+              return next;
+            })}
             loading={memories.loading && !memories.data}
             onRowClick={(row) => setDetailTarget(row)}
             empty={
@@ -675,6 +726,16 @@ export function ProjectMemoryPage() {
         title="删除这条项目记忆？"
         description={deleteTarget?.title || deleteTarget?.content.slice(0, 100)}
         confirmLabel="删除记忆"
+        loading={deleting}
+      />
+
+      <ConfirmDialog
+        open={bulkDeleteOpen}
+        onClose={() => setBulkDeleteOpen(false)}
+        onConfirm={() => void confirmBulkDelete()}
+        title={`删除选中的 ${selectedKeys.size} 条记忆？`}
+        description="删除后不可恢复；原始任务历史不受影响。"
+        confirmLabel="删除选中记忆"
         loading={deleting}
       />
     </div>

@@ -457,3 +457,29 @@ test('记忆做梦：只整理任务候选决策/经验并生成洞见', async (
   assert.equal(empty.run.status, 'skipped');
   delete process.env.AIWO_DREAM_AI;
 });
+
+test('记忆批量删除', async () => {
+  const project = ok(await call('/api/projects', {
+    token: tokenLin,
+    method: 'POST',
+    body: { name: '批量删除项目', slug: 'bulk-delete-project', visibility: 'team', ownerTeamId: 'tm_platform', type: 'manual' },
+  }));
+  const one = ok(await call(`/api/projects/${project.id}/memories`, {
+    token: tokenLin,
+    method: 'POST',
+    body: { content: '批量删除测试记忆一，内容足够长。', category: 'note' },
+  }));
+  const two = ok(await call(`/api/projects/${project.id}/memories`, {
+    token: tokenLin,
+    method: 'POST',
+    body: { content: '批量删除测试记忆二，内容足够长。', category: 'note' },
+  }));
+  const removed = ok(await call(`/api/projects/${project.id}/memories`, {
+    token: tokenLin,
+    method: 'DELETE',
+    body: { ids: [one.id, two.id] },
+  }));
+  assert.equal(removed.deleted, 2);
+  const after = ok(await call(`/api/projects/${project.id}/memories?limit=20`, { token: tokenLin }));
+  assert.equal(after.memories.length, 0);
+});

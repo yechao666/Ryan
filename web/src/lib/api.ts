@@ -502,6 +502,10 @@ export const api = {
     return request(`/api/projects/${projectId}/memories/${memoryId}`, { method: 'DELETE' });
   },
 
+  deleteProjectMemories(projectId: string, ids: string[]): Promise<{ deleted: number }> {
+    return request(`/api/projects/${projectId}/memories`, { method: 'DELETE', body: JSON.stringify({ ids }) });
+  },
+
 
   // ---- SSE ----
   subscribeEvents(onEvent: (event: LiveEvent) => void, projectId?: string): () => void {
