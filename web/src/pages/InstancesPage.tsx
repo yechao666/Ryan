@@ -1,4 +1,4 @@
-import { useMemo, useState, type FormEvent } from 'react';
+import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import type { DshInstance, InstanceKind } from '@shared';
 import { INSTANCE_KINDS, INSTANCE_STATUSES } from '@shared';
@@ -16,17 +16,20 @@ import {
   IconButton,
   Input,
   Modal,
+  Pagination,
   PageHead,
   SectionHead,
   SearchInput,
   Select,
   Skeleton,
+  Table,
   useToast,
+  type Column,
   type Tone,
 } from '@ui';
 import { api } from '../lib/api.ts';
 import { useAuth } from '../lib/auth.tsx';
-import { fmtRelative, truncateMiddle } from '../lib/format.ts';
+import { fmtDateTime, fmtRelative, truncateMiddle } from '../lib/format.ts';
 import { useAsync, useInterval } from '../lib/hooks.ts';
 
 interface InstanceFormState {
@@ -103,6 +106,8 @@ export function InstancesPage() {
   const [editForm, setEditForm] = useState<InstanceFormState>(EMPTY_FORM);
   const [editError, setEditError] = useState<string | null>(null);
   const [savingEdit, setSavingEdit] = useState(false);
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(20);
 
   const list = useMemo(() => instances.data ?? [], [instances.data]);
   const filteredList = useMemo(() => {
@@ -113,6 +118,13 @@ export function InstancesPage() {
       return `${item.name} ${item.id} ${item.host} ${item.baseUrl ?? ''}`.toLowerCase().includes(needle);
     });
   }, [list, search, statusFilter]);
+  const totalPages = Math.max(1, Math.ceil(filteredList.length / pageSize));
+  const currentPage = Math.min(page, totalPages);
+  const pagedList = useMemo(
+    () => filteredList.slice((currentPage - 1) * pageSize, currentPage * pageSize),
+    [filteredList, currentPage, pageSize],
+  );
+  useEffect(() => { setPage(1); }, [search, statusFilter, pageSize]);
   const defaultServiceId = settings.data?.defaultServiceId ?? '';
   const online = list.filter((item) => item.status === 'online').length;
   const unconfigured = list.filter((item) => item.status === 'unconfigured').length;
@@ -316,6 +328,107 @@ export function InstancesPage() {
 
   const kindOptions = INSTANCE_KINDS.map((item) => ({ value: item.value, label: item.label }));
 
+  const columns: Column<DshInstance>[] = [
+    {
+      key: 'name',
+      header: '服务',
+      render: (instance) => {
+        const status = instanceStatusMeta(instance.status);
+        return (
+          <div className="hstack gap-8">
+            <span className={`cx-metric-icon tone-${status.tone}`}><Icon name="server" size={14} /></span>
+            <div className="vstack gap-2" style={{ minWidth: 0 }}>
+              <span className="strong truncate">{instance.name}</span>
+              <span className="tiny dim mono truncate" title={instance.id}>{truncateMiddle(instance.id, 16, 6)}</span>
+            </div>
+          </div>
+        );
+      },
+    },
+    {
+      key: 'kind',
+      header: '类型',
+      width: 100,
+      render: (instance) => {
+        const kind = instanceKindMeta(instance.kind);
+        return <Badge size="sm" tone={kind.tone as Tone}>{kind.label}</Badge>;
+      },
+    },
+    {
+      key: 'host',
+      header: '地址',
+      width: 180,
+      render: (instance) => <span className="tiny mono">{hostLabel(instance)}</span>,
+    },
+    {
+      key: 'status',
+      header: '状态',
+      width: 120,
+      render: (instance) => {
+        const status = instanceStatusMeta(instance.status);
+        return <Badge size="sm" tone={status.tone as Tone} dot>{status.label}</Badge>;
+      },
+      sortValue: (instance) => instance.status,
+    },
+    {
+      key: 'currentTask',
+      header: '当前任务',
+      width: 170,
+      render: (instance) => instance.currentTask ? (
+        <div className="vstack gap-2" style={{ minWidth: 0 }}>
+          <span className="truncate small">{instance.currentTask.title}</span>
+          <span className="tiny dim truncate">{instance.currentTask.projectName}</span>
+        </div>
+      ) : <span className="tiny dim">空闲</span>,
+    },
+    {
+      key: 'lastSeenAt',
+      header: '最后心跳',
+      width: 105,
+      render: (instance) => (
+        <span className="tiny dim" title={instance.lastSeenAt ? fmtDateTime(instance.lastSeenAt) : '从未'}>
+          {instance.lastSeenAt ? fmtRelative(instance.lastSeenAt) : '从未'}
+        </span>
+      ),
+      sortValue: (instance) => (instance.lastSeenAt ? Date.parse(instance.lastSeenAt) : 0),
+    },
+    {
+      key: 'default',
+      header: '默认',
+      width: 70,
+      render: (instance) => defaultServiceId === instance.id ? <Badge size="sm" tone="green">默认</Badge> : <span className="tiny dim">—</span>,
+    },
+    {
+      key: 'actions',
+      header: '操作',
+      width: 210,
+      align: 'right',
+      render: (instance) => {
+        if (!isAdmin) return <span className="tiny dim">只读</span>;
+        if (instance.status === 'revoked') {
+          return <Button size="sm" variant="outline" icon="refresh" onClick={() => void handleRestore(instance)}>恢复</Button>;
+        }
+        return (
+          <div className="hstack gap-2" style={{ justifyContent: 'flex-end' }}>
+            {instance.kind === 'local' && instance.status !== 'online' ? (
+              <IconButton icon="play" label="启动本机代理" size="sm" disabled={startingId === instance.id} onClick={() => void handleStart(instance)} />
+            ) : null}
+            <IconButton icon="activity" label="测试连接" size="sm" disabled={testingId === instance.id} onClick={() => void handleTest(instance)} />
+            <IconButton icon="settings" label="编辑服务" size="sm" onClick={() => openEdit(instance)} />
+            <IconButton icon="key" label="轮换 token" size="sm" onClick={() => setRotateTarget(instance)} />
+            <IconButton
+              icon="star"
+              label={defaultServiceId === instance.id ? '取消默认服务' : '设为默认服务'}
+              size="sm"
+              onClick={() => void handleDefault(instance)}
+            />
+            <IconButton icon="trash" label="删除服务" size="sm" onClick={() => setRevokeTarget(instance)} />
+          </div>
+        );
+      },
+    },
+  ];
+
   return (
     <div className="page">
       <PageHead
@@ -394,168 +507,47 @@ export function InstancesPage() {
       </div>
 
       {instances.error && !instances.data ? (
-        <ErrorState message={instances.error} onRetry={() => void instances.refresh()} />
-      ) : instances.loading && !instances.data ? (
-        <div className="grid-cards service-grid">
-          {[0, 1, 2].map((item) => (
-            <Card className="card-pad" key={item}>
-              <Skeleton h={22} />
-              <div style={{ height: 12 }} />
-              <Skeleton h={12} />
-              <div style={{ height: 8 }} />
-              <Skeleton h={48} />
-              <div style={{ height: 12 }} />
-              <Skeleton h={30} />
-            </Card>
-          ))}
-        </div>
-      ) : filteredList.length === 0 ? (
+        <Card><div style={{ padding: 18 }}><ErrorState message={instances.error} onRetry={() => void instances.refresh()} /></div></Card>
+      ) : (
         <Card>
-          <EmptyState
-            icon="server"
-            title={list.length === 0 ? '还没有 DSH 服务' : '没有匹配的服务'}
-            description={list.length === 0 ? '新增本机或远端服务，复制安装命令启动服务代理；任务会由在线服务领取执行。' : '调整搜索或状态筛选。'}
-            action={
-              isAdmin ? (
-                <Button variant="primary" icon="plus" onClick={openCreate}>
-                  新增服务
-                </Button>
-              ) : undefined
+          <Table
+            columns={columns}
+            rows={pagedList}
+            rowKey={(instance) => instance.id}
+            sortable
+            resizable
+            loading={instances.loading && !instances.data}
+            empty={
+              filteredList.length === 0 && list.length > 0 ? (
+                <EmptyState icon="filter" title="没有匹配的服务" description="调整搜索或状态筛选。" compact />
+              ) : (
+                <EmptyState
+                  icon="server"
+                  title="还没有 DSH 服务"
+                  description="新增本机或远端服务，复制安装命令启动服务代理。"
+                  action={isAdmin ? <Button size="sm" variant="primary" icon="plus" onClick={openCreate}>新增服务</Button> : undefined}
+                />
+              )
             }
           />
+          {!instances.loading && filteredList.length > 0 ? (
+            <div className="ws-table-foot">
+              <Pagination
+                page={currentPage}
+                totalPages={totalPages}
+                total={filteredList.length}
+                pageSize={pageSize}
+                pageSizeOptions={[
+                  { value: '10', label: '每页 10 行' },
+                  { value: '20', label: '每页 20 行' },
+                  { value: '50', label: '每页 50 行' },
+                ]}
+                onPageSizeChange={setPageSize}
+                onChange={setPage}
+              />
+            </div>
+          ) : null}
         </Card>
-      ) : (
-        <div className="grid-cards service-grid">
-          {filteredList.map((instance) => {
-            const status = instanceStatusMeta(instance.status);
-            const kind = instanceKindMeta(instance.kind);
-            const disabled = instance.status === 'revoked';
-            return (
-              <Card
-                className="card-pad service-card"
-                key={instance.id}
-                style={disabled ? { opacity: 0.68 } : undefined}
-              >
-                <div className="hstack gap-10" style={{ alignItems: 'flex-start' }}>
-                  <span className={`cx-metric-icon tone-${status.tone}`}>
-                    <Icon name="server" size={15} />
-                  </span>
-                  <div className="grow" style={{ minWidth: 0 }}>
-                    <div className="strong truncate">{instance.name}</div>
-                    <div className="tiny dim mono truncate" title={instance.id}>
-                      {truncateMiddle(instance.id, 14, 6)}
-                    </div>
-                    <div className="badge-dot-list" style={{ marginTop: 6 }}>
-                      <Badge size="sm" tone={kind.tone as Tone}>
-                        {kind.label}
-                      </Badge>
-                      <Badge size="sm" tone={status.tone as Tone} dot>
-                        {status.label}
-                      </Badge>
-                      {defaultServiceId === instance.id ? (
-                        <Badge size="sm" tone="green">默认服务</Badge>
-                      ) : null}
-                    </div>
-                  </div>
-                </div>
-
-                <div className="hstack gap-6 wrap" style={{ marginTop: 10 }}>
-                  <span className="chip mono">{hostLabel(instance)}</span>
-                </div>
-                <div className="badge-dot-list" style={{ marginTop: 8 }}>
-                  <span className="chip">服务池</span>
-                  <span className="tiny dim">工作目录由任务所属项目决定</span>
-                </div>
-
-                <div className="metric-grid" style={{ marginTop: 12 }}>
-                  <div className="metric">
-                    <span className="metric-label">最后心跳</span>
-                    <span className="metric-value">
-                      {instance.lastSeenAt ? fmtRelative(instance.lastSeenAt) : '从未'}
-                    </span>
-                  </div>
-                  <div className="metric">
-                    <span className="metric-label">插件版本</span>
-                    <span className="metric-value mono">{instance.pluginVersion || '—'}</span>
-                  </div>
-                  <div className="metric">
-                    <span className="metric-label">服务 token</span>
-                    <span className="metric-value">{instance.hasToken ? '已签发' : '未签发'}</span>
-                  </div>
-                  <div className="metric">
-                    <span className="metric-label">当前任务</span>
-                    <span className="metric-value truncate" title={instance.currentTask?.title ?? '空闲'}>
-                      {instance.currentTask?.title ?? '空闲'}
-                    </span>
-                  </div>
-                </div>
-
-                {instance.currentTask ? (
-                  <div className="tiny dim" style={{ marginTop: 4 }}>
-                    正在执行 · {instance.currentTask.projectName}
-                  </div>
-                ) : null}
-
-                {isAdmin && !disabled ? (
-                  <div
-                    className="row-between"
-                    style={{ marginTop: 12, paddingTop: 10, borderTop: '1px solid var(--border-faint)' }}
-                  >
-                    <div className="hstack gap-4">
-                      {instance.kind === 'local' && instance.status !== 'online' ? (
-                        <Button
-                          size="sm"
-                          variant="primary"
-                          icon="play"
-                          loading={startingId === instance.id}
-                          onClick={() => void handleStart(instance)}
-                        >
-                          启动本机代理
-                        </Button>
-                      ) : null}
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        icon="activity"
-                        loading={testingId === instance.id}
-                        onClick={() => void handleTest(instance)}
-                      >
-                        测试连接
-                      </Button>
-                    </div>
-                    <div className="hstack gap-4">
-                      <Button size="sm" variant="ghost" icon="settings" onClick={() => openEdit(instance)}>
-                        编辑
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant={defaultServiceId === instance.id ? 'ghost' : 'outline'}
-                        icon="star"
-                        onClick={() => void handleDefault(instance)}
-                      >
-                        {defaultServiceId === instance.id ? '取消默认' : '设为默认'}
-                      </Button>
-                      <Button size="sm" variant="ghost" icon="key" onClick={() => setRotateTarget(instance)}>
-                        轮换 token
-                      </Button>
-                      <Button size="sm" variant="ghost" icon="trash" onClick={() => setRevokeTarget(instance)}>
-                        删除
-                      </Button>
-                    </div>
-                  </div>
-                ) : null}
-                {isAdmin && disabled ? (
-                  <div className="hstack gap-4" style={{ marginTop: 12, paddingTop: 10, borderTop: '1px solid var(--border-faint)' }}>
-                    <span className="tiny dim">服务已删除，恢复后需要重新配置代理 token。</span>
-                    <Button size="sm" variant="outline" icon="refresh" onClick={() => void handleRestore(instance)}>
-                      恢复服务
-                    </Button>
-                  </div>
-                ) : null}
-              </Card>
-            );
-          })}
-        </div>
       )}
 
       <Card className="card-pad">
