@@ -62,7 +62,7 @@ function textOutput(value) {
 const toolDefinitions = [
   {
     name: 'aiwo_memory_search',
-    description: '检索当前任务所属项目的 Aiwo 内置项目记忆。返回相关记忆及分数。',
+    description: '检索当前任务所属项目的持久项目记忆。返回相关记忆及分数；候选/归档记忆不会命中。',
     parameters: {
       type: 'object',
       properties: {
@@ -101,13 +101,13 @@ const toolDefinitions = [
   },
   {
     name: 'aiwo_memory_add',
-    description: '向当前任务所属项目写入一条项目记忆，例如架构决策、踩坑经验、业务事实。',
+    description: '向当前任务所属项目写入一条候选记忆，经做梦提升为持久知识。仅用于跨任务可复用的决策/约定/领域事实/架构/踩坑/流程；不要写任务摘要、状态、日志、逐文件改动、临时调试或未验证猜测。',
     parameters: {
       type: 'object',
       properties: {
         content: { type: 'string', description: '记忆正文' },
         title: { type: 'string', description: '可选标题' },
-        category: { type: 'string', enum: ['fact', 'decision', 'note', 'task_result'], description: '记忆类型' },
+        category: { type: 'string', enum: ['fact', 'decision', 'lesson', 'note'], description: '记忆类型：事实/决策/经验/笔记' },
       },
       required: ['content'],
       additionalProperties: false,

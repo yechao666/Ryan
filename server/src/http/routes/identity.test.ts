@@ -363,6 +363,7 @@ test('内置记忆：写入、claim 注入、完成写回', async () => {
   }));
   assert.equal(toolAdd.category, 'note');
   assert.equal(toolAdd.taskId, task.id);
+  assert.equal(toolAdd.status, 'candidate');
   ok(await call(`/api/runtime/tasks/${task.id}/complete`, {
     token: service.token,
     method: 'POST',

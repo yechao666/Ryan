@@ -272,3 +272,5 @@ node --check agent.mjs && node --check lib/*.mjs
 - `aiwo_memory_add`
 
 工具只调用当前任务项目下的 runtime 记忆 API，不接受任意 projectId；服务 token 通过临时 `HIVE_AUTH_FILE` 注入，不写入日志。
+
+写入准则：只写跨任务可复用的决策/约定/领域事实/架构/踩坑/流程；普通任务结果、状态、日志、逐文件改动、临时调试、未验证猜测、密钥/隐私都不写。工具写入进入 `candidate`，由做梦提升为持久洞见。

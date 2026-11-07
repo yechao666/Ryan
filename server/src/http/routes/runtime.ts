@@ -131,7 +131,7 @@ const memorySearchSchema = z.object({
 const memoryAddSchema = z.object({
   content: z.string().trim().min(1).max(20_000),
   title: z.string().trim().max(200).optional(),
-  category: z.enum(['fact', 'decision', 'note', 'task_result']).optional(),
+  category: z.enum(['fact', 'decision', 'lesson', 'note']).optional(),
 });
 
 const memoryContextSchema = z.object({
@@ -388,6 +388,7 @@ export function registerRuntimeRoutes(router: Router): void {
       title: input.title,
       category: input.category ?? 'note',
       source: 'agent',
+      status: 'candidate',
       taskId: task.id,
       createdBy: task.created_by,
       metadata: { sourceTaskId: task.id, instanceId: instance.id },

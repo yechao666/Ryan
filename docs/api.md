@@ -81,7 +81,7 @@ Aiwo 任务执行者固定为「创建人@Aiwo」；任务不支持对话，只�
 | GET | `/api/runtime/tasks/current` | 当前服务正在执行的任务 |
 | POST | `/api/runtime/tasks/:id/memory/search` | `{query,topK?}` 当前任务项目记忆检索 |
 | GET | `/api/runtime/tasks/:id/memory/context?query=` | 当前任务项目记忆简报 |
-| POST | `/api/runtime/tasks/:id/memory/add` | `{content,title?,category?}` 写入当前项目记忆 |
+| POST | `/api/runtime/tasks/:id/memory/add` | `{content,title?,category?}` 写入候选记忆（fact/decision/lesson/note） |
 
 | GET | `/api/tasks/:id/runtime-events?after=seq` | 控制台读取运行时事件 |
 
@@ -103,7 +103,7 @@ Aiwo 任务执行者固定为「创建人@Aiwo」；任务不支持对话，只�
 | GET | `/api/projects/:id/memory/search?q=&topK=` | 项目记忆检索 |
 | GET | `/api/projects/:id/memory/context?q=` | 项目记忆上下文简报 |
 | GET | `/api/projects/:id/memories?limit=` | 列出项目记忆 |
-| POST | `/api/projects/:id/memories` | `{content,title?,category?}` 手动写入 |
+| POST | `/api/projects/:id/memories` | `{content,title?,category?}` 手动写入持久记忆 |
 | DELETE | `/api/projects/:id/memories/:memoryId` | 删除项目记忆 |
 | GET | `/api/projects/:id/memory/dream` | 做梦设置、待整理数量与最近运行 |
 | PATCH | `/api/projects/:id/memory/dream` | `{enabled,intervalMinutes}` 设置增量做梦周期 |
