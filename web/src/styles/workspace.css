@@ -2293,3 +2293,23 @@
   max-height: 180px;
   overflow: auto;
 }
+
+/* 项目工作区文件浏览器 */
+.ws-workspace-meta { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; min-width: 0; }
+.ws-workspace-path { font-size: 10px; color: var(--text-dim); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ws-workspace-layout { display: grid; grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr); gap: 12px; min-height: 320px; }
+.ws-workspace-list, .ws-workspace-preview { min-width: 0; border: 1px solid var(--border-faint); border-radius: 10px; padding: 9px; background: var(--surface); }
+.ws-workspace-list { display: flex; flex-direction: column; gap: 7px; max-height: 440px; overflow: auto; }
+.ws-workspace-preview { max-height: 440px; overflow: auto; }
+.ws-breadcrumbs { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; font-size: 10px; color: var(--text-dim); }
+.ws-breadcrumbs button { border: 0; padding: 0; background: transparent; color: var(--text-soft); font: inherit; cursor: pointer; }
+.ws-breadcrumbs button:hover { color: var(--text); }
+.ws-workspace-entries { display: flex; flex-direction: column; gap: 2px; }
+.ws-workspace-entry { display: flex; align-items: center; gap: 7px; width: 100%; min-width: 0; padding: 6px 7px; border: 0; border-radius: 6px; background: transparent; color: var(--text-soft); font-size: 11px; text-align: left; cursor: pointer; }
+.ws-workspace-entry:hover { background: var(--surface-hover); color: var(--text); }
+.ws-workspace-entry.is-dir { color: var(--text); }
+.ws-workspace-entry .tiny { margin-left: auto; flex: 0 0 auto; }
+.ws-workspace-preview-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; margin-bottom: 8px; }
+.ws-workspace-image { display: block; max-width: 100%; max-height: 360px; border-radius: 6px; margin: 0 auto; }
+.ws-workspace-text { margin: 0; padding: 8px; border-radius: 6px; background: rgba(0, 0, 0, 0.18); color: var(--text-soft); font-size: 10px; line-height: 1.55; white-space: pre-wrap; overflow-wrap: anywhere; }
+@media (max-width: 800px) { .ws-workspace-layout { grid-template-columns: 1fr; } }

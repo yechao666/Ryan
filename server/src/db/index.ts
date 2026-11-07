@@ -7,7 +7,7 @@ import { DEMO_PASSWORD } from '../../../shared/src/constants.ts';
 
 const here = dirname(fileURLToPath(import.meta.url));
 export type Db = DatabaseSync;
-export const SCHEMA_VERSION = 13;
+export const SCHEMA_VERSION = 14;
 
 export function openDatabase(dbPath: string): Db {
   if (dbPath !== ':memory:') mkdirSync(dirname(dbPath), { recursive: true });
@@ -35,6 +35,10 @@ export function migrate(db: Db): void {
   const personColumns = db.prepare('PRAGMA table_info(persons)').all() as unknown as { name: string }[];
   if (!personColumns.some((column) => column.name === 'password_set')) {
     db.exec('ALTER TABLE persons ADD COLUMN password_set INTEGER NOT NULL DEFAULT 1');
+  }
+  const instanceColumns = db.prepare('PRAGMA table_info(dsh_instances)').all() as unknown as { name: string }[];
+  if (!instanceColumns.some((column) => column.name === 'workspace_root')) {
+    db.exec("ALTER TABLE dsh_instances ADD COLUMN workspace_root TEXT NOT NULL DEFAULT ''");
   }
   const cardColumns = db.prepare('PRAGMA table_info(prompt_cards)').all() as unknown as { name: string }[];
   if (!cardColumns.some((column) => column.name === 'person_id')) {

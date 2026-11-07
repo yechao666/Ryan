@@ -1,7 +1,8 @@
 import { spawn } from 'node:child_process';
-import { closeSync, mkdirSync, openSync } from 'node:fs';
-import { dirname, join, resolve } from 'node:path';
+import { closeSync, existsSync, mkdirSync, openSync, readFileSync, readdirSync, realpathSync, statSync } from 'node:fs';
+import { dirname, extname, join, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { homedir } from 'node:os';
 import { z } from 'zod';
 import type { Router } from '../router.ts';
 import { requireAdmin, requirePerson, requireProject } from '../auth.ts';
@@ -39,6 +40,79 @@ function instanceWith(db: import('../../db/index.ts').Db, id: string): DshInstan
   const row = getInstanceRow(db, id);
   if (!row) throw errors.notFound('服务不存在');
   return buildInstance(db, row);
+}
+
+const TEXT_EXTENSIONS = new Set([
+  '.md', '.txt', '.json', '.jsonl', '.yaml', '.yml', '.toml', '.ini', '.env', '.csv', '.tsv',
+  '.ts', '.tsx', '.js', '.mjs', '.cjs', '.jsx', '.css', '.scss', '.html', '.xml', '.svg', '.sql',
+  '.py', '.rb', '.go', '.rs', '.java', '.kt', '.c', '.h', '.cpp', '.hpp', '.sh', '.zsh', '.fish',
+  '.gitignore', '.gitattributes', '.lock', '.log', '.diff', '.patch',
+]);
+const IMAGE_EXTENSIONS = new Set(['.png', '.jpg', '.jpeg', '.gif', '.webp', '.svg']);
+
+function workspaceRootFor(row: import('./identity-helpers.ts').InstanceRow): string {
+  return row.workspace_root || join(homedir(), '.aiwo', 'workspaces');
+}
+
+function safeWorkspacePath(root: string, relativePath: string): string {
+  const target = resolve(root, relativePath || '.');
+  const base = resolve(root);
+  if (target !== base && !target.startsWith(`${base}${sep}`)) {
+    throw errors.badRequest('路径超出项目工作区');
+  }
+  // 防止工作区内的符号链接指向目录外。
+  if (existsSync(base) && existsSync(target)) {
+    const realBase = realpathSync(base);
+    const realTarget = realpathSync(target);
+    if (realTarget !== realBase && !realTarget.startsWith(`${realBase}${sep}`)) {
+      throw errors.badRequest('路径通过符号链接超出项目工作区');
+    }
+  }
+  return target;
+}
+
+function projectWorkspaceForService(
+  db: import('../../db/index.ts').Db,
+  projectId: string,
+  serviceId: string,
+): { row: import('./identity-helpers.ts').InstanceRow; root: string; workspace: string } {
+  const row = getInstanceRow(db, serviceId);
+  if (!row) throw errors.notFound('DSH 服务不存在');
+  const linked = db.prepare('SELECT 1 FROM instance_projects WHERE instance_id = ? AND project_id = ?').get(serviceId, projectId);
+  if (!linked) throw errors.badRequest('该 DSH 服务未绑定到当前项目');
+  const root = workspaceRootFor(row);
+  const safeProject = projectId.replace(/[^A-Za-z0-9._-]/g, '_');
+  return { row, root, workspace: join(root, 'projects', safeProject) };
+}
+
+function directoryEntries(root: string, workspace: string, relativePath: string) {
+  const target = safeWorkspacePath(workspace, relativePath);
+  if (!existsSync(target)) return { exists: false, entries: [] };
+  const stat = statSync(target);
+  if (!stat.isDirectory()) throw errors.badRequest('路径不是目录');
+  const entries = readdirSync(target, { withFileTypes: true })
+    .slice(0, 500)
+    .map((entry) => {
+      const absolute = join(target, entry.name);
+      let size = 0;
+      let mtime = '';
+      try {
+        const info = statSync(absolute);
+        size = info.size;
+        mtime = info.mtime.toISOString();
+      } catch {
+        /* 忽略不可读条目 */
+      }
+      return {
+        name: entry.name,
+        path: relativePath ? `${relativePath}/${entry.name}` : entry.name,
+        type: entry.isDirectory() ? 'dir' : entry.isSymbolicLink() ? 'link' : 'file',
+        size,
+        mtime,
+      };
+    })
+    .sort((a, b) => (a.type === 'dir' ? -1 : 0) - (b.type === 'dir' ? -1 : 0) || a.name.localeCompare(b.name, 'zh-CN'));
+  return { exists: true, entries };
 }
 
 export function registerInstanceRoutes(router: Router): void {
@@ -179,6 +253,7 @@ export function registerInstanceRoutes(router: Router): void {
           AIWO_BASE_URL: base,
           AIWO_INSTANCE_TOKEN: token,
           AIWO_WORKSPACE: workspace,
+          AIWO_WORKSPACE_ROOT: workspace,
           AIWO_INSTANCE_NAME: row.name,
           AIWO_INSTANCE_HOST: row.host || '127.0.0.1',
         },
@@ -229,6 +304,69 @@ export function registerInstanceRoutes(router: Router): void {
       pluginVersion: row.plugin_version,
       message: status === 'online' ? '服务在线，插件心跳正常' : row.status === 'unconfigured' ? '尚未安装/连接插件' : '服务离线',
     });
+  });
+
+  router.get('/api/projects/:id/services/:serviceId/workspace', (rc) => {
+    requirePerson(rc);
+    const project = requireProject(rc, rc.params.id!, 'view');
+    const query = rc.query(z.object({ path: z.string().trim().max(1_000).optional().default('') }));
+    const target = projectWorkspaceForService(rc.app.db, project.id, rc.params.serviceId!);
+    const response = {
+      projectId: project.id,
+      serviceId: target.row.id,
+      serviceName: target.row.name,
+      serviceKind: target.row.kind,
+      available: target.row.kind === 'local',
+      workspaceRoot: target.workspace,
+      path: query.path,
+      reason: target.row.kind === 'local' ? undefined : '该服务是远端 DSH，工作区位于服务所在机器；当前仅支持本机服务在线浏览。',
+      ...directoryEntries(target.root, target.workspace, query.path),
+    };
+    rc.json(response);
+  });
+
+  router.get('/api/projects/:id/services/:serviceId/file', (rc) => {
+    requirePerson(rc);
+    const project = requireProject(rc, rc.params.id!, 'view');
+    const query = rc.query(z.object({ path: z.string().trim().min(1).max(1_000) }));
+    const target = projectWorkspaceForService(rc.app.db, project.id, rc.params.serviceId!);
+    if (target.row.kind !== 'local') throw errors.badRequest('远端服务暂不支持在线预览文件');
+    const absolute = safeWorkspacePath(target.workspace, query.path);
+    if (!existsSync(absolute)) throw errors.notFound('文件不存在');
+    const stat = statSync(absolute);
+    if (stat.isDirectory()) throw errors.badRequest('路径是目录');
+    const ext = extname(absolute).toLowerCase();
+    const result = {
+      path: query.path,
+      name: absolute.split(sep).pop() ?? query.path,
+      size: stat.size,
+      mtime: stat.mtime.toISOString(),
+      binary: false,
+      truncated: false,
+      content: '',
+      dataUrl: undefined as string | undefined,
+    };
+    if (IMAGE_EXTENSIONS.has(ext) && stat.size <= 5_000_000) {
+      const mime = ext === '.svg' ? 'image/svg+xml' : ext === '.jpg' || ext === '.jpeg' ? 'image/jpeg' : ext === '.gif' ? 'image/gif' : ext === '.webp' ? 'image/webp' : 'image/png';
+      result.dataUrl = `data:${mime};base64,${readFileSync(absolute).toString('base64')}`;
+      rc.json(result);
+      return;
+    }
+    if (!TEXT_EXTENSIONS.has(ext) && ext !== '') {
+      result.binary = true;
+      rc.json(result);
+      return;
+    }
+    const raw = readFileSync(absolute);
+    const slice = raw.subarray(0, 256_000);
+    if (slice.includes(0)) {
+      result.binary = true;
+      rc.json(result);
+      return;
+    }
+    result.content = slice.toString('utf8');
+    result.truncated = raw.length > slice.length;
+    rc.json(result);
   });
 
   router.delete('/api/instances/:id', (rc) => {

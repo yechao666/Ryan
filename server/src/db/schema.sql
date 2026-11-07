@@ -182,6 +182,7 @@ CREATE TABLE IF NOT EXISTS dsh_instances (
   port           INTEGER,
   base_url       TEXT,
   workspace_path TEXT NOT NULL DEFAULT '',
+  workspace_root TEXT NOT NULL DEFAULT '',
   version        TEXT NOT NULL DEFAULT '',
   plugin_version TEXT,
   token_hash     TEXT NOT NULL UNIQUE,

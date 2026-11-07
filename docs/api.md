@@ -39,6 +39,8 @@ scope：`org | team | project | person`；person 级卡片仅指定人员可引�
 | DELETE | `/api/instances/:id` | 软删除服务 |
 | POST | `/api/instances/:id/restore` | 恢复已删除服务并重新签发 token |
 | GET | `/api/projects/:id/services` | 项目绑定的 DSH 服务 |
+| GET | `/api/projects/:id/services/:serviceId/workspace?path=` | 项目在该服务上的工作目录与文件列表 |
+| GET | `/api/projects/:id/services/:serviceId/file?path=` | 预览工作区文件（本机服务） |
 | PATCH | `/api/projects/:id/services` | `{serviceIds:string[]}` 设置项目绑定服务 |
 | POST | `/api/instances/:id/token` | 轮换服务 token |
 | POST | `/api/instances/:id/start` | 本机服务：服务端自动启动服务代理（轮换 token） |

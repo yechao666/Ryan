@@ -685,3 +685,19 @@ test('团队负责人角色可调整且至少保留一位', async () => {
   });
   assert.equal(lastLead.status, 409);
 });
+
+test('项目工作区：本机服务可浏览，远端服务明确不可用', async () => {
+  ok(await call('/api/projects/prj_calc/services', {
+    token: tokenLin,
+    method: 'PATCH',
+    body: { serviceIds: ['ins_local', 'ins_remote'] },
+  }));
+  const local = ok(await call('/api/projects/prj_calc/services/ins_local/workspace', { token: tokenLin }));
+  assert.equal(local.projectId, 'prj_calc');
+  assert.equal(local.serviceId, 'ins_local');
+  assert.equal(local.available, true);
+  assert.ok(local.workspaceRoot.includes('prj_calc'));
+  const remote = ok(await call('/api/projects/prj_calc/services/ins_remote/workspace', { token: tokenLin }));
+  assert.equal(remote.available, false);
+  assert.ok(remote.reason);
+});

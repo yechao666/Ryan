@@ -62,6 +62,7 @@ export interface InstanceRow {
   port: number | null;
   base_url: string | null;
   workspace_path: string;
+  workspace_root: string;
   version: string;
   plugin_version: string | null;
   token_hash: string;

@@ -110,6 +110,7 @@ const registerSchema = z.object({
   port: z.number().int().min(1).max(65535).optional(),
   version: z.string().trim().max(80).optional().default(''),
   pluginVersion: z.string().trim().max(80).optional(),
+  workspaceRoot: z.string().trim().max(1_000).optional(),
 });
 
 const progressSchema = z.object({
@@ -200,7 +201,7 @@ export function registerRuntimeRoutes(router: Router): void {
       .prepare(
         `UPDATE dsh_instances
             SET name = ?, kind = ?, host = ?, port = ?, version = ?,
-                plugin_version = ?, status = 'online', registered_at = ?, last_seen_at = ?, updated_at = ?
+                plugin_version = ?, workspace_root = COALESCE(NULLIF(?, ''), workspace_root), status = 'online', registered_at = ?, last_seen_at = ?, updated_at = ?
           WHERE id = ?`,
       )
       .run(
@@ -210,6 +211,7 @@ export function registerRuntimeRoutes(router: Router): void {
         input.port ?? current.port,
         input.version || current.version,
         input.pluginVersion ?? current.plugin_version,
+        input.workspaceRoot ?? '',
         current.registered_at,
         now,
         now,

@@ -103,6 +103,7 @@ class Agent {
       host: this.config.host,
       version,
       pluginVersion: this.config.pluginVersion,
+      workspaceRoot: this.config.workspaceRoot,
     };
     if (this.config.kind) payload.kind = this.config.kind;
     if (this.config.port !== undefined) payload.port = this.config.port;

@@ -20,6 +20,7 @@ import {
   type Tone,
 } from '@ui';
 import { useProject } from '../ProjectLayout.tsx';
+import { ProjectWorkspaceBrowser } from '../../components/project/ProjectWorkspaceBrowser.tsx';
 
 /** 项目服务资源：显式添加/解除绑定的 DSH 服务。 */
 export function ProjectServicesPage() {
@@ -32,6 +33,7 @@ export function ProjectServicesPage() {
   const [saving, setSaving] = useState(false);
   const [addOpen, setAddOpen] = useState(false);
   const [selected, setSelected] = useState<string[]>([]);
+  const [workspaceService, setWorkspaceService] = useState<DshInstance | null>(null);
 
   useEffect(() => {
     setServiceIds(detail.project.serviceIds ?? []);
@@ -130,7 +132,15 @@ export function ProjectServicesPage() {
             {bound.map((service) => {
               const status = INSTANCE_STATUSES.find((item) => item.value === service.status) ?? { label: service.status, tone: 'slate' as const };
               return (
-                <div className="ws-pick-item" key={service.id}>
+                <div
+                  className="ws-pick-item"
+                  key={service.id}
+                  role="button"
+                  tabIndex={0}
+                  style={{ cursor: 'pointer' }}
+                  onClick={() => setWorkspaceService(service)}
+                  onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') setWorkspaceService(service); }}
+                >
                   <span className={`cx-metric-icon tone-${status.tone}`}>
                     <Icon name="server" size={14} />
                   </span>
@@ -146,9 +156,17 @@ export function ProjectServicesPage() {
                   <Button
                     size="sm"
                     variant="ghost"
+                    icon="folder"
+                    onClick={(event) => { event.stopPropagation(); setWorkspaceService(service); }}
+                  >
+                    浏览工作区
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="ghost"
                     icon="trash"
                     loading={saving}
-                    onClick={() => void save(serviceIds.filter((id) => id !== service.id), `已解除绑定：${service.name}`)}
+                    onClick={(event) => { event.stopPropagation(); void save(serviceIds.filter((id) => id !== service.id), `已解除绑定：${service.name}`); }}
                   >
                     解除绑定
                   </Button>
@@ -218,6 +236,13 @@ export function ProjectServicesPage() {
           </div>
         )}
       </Modal>
+      <ProjectWorkspaceBrowser
+        open={Boolean(workspaceService)}
+        projectId={projectId}
+        service={workspaceService}
+        onClose={() => setWorkspaceService(null)}
+      />
+
     </div>
   );
 }

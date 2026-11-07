@@ -67,6 +67,8 @@ export function assistantApiManifest() {
       { method: 'GET', path: '/api/projects/:id', summary: '项目详情与成员' },
       { method: 'PATCH', path: '/api/projects/:id', summary: '更新项目' },
       { method: 'GET', path: '/api/projects/:id/prompt-cards', summary: '项目可引用提示卡' },
+      { method: 'GET', path: '/api/projects/:id/services/:serviceId/workspace', summary: '项目在该 DSH 服务上的工作目录与文件列表', query: { path: 'string?' } },
+      { method: 'GET', path: '/api/projects/:id/services/:serviceId/file', summary: '预览项目工作区文件', query: { path: 'string' } },
       { method: 'GET', path: '/api/prompt-cards', summary: '提示卡列表' },
       {
         method: 'POST', path: '/api/prompt-cards',

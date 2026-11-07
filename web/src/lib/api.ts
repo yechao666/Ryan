@@ -167,6 +167,38 @@ export interface AssistantConversationDetail {
   messages: AssistantStoredMessage[];
 }
 
+export interface ProjectWorkspaceEntry {
+  name: string;
+  path: string;
+  type: 'dir' | 'file' | 'link';
+  size: number;
+  mtime: string;
+}
+
+export interface ProjectWorkspaceResponse {
+  projectId: string;
+  serviceId: string;
+  serviceName: string;
+  serviceKind: 'local' | 'remote';
+  available: boolean;
+  workspaceRoot: string;
+  path: string;
+  exists: boolean;
+  entries: ProjectWorkspaceEntry[];
+  reason?: string;
+}
+
+export interface ProjectWorkspaceFile {
+  path: string;
+  name: string;
+  size: number;
+  mtime: string;
+  binary: boolean;
+  truncated: boolean;
+  content: string;
+  dataUrl?: string;
+}
+
 /** 新增 DSH 服务的响应：token 与安装命令只返回一次。 */
 export interface InstanceCreateResult {
   instance: DshInstance;
@@ -374,6 +406,14 @@ export const api = {
 
   updateProjectServices(projectId: string, serviceIds: string[]): Promise<{ serviceIds: string[] }> {
     return request(`/api/projects/${projectId}/services`, { method: 'PATCH', body: JSON.stringify({ serviceIds }) });
+  },
+
+  projectWorkspace(projectId: string, serviceId: string, path = ''): Promise<ProjectWorkspaceResponse> {
+    return request(`/api/projects/${projectId}/services/${serviceId}/workspace${qs({ path })}`);
+  },
+
+  projectWorkspaceFile(projectId: string, serviceId: string, path: string): Promise<ProjectWorkspaceFile> {
+    return request(`/api/projects/${projectId}/services/${serviceId}/file${qs({ path })}`);
   },
 
   revokeInstance(id: string): Promise<{ ok: boolean }> {
