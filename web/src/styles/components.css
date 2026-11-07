@@ -2062,3 +2062,8 @@ body.drawer-resizing * {
 .table-resizable tbody td > * {
   max-width: 100%;
 }
+
+/* Card 内的表格由外层卡片裁切圆角，避免内层表头再叠一层圆角 */
+.card > .table-wrap {
+  border-radius: 0;
+}
