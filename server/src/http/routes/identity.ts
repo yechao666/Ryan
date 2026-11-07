@@ -388,6 +388,42 @@ export function registerIdentityRoutes(router: Router): void {
     rc.json({ ok: true, count: personIds.length });
   });
 
+  router.patch('/api/teams/:id/members/:personId', async (rc) => {
+    requirePerson(rc);
+    const team = loadTeamOr404(rc, rc.params.id!);
+    requireTeam(rc, team.id, true);
+    const body = await rc.body(z.object({ role: z.enum(['lead', 'member']) }));
+    const db = rc.app.db;
+    const personId = rc.params.personId!;
+    const existing = db
+      .prepare('SELECT role FROM team_members WHERE team_id = ? AND person_id = ?')
+      .get(team.id, personId) as unknown as { role: string } | undefined;
+    if (!existing) throw errors.notFound('该人员不是团队成员');
+    if (body.role === 'member' && existing.role === 'lead') {
+      const leadCount = countRows(
+        db,
+        "SELECT COUNT(*) AS c FROM team_members WHERE team_id = ? AND role = 'lead'",
+        team.id,
+      );
+      if (leadCount <= 1) throw errors.conflict('团队至少需要一位负责人');
+    }
+    tx(db, () => {
+      if (body.role === 'lead') {
+        db.prepare("UPDATE team_members SET role = 'member' WHERE team_id = ? AND role = 'lead'").run(team.id);
+      }
+      db.prepare('UPDATE team_members SET role = ? WHERE team_id = ? AND person_id = ?').run(body.role, team.id, personId);
+      if (body.role === 'lead') {
+        db.prepare('UPDATE teams SET lead_person_id = ? WHERE id = ?').run(personId, team.id);
+      } else if (team.lead_person_id === personId) {
+        const next = db
+          .prepare("SELECT person_id FROM team_members WHERE team_id = ? AND role = 'lead' ORDER BY created_at DESC LIMIT 1")
+          .get(team.id) as unknown as { person_id: string } | undefined;
+        db.prepare('UPDATE teams SET lead_person_id = ? WHERE id = ?').run(next?.person_id ?? null, team.id);
+      }
+    });
+    rc.json(buildTeamMember(db, team.id, personId));
+  });
+
   router.delete('/api/teams/:id/members/:personId', (rc) => {
     requirePerson(rc);
     const team = loadTeamOr404(rc, rc.params.id!);

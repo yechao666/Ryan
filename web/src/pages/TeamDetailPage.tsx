@@ -56,6 +56,7 @@ export function TeamDetailPage() {
   const [adding, setAdding] = useState(false);
   const [removeTarget, setRemoveTarget] = useState<TeamMember | null>(null);
   const [removing, setRemoving] = useState(false);
+  const [roleUpdating, setRoleUpdating] = useState<string | null>(null);
 
   const persons = useResource<Person[]>(() => api.persons(), [addOpen], addOpen);
   const teamsForFilter = useResource(() => api.teams(), [addOpen], addOpen);
@@ -95,6 +96,21 @@ export function TeamDetailPage() {
       toast.error(message);
     } finally {
       setAdding(false);
+    }
+  };
+
+  const handleRole = async (member: TeamMember) => {
+    if (!team) return;
+    const nextRole: TeamRole = member.role === 'lead' ? 'member' : 'lead';
+    setRoleUpdating(member.personId);
+    try {
+      await api.updateTeamMemberRole(team.id, member.personId, nextRole);
+      toast.success(nextRole === 'lead' ? `${member.name} 已设为团队负责人` : `${member.name} 已取消负责人`);
+      await reload();
+    } catch (cause) {
+      toast.error(apiErrorMessage(cause, '调整团队角色失败'));
+    } finally {
+      setRoleUpdating(null);
     }
   };
 
@@ -185,11 +201,20 @@ export function TeamDetailPage() {
     {
       key: 'actions',
       header: '',
-      width: 64,
+      width: 190,
       align: 'right',
       render: (member) =>
         canManage ? (
           <span className="cx-row-actions">
+            <Button
+              size="sm"
+              variant="ghost"
+              icon={member.role === 'lead' ? 'user' : 'star'}
+              disabled={roleUpdating === member.personId}
+              onClick={() => void handleRole(member)}
+            >
+              {member.role === 'lead' ? '取消负责人' : '设为负责人'}
+            </Button>
             <IconButton icon="trash" label={`移除 ${member.name}`} size="sm" onClick={() => setRemoveTarget(member)} />
           </span>
         ) : null,

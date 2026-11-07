@@ -276,6 +276,9 @@ export const api = {
   addTeamMembers(id: string, personIds: string[], role: TeamRole): Promise<{ ok: boolean; count: number }> {
     return request(`/api/teams/${id}/members/bulk`, { method: 'POST', body: JSON.stringify({ personIds, role }) });
   },
+  updateTeamMemberRole(id: string, personId: string, role: TeamRole): Promise<TeamMember> {
+    return request(`/api/teams/${id}/members/${personId}`, { method: 'PATCH', body: JSON.stringify({ role }) });
+  },
   removeTeamMember(id: string, personId: string): Promise<{ ok: boolean }> {
     return request(`/api/teams/${id}/members/${personId}`, { method: 'DELETE' });
   },

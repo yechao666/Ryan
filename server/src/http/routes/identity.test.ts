@@ -657,3 +657,31 @@ test('团队批量添加成员', async () => {
   assert.ok(detail.members.some((member: Json) => member.personId === 'per_zhouye'));
   assert.ok(detail.members.some((member: Json) => member.personId === 'per_suyan'));
 });
+
+test('团队负责人角色可调整且至少保留一位', async () => {
+  const team = ok(await call('/api/teams', {
+    token: tokenLin,
+    method: 'POST',
+    body: { name: '角色调整团队', slug: 'role-change-team', leadPersonId: 'per_linwei' },
+  }));
+  ok(await call(`/api/teams/${team.id}/members/bulk`, {
+    token: tokenLin,
+    method: 'POST',
+    body: { personIds: ['per_zhouye'], role: 'member' },
+  }));
+  const promoted = ok(await call(`/api/teams/${team.id}/members/per_zhouye`, {
+    token: tokenLin,
+    method: 'PATCH',
+    body: { role: 'lead' },
+  }));
+  assert.equal(promoted.role, 'lead');
+  const detail = ok(await call(`/api/teams/${team.id}`, { token: tokenLin }));
+  assert.equal(detail.team.leadPersonId, 'per_zhouye');
+  assert.equal(detail.members.find((member: Json) => member.personId === 'per_linwei').role, 'member');
+  const lastLead = await call(`/api/teams/${team.id}/members/per_zhouye`, {
+    token: tokenLin,
+    method: 'PATCH',
+    body: { role: 'member' },
+  });
+  assert.equal(lastLead.status, 409);
+});
