@@ -36,6 +36,8 @@ scope：`org | team | project | person`；person 级卡片仅指定人员可引�
 | GET | `/api/instances` | 服务列表（状态/当前任务）；项目绑定关系通过项目服务 API 管理 |
 | POST | `/api/instances` | 管理员创建；返回一次性 `token` 与安装命令 |
 | PATCH | `/api/instances/:id` | 名称/host/端口/Base URL |
+| DELETE | `/api/instances/:id` | 软删除服务 |
+| POST | `/api/instances/:id/restore` | 恢复已删除服务并重新签发 token |
 | GET | `/api/projects/:id/services` | 项目绑定的 DSH 服务 |
 | PATCH | `/api/projects/:id/services` | `{serviceIds:string[]}` 设置项目绑定服务 |
 | POST | `/api/instances/:id/token` | 轮换服务 token |

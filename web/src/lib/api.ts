@@ -312,7 +312,7 @@ export const api = {
   },
   updateInstance(
     id: string,
-    input: Partial<DshInstanceInput> & { status?: string },
+    input: { name?: string; kind?: 'local' | 'remote'; host?: string; port?: number | null; baseUrl?: string | null; status?: string },
   ): Promise<DshInstance> {
     return request(`/api/instances/${id}`, { method: 'PATCH', body: JSON.stringify(input) });
   },
@@ -335,6 +335,10 @@ export const api = {
 
   revokeInstance(id: string): Promise<{ ok: boolean }> {
     return request(`/api/instances/${id}`, { method: 'DELETE' });
+  },
+
+  restoreInstance(id: string): Promise<InstanceCreateResult> {
+    return request(`/api/instances/${id}/restore`, { method: 'POST', body: '{}' });
   },
 
   // ---- prompt cards ----

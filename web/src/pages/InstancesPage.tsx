@@ -18,6 +18,7 @@ import {
   Modal,
   PageHead,
   SectionHead,
+  SearchInput,
   Select,
   Skeleton,
   useToast,
@@ -96,8 +97,22 @@ export function InstancesPage() {
   const [rotating, setRotating] = useState(false);
   const [revokeTarget, setRevokeTarget] = useState<DshInstance | null>(null);
   const [revoking, setRevoking] = useState(false);
+  const [search, setSearch] = useState('');
+  const [statusFilter, setStatusFilter] = useState('all');
+  const [editTarget, setEditTarget] = useState<DshInstance | null>(null);
+  const [editForm, setEditForm] = useState<InstanceFormState>(EMPTY_FORM);
+  const [editError, setEditError] = useState<string | null>(null);
+  const [savingEdit, setSavingEdit] = useState(false);
 
   const list = useMemo(() => instances.data ?? [], [instances.data]);
+  const filteredList = useMemo(() => {
+    const needle = search.trim().toLowerCase();
+    return list.filter((item) => {
+      if (statusFilter !== 'all' && item.status !== statusFilter) return false;
+      if (!needle) return true;
+      return `${item.name} ${item.id} ${item.host} ${item.baseUrl ?? ''}`.toLowerCase().includes(needle);
+    });
+  }, [list, search, statusFilter]);
   const defaultServiceId = settings.data?.defaultServiceId ?? '';
   const online = list.filter((item) => item.status === 'online').length;
   const unconfigured = list.filter((item) => item.status === 'unconfigured').length;
@@ -117,6 +132,62 @@ export function InstancesPage() {
   const closeCreate = () => {
     setFormError(null);
     setParams({}, { replace: true });
+  };
+
+  const openEdit = (instance: DshInstance) => {
+    setEditTarget(instance);
+    setEditError(null);
+    setEditForm({
+      name: instance.name,
+      kind: instance.kind,
+      host: instance.host,
+      port: instance.port ? String(instance.port) : '',
+      baseUrl: instance.baseUrl ?? '',
+    });
+  };
+
+  const updateEdit = <K extends keyof InstanceFormState>(key: K, value: InstanceFormState[K]) => {
+    setEditForm((prev) => ({ ...prev, [key]: value }));
+  };
+
+  const handleEdit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!editTarget) return;
+    if (!editForm.name.trim()) { setEditError('请填写服务名称。'); return; }
+    let port: number | null | undefined;
+    if (editForm.port.trim()) {
+      const parsed = Number(editForm.port);
+      if (!Number.isInteger(parsed) || parsed < 1 || parsed > 65535) { setEditError('端口需为 1–65535 的整数。'); return; }
+      port = parsed;
+    } else {
+      port = null;
+    }
+    setSavingEdit(true);
+    try {
+      await api.updateInstance(editTarget.id, {
+        name: editForm.name.trim(),
+        kind: editForm.kind,
+        host: editForm.host.trim(),
+        port,
+        baseUrl: editForm.baseUrl.trim() || null,
+      });
+      toast.success('服务配置已更新');
+      setEditTarget(null);
+      await instances.refresh();
+    } catch (cause) {
+      setEditError(errorMessage(cause, '更新服务失败'));
+    } finally { setSavingEdit(false); }
+  };
+
+  const handleRestore = async (instance: DshInstance) => {
+    try {
+      const result = await api.restoreInstance(instance.id);
+      toast.success(`服务「${instance.name}」已恢复，请重新配置代理 token`);
+      setSecret({ title: '服务已恢复', instanceName: instance.name, token: result.token, command: result.command });
+      await instances.refresh();
+    } catch (cause) {
+      toast.error(errorMessage(cause, '恢复服务失败'));
+    }
   };
 
   const handleCreate = async (event: FormEvent<HTMLFormElement>) => {
@@ -233,7 +304,7 @@ export function InstancesPage() {
     setRevoking(true);
     try {
       await api.revokeInstance(revokeTarget.id);
-      toast.success(`服务「${revokeTarget.name}」已吊销`);
+      toast.success(`服务「${revokeTarget.name}」已删除`);
       setRevokeTarget(null);
       await instances.refresh();
     } catch (cause) {
@@ -294,6 +365,34 @@ export function InstancesPage() {
         </div>
       </Card>
 
+      <div className="toolbar">
+        <div className="toolbar-left">
+          <Select
+            className="ws-filter-select"
+            value={statusFilter}
+            options={[
+              { value: 'all', label: '全部状态' },
+              { value: 'online', label: '在线' },
+              { value: 'unconfigured', label: '待接入' },
+              { value: 'offline', label: '离线' },
+              { value: 'error', label: '异常' },
+              { value: 'revoked', label: '已删除' },
+            ]}
+            onChange={(event) => setStatusFilter(event.target.value)}
+          />
+          <SearchInput
+            value={search}
+            onChange={setSearch}
+            placeholder="搜索名称 / ID / Host"
+            className="ws-search"
+          />
+          <span className="tiny dim">共 {filteredList.length} 个服务</span>
+        </div>
+        {search || statusFilter !== 'all' ? (
+          <Button size="sm" variant="ghost" onClick={() => { setSearch(''); setStatusFilter('all'); }}>清除筛选</Button>
+        ) : null}
+      </div>
+
       {instances.error && !instances.data ? (
         <ErrorState message={instances.error} onRetry={() => void instances.refresh()} />
       ) : instances.loading && !instances.data ? (
@@ -310,12 +409,12 @@ export function InstancesPage() {
             </Card>
           ))}
         </div>
-      ) : list.length === 0 ? (
+      ) : filteredList.length === 0 ? (
         <Card>
           <EmptyState
             icon="server"
-            title="还没有 DSH 服务"
-            description="新增本机或远端服务，复制安装命令启动服务代理；任务会由在线服务领取执行。"
+            title={list.length === 0 ? '还没有 DSH 服务' : '没有匹配的服务'}
+            description={list.length === 0 ? '新增本机或远端服务，复制安装命令启动服务代理；任务会由在线服务领取执行。' : '调整搜索或状态筛选。'}
             action={
               isAdmin ? (
                 <Button variant="primary" icon="plus" onClick={openCreate}>
@@ -327,7 +426,7 @@ export function InstancesPage() {
         </Card>
       ) : (
         <div className="grid-cards service-grid">
-          {list.map((instance) => {
+          {filteredList.map((instance) => {
             const status = instanceStatusMeta(instance.status);
             const kind = instanceKindMeta(instance.kind);
             const disabled = instance.status === 'revoked';
@@ -425,6 +524,9 @@ export function InstancesPage() {
                       </Button>
                     </div>
                     <div className="hstack gap-4">
+                      <Button size="sm" variant="ghost" icon="settings" onClick={() => openEdit(instance)}>
+                        编辑
+                      </Button>
                       <Button
                         size="sm"
                         variant={defaultServiceId === instance.id ? 'ghost' : 'outline'}
@@ -436,13 +538,18 @@ export function InstancesPage() {
                       <Button size="sm" variant="ghost" icon="key" onClick={() => setRotateTarget(instance)}>
                         轮换 token
                       </Button>
-                      <IconButton
-                        icon="trash"
-                        label={`吊销服务 ${instance.name}`}
-                        size="sm"
-                        onClick={() => setRevokeTarget(instance)}
-                      />
+                      <Button size="sm" variant="ghost" icon="trash" onClick={() => setRevokeTarget(instance)}>
+                        删除
+                      </Button>
                     </div>
+                  </div>
+                ) : null}
+                {isAdmin && disabled ? (
+                  <div className="hstack gap-4" style={{ marginTop: 12, paddingTop: 10, borderTop: '1px solid var(--border-faint)' }}>
+                    <span className="tiny dim">服务已删除，恢复后需要重新配置代理 token。</span>
+                    <Button size="sm" variant="outline" icon="refresh" onClick={() => void handleRestore(instance)}>
+                      恢复服务
+                    </Button>
                   </div>
                 ) : null}
               </Card>
@@ -557,6 +664,37 @@ export function InstancesPage() {
       </Modal>
 
       <Modal
+        open={Boolean(editTarget)}
+        onClose={() => setEditTarget(null)}
+        title="编辑 DSH 服务"
+        description="修改服务名称、类型与连接信息；不会改变 token 和当前在线状态。"
+        size="lg"
+        footer={
+          <>
+            <Button variant="ghost" onClick={() => setEditTarget(null)}>取消</Button>
+            <Button variant="primary" type="submit" form="edit-instance-form" loading={savingEdit} icon="check">保存修改</Button>
+          </>
+        }
+      >
+        <form id="edit-instance-form" className="stack" style={{ gap: 14 }} onSubmit={handleEdit}>
+          <div className="grid grid-2">
+            <Field label="服务名称" required>
+              <Input value={editForm.name} autoFocus onChange={(event) => updateEdit('name', event.target.value)} />
+            </Field>
+            <Field label="类型" hint="本机由 Aiwo 拉起代理；远端需安装通讯插件。">
+              <Select value={editForm.kind} options={kindOptions} onChange={(event) => updateEdit('kind', event.target.value as InstanceKind)} />
+            </Field>
+          </div>
+          <div className="grid grid-3">
+            <Field label="Host"><Input value={editForm.host} placeholder="127.0.0.1" onChange={(event) => updateEdit('host', event.target.value)} /></Field>
+            <Field label="Port"><Input type="number" min={1} max={65535} value={editForm.port} onChange={(event) => updateEdit('port', event.target.value)} /></Field>
+            <Field label="Base URL（可选）"><Input value={editForm.baseUrl} placeholder="http://host:4501" onChange={(event) => updateEdit('baseUrl', event.target.value)} /></Field>
+          </div>
+          {editError ? <Callout tone="red" icon="xCircle">{editError}</Callout> : null}
+        </form>
+      </Modal>
+
+      <Modal
         open={Boolean(secret)}
         onClose={() => setSecret(null)}
         title={secret?.title ?? '服务凭据'}
@@ -604,13 +742,13 @@ export function InstancesPage() {
         onClose={() => setRevokeTarget(null)}
         onConfirm={() => void handleRevoke()}
         loading={revoking}
-        title="吊销服务"
+        title="删除 DSH 服务"
         description={
           revokeTarget
-            ? `吊销「${revokeTarget.name}」后，该服务会立即离线且无法再领取任务。`
+            ? `删除「${revokeTarget.name}」后，该服务会立即离线且无法再领取任务；可在“已删除”筛选中恢复。`
             : undefined
         }
-        confirmLabel="吊销服务"
+        confirmLabel="删除服务"
       />
     </div>
   );

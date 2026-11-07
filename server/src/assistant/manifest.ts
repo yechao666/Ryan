@@ -81,6 +81,9 @@ export function assistantApiManifest() {
       { method: 'POST', path: '/api/instances/:id/test', summary: '测试服务心跳' },
       { method: 'POST', path: '/api/instances/:id/start', summary: '启动本机服务代理' },
       { method: 'POST', path: '/api/instances/:id/token', summary: '轮换服务 token' },
+      { method: 'PATCH', path: '/api/instances/:id', summary: '编辑 DSH 服务名称、类型与连接信息', body: { name: 'string?', kind: 'local|remote?', host: 'string?', port: 'number|null?', baseUrl: 'string|null?', status: 'string?' } },
+      { method: 'DELETE', path: '/api/instances/:id', summary: '删除 DSH 服务（软删除，可在 revoked 状态恢复）' },
+      { method: 'POST', path: '/api/instances/:id/restore', summary: '恢复已删除 DSH 服务并重新签发 token' },
       { method: 'GET', path: '/api/tasks', summary: '任务列表', query: { projectId: 'string?', status: 'string?', type: 'string?', mine: '0|1?', limit: 'number?' } },
       {
         method: 'POST', path: '/api/projects/:id/tasks',

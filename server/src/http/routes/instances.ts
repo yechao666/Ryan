@@ -199,6 +199,23 @@ export function registerInstanceRoutes(router: Router): void {
     rc.json({ started: true, pid: child.pid, logPath, instance: updated ? buildInstance(rc.app.db, updated) : null });
   });
 
+  router.post('/api/instances/:id/restore', (rc) => {
+    requireAdmin(rc);
+    const row = getInstanceRow(rc.app.db, rc.params.id);
+    if (!row) throw errors.notFound('服务不存在');
+    if (!row.revoked_at) throw errors.conflict('服务未被删除');
+    const token = `aiwo_ins_${randomToken(32)}`;
+    rc.app.db.prepare(
+      "UPDATE dsh_instances SET revoked_at = NULL, status = 'unconfigured', token_hash = ?, token_prefix = ?, last_seen_at = NULL, updated_at = ? WHERE id = ?",
+    ).run(sha256(token), token.slice(0, 18), nowIso(), row.id);
+    const base = process.env.AIWO_PUBLIC_BASE_URL || `http://${rc.app.env.host === '0.0.0.0' ? '127.0.0.1' : rc.app.env.host}:${rc.app.env.port}`;
+    rc.json({
+      instance: instanceWith(rc.app.db, row.id),
+      token,
+      command: installCommand(base, token),
+    });
+  });
+
   router.post('/api/instances/:id/test', (rc) => {
     requireAdmin(rc);
     const row = getInstanceRow(rc.app.db, rc.params.id);

@@ -147,6 +147,23 @@ test('实例资源：管理员创建返回一次性 token，测试未接入状�
   const tested = ok(await call(`/api/instances/${created.instance.id}/test`, { token: tokenLin, method: 'POST' }));
   assert.equal(tested.ok, false);
   assert.equal(tested.status, 'unconfigured');
+
+  const edited = ok(await call(`/api/instances/${created.instance.id}`, {
+    token: tokenLin,
+    method: 'PATCH',
+    body: { name: '测试服务已编辑', host: '10.0.0.9', port: 4600 },
+  }));
+  assert.equal(edited.name, '测试服务已编辑');
+  assert.equal(edited.host, '10.0.0.9');
+  assert.equal(edited.port, 4600);
+
+  ok(await call(`/api/instances/${created.instance.id}`, { token: tokenLin, method: 'DELETE' }));
+  const list = ok(await call('/api/instances', { token: tokenLin }));
+  assert.equal(list.find((item: Json) => item.id === created.instance.id).status, 'revoked');
+  const restored = ok(await call(`/api/instances/${created.instance.id}/restore`, { token: tokenLin, method: 'POST', body: {} }));
+  assert.match(restored.token, /^aiwo_ins_/);
+  assert.equal(restored.instance.status, 'unconfigured');
+  assert.equal(restored.instance.name, '测试服务已编辑');
 });
 
 test('系统设置：安全检查 endpoint 为空时关闭；实例配置可保存', async () => {
