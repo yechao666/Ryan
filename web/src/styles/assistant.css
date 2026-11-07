@@ -964,7 +964,40 @@
   color: var(--text-dim);
   font-size: 11px;
   line-height: 1.6;
-  white-space: pre-wrap;
+}
+
+.cx-process-thinking .ws-md {
+  font-size: 11px;
+  color: var(--text-dim);
+  line-height: 1.6;
+}
+
+.cx-process-thinking .ws-md p {
+  margin: 0 0 6px;
+}
+
+.cx-process-thinking .ws-md p:last-child {
+  margin-bottom: 0;
+}
+
+.cx-process-thinking .ws-md h1,
+.cx-process-thinking .ws-md h2,
+.cx-process-thinking .ws-md h3,
+.cx-process-thinking .ws-md h4 {
+  margin: 8px 0 4px;
+  color: var(--text-secondary, var(--text-muted));
+  font-size: 11.5px;
+}
+
+.cx-process-thinking .ws-md ul,
+.cx-process-thinking .ws-md ol {
+  margin: 0 0 6px;
+  padding-left: 16px;
+}
+
+.cx-process-thinking .ws-md pre {
+  max-height: 160px;
+  margin: 4px 0;
 }
 
 .cx-process-code,

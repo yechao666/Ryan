@@ -106,7 +106,7 @@ function ProcessPanel({ message, onToggle }: { message: ChatMessage; onToggle: (
                 {bodyVisible ? (
                   <div className="cx-process-step__body">
                     {block.kind === 'thinking' ? (
-                      <div className="cx-process-thinking">{block.text}</div>
+                      <div className="cx-process-thinking"><Markdown text={block.text} /></div>
                     ) : (
                       <>
                         {inputText(block.input) ? <pre className="cx-process-code">{inputText(block.input)}</pre> : null}
