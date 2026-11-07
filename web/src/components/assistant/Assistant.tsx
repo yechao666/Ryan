@@ -217,6 +217,9 @@ export function Assistant() {
   const [input, setInput] = useState('');
   const [busy, setBusy] = useState(false);
   const [editing, setEditing] = useState<{ id: string; text: string } | null>(null);
+  const [suggestions, setSuggestions] = useState<string[]>([]);
+  const [suggestionsLoading, setSuggestionsLoading] = useState(false);
+  const suggestionSeq = useRef(0);
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const abortRef = useRef<AbortController | null>(null);
 
@@ -477,6 +480,7 @@ export function Assistant() {
               processOpen: false,
             }));
             window.dispatchEvent(new CustomEvent('aiwo:assistant-refresh'));
+            void loadSuggestions(`${message}\n${result.reply}`.slice(-1_800));
             if (result.navigate) navigate(result.navigate);
           },
           onError: (text) => {
@@ -538,11 +542,31 @@ export function Assistant() {
     window.addEventListener('pointerup', stopResize);
   };
 
-  const suggestions = [
-    '创建一个任务：为计算器补充乘法边界测试',
-    '列出当前项目的 DSH 服务和绑定情况',
-    '帮我生成一个每日开发简报自动化',
-  ];
+  const loadSuggestions = async (context?: string): Promise<void> => {
+    const seq = ++suggestionSeq.current;
+    setSuggestionsLoading(true);
+    try {
+      const result = await api.assistantSuggestions({
+        pathname: fullPath,
+        projectId: projectId ? decodeURIComponent(projectId) : undefined,
+        taskId,
+        context,
+      });
+      if (seq === suggestionSeq.current) setSuggestions(result.suggestions.slice(0, 3));
+    } catch {
+      if (seq === suggestionSeq.current) setSuggestions([]);
+    } finally {
+      if (seq === suggestionSeq.current) setSuggestionsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!open) return;
+    void loadSuggestions();
+    // 页面、项目、任务或会话变化时刷新推荐。
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, fullPath, projectId, taskId, activeId]);
+
   const sortedConversations = useMemo(
     () => [...conversations].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)),
     [conversations],
@@ -693,13 +717,17 @@ export function Assistant() {
             ))}
           </div>
 
-          <div className="cx-assistant-suggestions">
-            {suggestions.map((suggestion) => (
-              <button key={suggestion} type="button" className="cx-assistant-chip" disabled={busy} onClick={() => void send(suggestion)}>
-                {suggestion}
-              </button>
-            ))}
-          </div>
+          {(suggestionsLoading && suggestions.length === 0) || suggestions.length > 0 ? (
+            <div className="cx-assistant-suggestions" aria-label="下一步任务推荐">
+              {suggestionsLoading && suggestions.length === 0
+                ? [0, 1, 2].map((item) => <span className="cx-assistant-chip-skeleton" key={item} />)
+                : suggestions.map((suggestion) => (
+                    <button key={suggestion} type="button" className="cx-assistant-chip" disabled={busy} onClick={() => void send(suggestion)}>
+                      {suggestion}
+                    </button>
+                  ))}
+            </div>
+          ) : null}
 
           <form
             className="cx-assistant-composer"

@@ -408,6 +408,15 @@ export const api = {
     if (buffer.trim()) dispatch(buffer.replace(/\r/g, ''));
   },
 
+  assistantSuggestions(input: {
+    pathname: string;
+    projectId?: string;
+    taskId?: string;
+    context?: string;
+  }): Promise<{ suggestions: string[]; source: 'ai' | 'fallback' }> {
+    return request('/api/assistant/suggestions', { method: 'POST', body: JSON.stringify(input) });
+  },
+
   assistantChat(input: {
     message: string;
     pathname: string;

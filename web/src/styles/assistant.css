@@ -498,9 +498,22 @@
   flex-wrap: wrap;
   gap: 5px;
   padding: 8px 14px 0;
-  max-height: 88px;
-  overflow-y: auto;
-  scrollbar-width: thin;
+  max-height: none;
+  overflow: visible;
+}
+.cx-assistant-chip-skeleton {
+  width: 190px;
+  max-width: 100%;
+  height: 27px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: linear-gradient(90deg, rgba(255,255,255,0.035), rgba(139,124,255,0.08), rgba(255,255,255,0.035));
+  background-size: 200% 100%;
+  animation: cx-assistant-skeleton 1.4s ease-in-out infinite;
+}
+@keyframes cx-assistant-skeleton {
+  0% { background-position: 100% 0; }
+  100% { background-position: -100% 0; }
 }
 
 .cx-assistant-chip {

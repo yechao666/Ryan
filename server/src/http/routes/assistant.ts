@@ -5,6 +5,7 @@ import { errors } from '../respond.ts';
 import { runAssistantTurn } from '../../assistant/runner.ts';
 import { checkUserInput } from '../../security/check.ts';
 import { assistantApiManifest } from '../../assistant/manifest.ts';
+import { generateSuggestions } from '../../assistant/suggestions.ts';
 import type { ServerResponse } from 'node:http';
 import { mkdirSync } from 'node:fs';
 import { homedir } from 'node:os';
@@ -95,6 +96,23 @@ export function registerAssistantRoutes(router: Router): void {
   router.get('/api/assistant/manifest', (rc) => {
     requirePerson(rc);
     rc.json(assistantApiManifest());
+  });
+
+  router.post('/api/assistant/suggestions', async (rc) => {
+    const person = requirePerson(rc);
+    const input = await rc.body(z.object({
+      pathname: z.string().max(500).optional().default('/'),
+      projectId: z.string().max(80).optional(),
+      taskId: z.string().max(80).optional(),
+      context: z.string().max(2_000).optional(),
+    }));
+    rc.json(await generateSuggestions(rc.app.db, {
+      personName: person.name,
+      pathname: input.pathname,
+      projectId: input.projectId,
+      taskId: input.taskId,
+      context: input.context,
+    }));
   });
 
   // POST /api/assistant/chat/stream —— SSE 流式助手；DSH 事件实时转发。
