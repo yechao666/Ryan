@@ -30,6 +30,7 @@ interface ChatMessage {
   role: 'user' | 'assistant';
   text: string;
   tone?: 'error';
+  createdAt?: string;
   streaming?: boolean;
   status?: string;
   process?: ProcessBlock[];
@@ -53,7 +54,16 @@ function uid(prefix = 'm'): string {
 }
 
 function welcomeMessage(): ChatMessage {
-  return { id: uid('welcome'), role: 'assistant', text: WELCOME };
+  return { id: uid('welcome'), role: 'assistant', text: WELCOME, createdAt: new Date().toISOString() };
+}
+
+function messageTime(iso?: string): string {
+  const date = iso ? new Date(iso) : new Date();
+  if (Number.isNaN(date.getTime())) return '';
+  const now = new Date();
+  const sameDay = date.toDateString() === now.toDateString();
+  const time = date.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' });
+  return sameDay ? time : `${date.getMonth() + 1}-${date.getDate()} ${time}`;
 }
 
 function createConversation(): Conversation {
@@ -77,6 +87,7 @@ function sanitizeMessages(input: unknown): ChatMessage[] {
     .filter((message): message is ChatMessage => Boolean(message && typeof message === 'object' && (message.role === 'user' || message.role === 'assistant')))
     .map((message) => ({
       ...message,
+      createdAt: typeof message.createdAt === 'string' ? message.createdAt : new Date().toISOString(),
       streaming: false,
       status: undefined,
       process: Array.isArray(message.process)
@@ -378,11 +389,12 @@ export function Assistant() {
       }
       return [
         ...base,
-        { id: uid('u'), role: 'user', text: message },
+        { id: uid('u'), role: 'user', text: message, createdAt: new Date().toISOString() },
         {
           id: assistantId,
           role: 'assistant',
           text: '',
+          createdAt: new Date().toISOString(),
           streaming: true,
           status: '正在连接 DSH 助手…',
           process: [],
@@ -686,32 +698,37 @@ export function Assistant() {
                       <span className="cx-assistant-stream-status">{message.status}</span>
                     </div>
                   ) : null}
-                  {message.text && message.role === 'user' && editing?.id !== message.id ? (
+                  <div className="cx-assistant-msg-foot">
+                    <time className="cx-assistant-msg-time" dateTime={message.createdAt}>{messageTime(message.createdAt)}</time>
                     <div className="cx-assistant-msg-actions">
-                      <IconButton
-                        icon="pencil"
-                        label="编辑并重发"
-                        size="sm"
-                        disabled={busy}
-                        onClick={() => setEditing({ id: message.id, text: message.text })}
-                      />
-                      <IconButton
-                        icon="trash"
-                        label="删除这一轮"
-                        size="sm"
-                        disabled={busy}
-                        onClick={() => deleteTurn(message)}
-                      />
-                    </div>
-                  ) : null}
-                  {message.text && message.role === 'assistant' && editing?.id !== message.id ? (
-                    <div className="cx-assistant-msg-actions">
-                      <IconButton icon="copy" label="复制" size="sm" onClick={() => void copyMessage(message.text)} />
-                      {messages.slice(0, messages.indexOf(message)).some((item) => item.role === 'user') && !message.streaming ? (
-                        <IconButton icon="refresh" label="重新生成" size="sm" disabled={busy} onClick={() => regenerate(message)} />
+                      {message.role === 'user' && editing?.id !== message.id ? (
+                        <>
+                          <IconButton
+                            icon="pencil"
+                            label="编辑并重发"
+                            size="sm"
+                            disabled={busy}
+                            onClick={() => setEditing({ id: message.id, text: message.text })}
+                          />
+                          <IconButton
+                            icon="trash"
+                            label="删除这一轮"
+                            size="sm"
+                            disabled={busy}
+                            onClick={() => deleteTurn(message)}
+                          />
+                        </>
+                      ) : null}
+                      {message.role === 'assistant' && editing?.id !== message.id ? (
+                        <>
+                          <IconButton icon="copy" label="复制" size="sm" onClick={() => void copyMessage(message.text)} />
+                          {messages.slice(0, messages.indexOf(message)).some((item) => item.role === 'user') && !message.streaming ? (
+                            <IconButton icon="refresh" label="重新生成" size="sm" disabled={busy} onClick={() => regenerate(message)} />
+                          ) : null}
+                        </>
                       ) : null}
                     </div>
-                  ) : null}
+                  </div>
                 </div>
               </div>
             ))}
