@@ -108,6 +108,16 @@ export interface CreateTaskResult {
   task: WorkItem;
 }
 
+export interface AssistantStreamHandlers {
+  onMeta?: (data: { person?: { id: string; name: string }; pathname?: string }) => void;
+  onStatus?: (data: { phase: string; turn?: number; step?: number }) => void;
+  onThinking?: (text: string) => void;
+  onTool?: (data: { kind: string; tool: string; status?: string; detail?: string }) => void;
+  onText?: (delta: string) => void;
+  onDone?: (result: { reply: string; navigate?: string; sessionId?: string; instance?: string }) => void;
+  onError?: (message: string) => void;
+}
+
 /** 新增 DSH 实例的响应：token 与安装命令只返回一次。 */
 export interface InstanceCreateResult {
   instance: DshInstance;
@@ -303,6 +313,78 @@ export const api = {
   },
 
   // ---- assistant ----
+  async assistantChatStream(
+    input: {
+      message: string;
+      pathname: string;
+      projectId?: string;
+      taskId?: string;
+    },
+    handlers: AssistantStreamHandlers,
+    signal?: AbortSignal,
+  ): Promise<void> {
+    const token = getToken();
+    const response = await fetch('/api/assistant/chat/stream', {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        accept: 'text/event-stream',
+        ...(token ? { authorization: `Bearer ${token}` } : {}),
+      },
+      body: JSON.stringify(input),
+      signal,
+    });
+    if (!response.ok) {
+      const text = await response.text();
+      let body: { error?: { code?: string; message?: string; details?: unknown } } | null = null;
+      try { body = text ? JSON.parse(text) : null; } catch { body = null; }
+      throw new ApiError(
+        response.status,
+        body?.error?.code ?? 'HTTP_ERROR',
+        body?.error?.message ?? `助手请求失败（${response.status}）`,
+        body?.error?.details,
+      );
+    }
+    if (!response.body) throw new ApiError(502, 'NO_BODY', '助手没有返回流式响应');
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+    const dispatch = (block: string): void => {
+      let event = 'message';
+      const dataLines: string[] = [];
+      for (const line of block.split('\n')) {
+        if (line.startsWith('event:')) event = line.slice(6).trim();
+        else if (line.startsWith('data:')) dataLines.push(line.slice(5).trimStart());
+      }
+      if (dataLines.length === 0) return;
+      let data: any;
+      try { data = JSON.parse(dataLines.join('\n')); } catch { return; }
+      switch (event) {
+        case 'meta': handlers.onMeta?.(data); break;
+        case 'status': handlers.onStatus?.(data); break;
+        case 'thinking': handlers.onThinking?.(String(data.text ?? '')); break;
+        case 'tool': handlers.onTool?.(data); break;
+        case 'text': handlers.onText?.(String(data.delta ?? '')); break;
+        case 'done': handlers.onDone?.(data); break;
+        case 'error': handlers.onError?.(String(data.message ?? '助手运行错误')); break;
+        default: break;
+      }
+    };
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      let boundary = buffer.indexOf('\n\n');
+      while (boundary >= 0) {
+        const block = buffer.slice(0, boundary).replace(/\r/g, '');
+        buffer = buffer.slice(boundary + 2);
+        if (block.trim()) dispatch(block);
+        boundary = buffer.indexOf('\n\n');
+      }
+    }
+    if (buffer.trim()) dispatch(buffer.replace(/\r/g, ''));
+  },
+
   assistantChat(input: {
     message: string;
     pathname: string;

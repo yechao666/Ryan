@@ -20,6 +20,10 @@ export interface AssistantTurn {
   taskId?: string;
   token: string;
   apiBase: string;
+  /** SSE/流式调用时接收 DSH 原始运行事件。 */
+  onEvent?: (event: Record<string, unknown>) => void;
+  /** 浏览器断开/取消时中止 DSH 子进程。 */
+  signal?: AbortSignal;
 }
 
 export interface AssistantResult {
@@ -99,7 +103,7 @@ function extractNavigation(text: string): { reply: string; navigate?: string } {
   };
 }
 
-export async function runAssistantTurn(input: AssistantTurn): Promise<AssistantResult> {
+async function runAssistantTurnOnce(input: AssistantTurn): Promise<AssistantResult> {
   const apiKey = await deepseekKey();
   if (!apiKey) {
     throw new Error('Aiwo 助手缺少 DEEPSEEK_API_KEY：请在服务器环境中配置，或写入 ~/.dsh/.credentials.yaml');
@@ -127,6 +131,11 @@ export async function runAssistantTurn(input: AssistantTurn): Promise<AssistantR
     stdio: ['pipe', 'pipe', 'pipe'],
   });
 
+  const abortChild = () => {
+    if (child.exitCode === null) child.kill('SIGTERM');
+  };
+  input.signal?.addEventListener('abort', abortChild, { once: true });
+
   let stdout = '';
   let stderr = '';
   let buffer = '';
@@ -152,6 +161,13 @@ export async function runAssistantTurn(input: AssistantTurn): Promise<AssistantR
   });
 
   const handleEvent = (event: any): void => {
+    if (event && typeof event.type === 'string') {
+      try {
+        input.onEvent?.(event);
+      } catch {
+        /* 事件消费者失败不影响助手主流程 */
+      }
+    }
     if (!event || typeof event.type !== 'string') return;
     if (event.type === 'session' && typeof event.sessionId === 'string') sessionId = event.sessionId;
     if (event.type === 'text' && typeof event.text === 'string' && event.text.trim()) lastText = event.text;
@@ -197,7 +213,40 @@ export async function runAssistantTurn(input: AssistantTurn): Promise<AssistantR
     return { ...extractNavigation(raw), sessionId, instance: 'aiwo-assistant' };
   } finally {
     clearTimeout(timeout);
+    input.signal?.removeEventListener('abort', abortChild);
     if (child.exitCode === null) child.kill('SIGTERM');
     await rm(tokenDir, { recursive: true, force: true });
+  }
+}
+
+
+const assistantQueues = new Map<string, Promise<void>>();
+const SESSION_LOCK_RE = /already owned by an active write handle|active write handle|session[^\n]*locked/i;
+
+/**
+ * 同一人员的助手请求串行执行；DSH session 若被遗留进程锁住，清掉 session 并用新会话重试一次。
+ * 避免多标签页/流式请求取消后出现 “session already owned” 永久失败。
+ */
+export async function runAssistantTurn(input: AssistantTurn): Promise<AssistantResult> {
+  const previous = assistantQueues.get(input.personId) ?? Promise.resolve();
+  let release!: () => void;
+  const current = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  const chained = previous.then(() => current);
+  assistantQueues.set(input.personId, chained);
+  await previous;
+  try {
+    try {
+      return await runAssistantTurnOnce(input);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      if (!SESSION_LOCK_RE.test(message)) throw error;
+      sessions.delete(input.personId);
+      return await runAssistantTurnOnce(input);
+    }
+  } finally {
+    release();
+    if (assistantQueues.get(input.personId) === chained) assistantQueues.delete(input.personId);
   }
 }

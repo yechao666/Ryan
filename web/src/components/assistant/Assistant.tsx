@@ -4,11 +4,21 @@ import { api, ApiError } from '@lib/api.ts';
 import { Badge, Button, Icon, IconButton, Textarea, useToast } from '@ui';
 import { Markdown } from '../project/Markdown.tsx';
 
+interface ToolStep {
+  id: string;
+  tool: string;
+  status?: string;
+}
+
 interface ChatMessage {
   id: string;
   role: 'user' | 'assistant';
   text: string;
   tone?: 'error';
+  streaming?: boolean;
+  status?: string;
+  thinking?: string;
+  tools?: ToolStep[];
 }
 
 const WELCOME =
@@ -16,6 +26,16 @@ const WELCOME =
 
 function uid(): string {
   return `m_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+}
+
+function statusLabel(phase: string): string {
+  switch (phase) {
+    case 'turn_start': return '正在理解请求…';
+    case 'step_start': return '正在思考并执行…';
+    case 'step_end': return '正在整理结果…';
+    case 'turn_end': return '正在收尾…';
+    default: return '正在处理…';
+  }
 }
 
 export function Assistant() {
@@ -45,6 +65,7 @@ export function Assistant() {
   const [input, setInput] = useState('');
   const [busy, setBusy] = useState(false);
   const scrollRef = useRef<HTMLDivElement | null>(null);
+  const abortRef = useRef<AbortController | null>(null);
 
   useEffect(() => {
     localStorage.setItem('aiwo.assistant.open', open ? '1' : '0');
@@ -56,31 +77,96 @@ export function Assistant() {
     const el = scrollRef.current;
     if (el) el.scrollTop = el.scrollHeight;
   }, [messages, busy]);
+  useEffect(() => () => abortRef.current?.abort(), []);
+
+  const patchMessage = (id: string, patch: (message: ChatMessage) => Partial<ChatMessage>): void => {
+    setMessages((current) => current.map((message) => (message.id === id ? { ...message, ...patch(message) } : message)));
+  };
 
   const send = async (raw?: string): Promise<void> => {
     const message = (raw ?? input).trim();
     if (!message || busy) return;
     setInput('');
-    setMessages((current) => [...current, { id: uid(), role: 'user', text: message }]);
+    const assistantId = uid();
+    setMessages((current) => [
+      ...current,
+      { id: uid(), role: 'user', text: message },
+      { id: assistantId, role: 'assistant', text: '', streaming: true, status: '正在连接 DSH 助手…', tools: [] },
+    ]);
     setBusy(true);
+    const controller = new AbortController();
+    abortRef.current = controller;
+    let failed = false;
+
     try {
-      const result = await api.assistantChat({
-        message,
-        pathname: fullPath,
-        projectId: projectId ? decodeURIComponent(projectId) : undefined,
-        taskId,
-      });
-      setMessages((current) => [
-        ...current,
-        { id: uid(), role: 'assistant', text: result.reply || '已完成。' },
-      ]);
-      window.dispatchEvent(new CustomEvent('aiwo:assistant-refresh'));
-      if (result.navigate) navigate(result.navigate);
+      await api.assistantChatStream(
+        {
+          message,
+          pathname: fullPath,
+          projectId: projectId ? decodeURIComponent(projectId) : undefined,
+          taskId,
+        },
+        {
+          onStatus: (data) => {
+            patchMessage(assistantId, (current) => ({
+              status: current.text ? undefined : statusLabel(data.phase),
+            }));
+          },
+          onThinking: (text) => {
+            if (text.trim()) patchMessage(assistantId, () => ({ thinking: text }));
+          },
+          onTool: (data) => {
+            patchMessage(assistantId, (current) => {
+              const tools = current.tools ?? [];
+              const existing = tools.findIndex((item) => item.tool === data.tool);
+              const next = existing >= 0
+                ? tools.map((item, index) => (index === existing ? { ...item, status: data.status ?? item.status } : item))
+                : [...tools, { id: `${Date.now()}_${tools.length}`, tool: data.tool, status: data.status }];
+              return { tools: next, status: data.kind === 'tool_call' ? `正在调用 ${data.tool}…` : undefined };
+            });
+          },
+          onText: (delta) => {
+            patchMessage(assistantId, (current) => ({
+              text: current.text + delta,
+              status: undefined,
+              thinking: undefined,
+            }));
+          },
+          onDone: (result) => {
+            patchMessage(assistantId, (current) => ({
+              text: result.reply || current.text || '已完成。',
+              streaming: false,
+              status: undefined,
+              thinking: undefined,
+            }));
+            window.dispatchEvent(new CustomEvent('aiwo:assistant-refresh'));
+            if (result.navigate) navigate(result.navigate);
+          },
+          onError: (text) => {
+            failed = true;
+            patchMessage(assistantId, () => ({ text, tone: 'error', streaming: false, status: undefined, thinking: undefined }));
+            toast.error(text);
+          },
+        },
+        controller.signal,
+      );
+      patchMessage(assistantId, (current) => ({ streaming: false, status: undefined }));
+      if (!failed) window.dispatchEvent(new CustomEvent('aiwo:assistant-refresh'));
     } catch (error) {
-      const text = error instanceof ApiError ? error.message : error instanceof Error ? error.message : '助手请求失败';
-      setMessages((current) => [...current, { id: uid(), role: 'assistant', text, tone: 'error' }]);
-      toast.error(text);
+      if (controller.signal.aborted) {
+        patchMessage(assistantId, (current) => ({
+          text: current.text || '已停止生成。',
+          streaming: false,
+          status: undefined,
+          thinking: undefined,
+        }));
+      } else {
+        const text = error instanceof ApiError ? error.message : error instanceof Error ? error.message : '助手请求失败';
+        patchMessage(assistantId, () => ({ text, tone: 'error', streaming: false, status: undefined, thinking: undefined }));
+        toast.error(text);
+      }
     } finally {
+      abortRef.current = null;
       setBusy(false);
     }
   };
@@ -142,20 +228,37 @@ export function Assistant() {
               <div key={message.id} className={`cx-assistant-msg cx-assistant-msg--${message.role}`}>
                 {message.role === 'assistant' ? <span className="cx-assistant-avatar">A</span> : null}
                 <div className="cx-assistant-bubble">
+                  {message.tools?.length ? (
+                    <div className="cx-assistant-tools">
+                      {message.tools.map((tool) => (
+                        <span key={tool.id} className="cx-assistant-tool">
+                          <Icon name="terminal" size={11} />
+                          {tool.tool}
+                          {tool.status ? <span className="cx-assistant-tool__state">{tool.status}</span> : null}
+                        </span>
+                      ))}
+                    </div>
+                  ) : null}
                   <div className={`cx-assistant-text${message.tone ? ' cx-assistant-text--error' : ''}`}>
                     {message.role === 'assistant' ? <Markdown text={message.text} /> : message.text}
                   </div>
+                  {message.streaming && !message.text ? (
+                    <div className="cx-assistant-streaming">
+                      <span className="cx-assistant-typing"><span /><span /><span /></span>
+                      <span className="cx-assistant-stream-status">{message.status ?? '正在思考…'}</span>
+                    </div>
+                  ) : null}
+                  {message.streaming && message.text && message.status ? (
+                    <div className="cx-assistant-streaming cx-assistant-streaming--text">
+                      <span className="cx-assistant-stream-status">{message.status}</span>
+                    </div>
+                  ) : null}
+                  {message.thinking && message.streaming ? (
+                    <div className="cx-assistant-thinking">{message.thinking.slice(0, 180)}</div>
+                  ) : null}
                 </div>
               </div>
             ))}
-            {busy ? (
-              <div className="cx-assistant-msg cx-assistant-msg--assistant">
-                <span className="cx-assistant-avatar">A</span>
-                <div className="cx-assistant-bubble">
-                  <span className="cx-assistant-typing"><span /><span /><span /></span>
-                </div>
-              </div>
-            ) : null}
           </div>
 
           <div className="cx-assistant-suggestions">

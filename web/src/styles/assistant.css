@@ -767,3 +767,80 @@
     display: none;
   }
 }
+
+/* 流式输出：状态、思考与工具调用 */
+
+.cx-assistant-streaming {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 20px;
+}
+
+.cx-assistant-streaming--text {
+  margin-top: 6px;
+}
+
+.cx-assistant-stream-status {
+  color: var(--text-muted);
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.cx-assistant-stream-status::after {
+  content: '';
+  display: inline-block;
+  width: 5px;
+  height: 5px;
+  margin-left: 6px;
+  border-radius: 50%;
+  background: var(--violet);
+  vertical-align: middle;
+  animation: cx-assistant-pulse 1.1s infinite ease-in-out;
+}
+
+@keyframes cx-assistant-pulse {
+  0%, 100% { opacity: 0.2; }
+  50% { opacity: 0.9; }
+}
+
+.cx-assistant-thinking {
+  margin-top: 8px;
+  padding: 7px 9px;
+  border-left: 2px solid rgba(167, 139, 250, 0.35);
+  color: var(--text-dim);
+  font-size: 11px;
+  line-height: 1.55;
+  white-space: pre-wrap;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+}
+
+.cx-assistant-tools {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-bottom: 8px;
+}
+
+.cx-assistant-tool {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  max-width: 100%;
+  padding: 3px 6px;
+  border: 1px solid var(--border-faint);
+  border-radius: 6px;
+  color: var(--text-muted);
+  font-size: 10px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cx-assistant-tool__state {
+  color: var(--text-dim);
+  font-family: var(--font-mono, monospace);
+}
