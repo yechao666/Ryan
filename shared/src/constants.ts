@@ -87,7 +87,7 @@ export const PROMPT_CARD_SCOPES: { value: PromptCardScope; label: string; desc: 
   { value: 'org', label: '公共', desc: '全员所有项目可引用' },
   { value: 'team', label: '团队', desc: '归属团队的项目可引用' },
   { value: 'project', label: '项目', desc: '仅指定项目可引用' },
-  { value: 'person', label: '人员', desc: '仅指定人员可引用' },
+  { value: 'person', label: '个人', desc: '仅本人可引用' },
 ];
 
 export const INSTANCE_KINDS: { value: InstanceKind; label: string; tone: string; desc: string }[] = [

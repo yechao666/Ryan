@@ -484,7 +484,7 @@ export function PromptCardsPage() {
                       ? '团队级卡片由团队负责人维护。'
                       : form.scope === 'project'
                         ? '项目级卡片仅指定项目可引用。'
-                        : '人员级卡片仅本人可引用。'
+                        : '个人级卡片仅本人可引用。'
               }
             >
               <Select
@@ -529,7 +529,7 @@ export function PromptCardsPage() {
                 />
               </Field>
             ) : form.scope === 'person' ? (
-              <Field label="可见范围" hint="人员级卡片只属于当前人员，不共享给其他人员。">
+              <Field label="可见范围" hint="个人级卡片只属于当前账号，不共享给其他人。">
                 <Input value={`${person?.name ?? '当前人员'}（仅本人）`} disabled readOnly />
               </Field>
             ) : (

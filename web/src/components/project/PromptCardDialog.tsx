@@ -122,7 +122,7 @@ export function PromptCardDialog({ projectId, open, value, onChange, onClose }: 
           <EmptyState
             icon="book"
             title={cards.data?.length ? '没有匹配的卡片' : '暂无可引用的提示词卡片'}
-            description={cards.data?.length ? '调整搜索或筛选条件。' : '组织、团队、项目或人员级卡片会出现在这里。'}
+            description={cards.data?.length ? '调整搜索或筛选条件。' : '组织、团队、项目或个人级卡片会出现在这里。'}
             compact
           />
         ) : (
