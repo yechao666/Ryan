@@ -331,7 +331,7 @@ export function InstancesPage() {
                   <span className="chip mono">{hostLabel(instance)}</span>
                 </div>
                 <div className="badge-dot-list" style={{ marginTop: 8 }}>
-                  <span className="chip">共享调度池</span>
+                  <span className="chip">服务池</span>
                   <span className="tiny dim">工作目录由任务所属项目决定</span>
                 </div>
 

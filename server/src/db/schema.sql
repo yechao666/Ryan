@@ -139,6 +139,7 @@ CREATE TABLE IF NOT EXISTS work_items (
   priority           INTEGER NOT NULL DEFAULT 0,
   lease_until        TEXT,
   instance_id        TEXT REFERENCES dsh_instances(id) ON DELETE SET NULL,
+  allowed_service_ids TEXT NOT NULL DEFAULT '[]',
   created_by         TEXT REFERENCES persons(id) ON DELETE SET NULL,
   executor_person_id TEXT REFERENCES persons(id) ON DELETE SET NULL,
   created_at         TEXT NOT NULL,

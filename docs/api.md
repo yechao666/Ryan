@@ -33,9 +33,11 @@ scope：`org | team | project`；category：`workflow | style | standard | role 
 
 | Method | Path | 说明 |
 | --- | --- | --- |
-| GET | `/api/instances` | 服务列表（状态/当前任务；不绑定项目） |
+| GET | `/api/instances` | 服务列表（状态/当前任务）；项目绑定关系通过项目服务 API 管理 |
 | POST | `/api/instances` | 管理员创建；返回一次性 `token` 与安装命令 |
 | PATCH | `/api/instances/:id` | 名称/host/端口/Base URL |
+| GET | `/api/projects/:id/services` | 项目绑定的 DSH 服务 |
+| PATCH | `/api/projects/:id/services` | `{serviceIds:string[]}` 设置项目绑定服务 |
 | POST | `/api/instances/:id/token` | 轮换服务 token |
 | POST | `/api/instances/:id/start` | 本机服务：服务端自动启动服务代理（轮换 token） |
 | POST | `/api/instances/:id/test` | 测试插件心跳/在线状态 |
@@ -59,7 +61,7 @@ node integrations/aiwo-instance/agent.mjs --base http://<aiwo>:4500 --token aiwo
 | --- | --- | --- |
 | GET | `/api/tasks` | `?projectId=&status=&type=&mine=&limit=`；返回 `executorLabel`、`promptCards` |
 | GET | `/api/tasks/:id` | `{task,events,memory}` |
-| POST | `/api/projects/:id/tasks` | `{title,prompt,type,promptCardIds,instanceId,priority}` |
+| POST | `/api/projects/:id/tasks` | `{title,prompt,type,promptCardIds,instanceIds,priority}`；instanceIds 为空时按项目绑定公平调度 |
 | POST | `/api/tasks/:id/cancel` | 取消任务 |
 
 Aiwo 任务执行者固定为「创建人@Aiwo」；任务不支持对话，只展示执行过程。

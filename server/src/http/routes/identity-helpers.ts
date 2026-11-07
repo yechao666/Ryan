@@ -174,6 +174,12 @@ export function mapProjectMemberRow(row: ProjectMemberRow): ProjectMember {
 export function buildProjectSummary(db: Db, row: ProjectRow): ProjectSummary {
   const owner = nameOfPerson(db, row.owner_person_id);
   const team = row.owner_team_id ? db.prepare('SELECT name FROM teams WHERE id = ?').get(row.owner_team_id) as unknown as { name: string } | undefined : undefined;
+  const services = db
+    .prepare(
+      `SELECT i.id, i.name FROM instance_projects ip JOIN dsh_instances i ON i.id = ip.instance_id
+        WHERE ip.project_id = ? AND i.revoked_at IS NULL ORDER BY i.name ASC`,
+    )
+    .all(row.id) as unknown as { id: string; name: string }[];
   return {
     id: row.id,
     slug: row.slug,
@@ -188,6 +194,8 @@ export function buildProjectSummary(db: Db, row: ProjectRow): ProjectSummary {
     prompt: row.prompt,
     repoUrl: row.repo_url ?? undefined,
     status: row.status as ProjectSummary['status'],
+    serviceIds: services.map((service) => service.id),
+    serviceNames: services.map((service) => service.name),
     mnemosProjectId: row.mnemos_project_id ?? undefined,
     mnemosConfigured: Boolean(row.mnemos_project_id && row.mnemos_api_key),
     memoryAgentId: row.memory_agent_id ?? undefined,
@@ -206,7 +214,7 @@ export function buildProjectSummary(db: Db, row: ProjectRow): ProjectSummary {
         "SELECT COUNT(*) AS c FROM work_items WHERE project_id = ? AND status IN ('queued','assigned','running','waiting_input')",
         row.id,
       ),
-      instances: countRows(db, "SELECT COUNT(*) AS c FROM dsh_instances WHERE revoked_at IS NULL"),
+      instances: services.length,
       members: countRows(db, 'SELECT COUNT(*) AS c FROM project_members WHERE project_id = ?', row.id),
     },
     lastActivityAt:

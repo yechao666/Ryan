@@ -17,6 +17,7 @@
 ```
 
 - 服务是独立资源，不依赖智员。
+- 项目可绑定多个 DSH 服务；任务在绑定服务之间按项目 cursor 轮询，指定多个候选时只在这些服务中分配。
 - 一个服务同一时刻执行一个任务；任务租约 3 分钟，progress 续租。
 - ACP `session/new` 的 `cwd` 由 Aiwo DSH 插件按项目 ID 自动生成（默认 `~/.aiwo/workspaces/projects/<projectId>`）；同一项目固定同一路径，同一 ACP 进程可承载多个不同 cwd 的独立 session。
 - ACP 不可用时自动回退 headless；两种模式都产生同样的 runtime_events。

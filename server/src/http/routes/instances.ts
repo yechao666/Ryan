@@ -4,7 +4,7 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { z } from 'zod';
 import type { Router } from '../router.ts';
-import { requireAdmin, requirePerson } from '../auth.ts';
+import { requireAdmin, requirePerson, requireProject } from '../auth.ts';
 import { errors } from '../respond.ts';
 import { newId, nowIso, randomToken, sha256 } from '../../lib/ids.ts';
 import { buildInstance, computeInstanceStatus, getInstanceRow } from './identity-helpers.ts';
@@ -42,6 +42,37 @@ function instanceWith(db: import('../../db/index.ts').Db, id: string): DshInstan
 }
 
 export function registerInstanceRoutes(router: Router): void {
+  router.get('/api/projects/:id/services', (rc) => {
+    requirePerson(rc);
+    const project = requireProject(rc, rc.params.id, 'view');
+    const rows = rc.app.db
+      .prepare(
+        `SELECT i.id, i.name FROM instance_projects ip JOIN dsh_instances i ON i.id = ip.instance_id
+          WHERE ip.project_id = ? AND i.revoked_at IS NULL ORDER BY i.name ASC`,
+      )
+      .all(project.id) as unknown as { id: string; name: string }[];
+    rc.json({ serviceIds: rows.map((row) => row.id), services: rows });
+  });
+
+  router.patch('/api/projects/:id/services', async (rc) => {
+    requirePerson(rc);
+    const project = requireProject(rc, rc.params.id, 'manage');
+    const input = await rc.body(z.object({ serviceIds: z.array(z.string().min(1)).max(100) }));
+    const ids = [...new Set(input.serviceIds)];
+    for (const serviceId of ids) {
+      const service = rc.app.db
+        .prepare('SELECT id FROM dsh_instances WHERE id = ? AND revoked_at IS NULL')
+        .get(serviceId) as unknown as { id: string } | undefined;
+      if (!service) throw errors.badRequest(`DSH 服务不存在或已吊销：${serviceId}`);
+    }
+    const now = nowIso();
+    rc.app.db.prepare('DELETE FROM instance_projects WHERE project_id = ?').run(project.id);
+    for (const serviceId of ids) {
+      rc.app.db.prepare('INSERT INTO instance_projects (instance_id, project_id, created_at) VALUES (?, ?, ?)').run(serviceId, project.id, now);
+    }
+    rc.json({ serviceIds: ids });
+  });
+
   router.get('/api/instances', (rc) => {
     requirePerson(rc);
     const rows = rc.app.db.prepare('SELECT id FROM dsh_instances ORDER BY created_at DESC').all() as unknown as { id: string }[];

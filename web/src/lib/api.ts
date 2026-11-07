@@ -258,6 +258,14 @@ export const api = {
   startInstance(id: string): Promise<InstanceStartResult> {
     return request(`/api/instances/${id}/start`, { method: 'POST' });
   },
+  projectServices(projectId: string): Promise<{ serviceIds: string[]; services: { id: string; name: string }[] }> {
+    return request(`/api/projects/${projectId}/services`);
+  },
+
+  updateProjectServices(projectId: string, serviceIds: string[]): Promise<{ serviceIds: string[] }> {
+    return request(`/api/projects/${projectId}/services`, { method: 'PATCH', body: JSON.stringify({ serviceIds }) });
+  },
+
   revokeInstance(id: string): Promise<{ ok: boolean }> {
     return request(`/api/instances/${id}`, { method: 'DELETE' });
   },

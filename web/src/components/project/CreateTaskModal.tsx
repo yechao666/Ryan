@@ -5,7 +5,7 @@ import { api } from '@lib/api.ts';
 import { Button, Field, Input, Modal, Select, Textarea, useToast } from '@ui';
 import { useProject } from './context.ts';
 import { PRIORITY_OPTIONS } from './meta.ts';
-import { ProjectInstanceSelect, PromptCardPicker } from './PromptCardPicker.tsx';
+import { ProjectInstanceMultiSelect, PromptCardPicker } from './PromptCardPicker.tsx';
 
 export interface CreateTaskModalProps {
   open: boolean;
@@ -28,7 +28,7 @@ export function CreateTaskModal({ open, onClose, onCreated }: CreateTaskModalPro
   const [title, setTitle] = useState('');
   const [prompt, setPrompt] = useState('');
   const [promptCardIds, setPromptCardIds] = useState<string[]>([]);
-  const [instanceId, setInstanceId] = useState('');
+  const [instanceIds, setInstanceIds] = useState<string[]>([]);
   const [type, setType] = useState<TaskType>('feature');
   const [priority, setPriority] = useState('2');
   const [errors, setErrors] = useState<FormErrors>({});
@@ -40,7 +40,7 @@ export function CreateTaskModal({ open, onClose, onCreated }: CreateTaskModalPro
     setTitle('');
     setPrompt('');
     setPromptCardIds([]);
-    setInstanceId('');
+    setInstanceIds([]);
     setType('feature');
     setPriority('2');
     setErrors({});
@@ -59,7 +59,7 @@ export function CreateTaskModal({ open, onClose, onCreated }: CreateTaskModalPro
         title: title.trim(),
         prompt: prompt.trim(),
         promptCardIds,
-        instanceId: instanceId || undefined,
+        instanceIds,
         type,
         priority: Number(priority),
         source: 'human',
@@ -79,7 +79,7 @@ export function CreateTaskModal({ open, onClose, onCreated }: CreateTaskModalPro
       onClose={onClose}
       size="lg"
       title="新建任务"
-      description="任务会进入排队队列，由共享调度池中的 DSH 服务领取后交给 Aiwo 执行。"
+      description="任务会进入排队队列；有项目绑定服务时在绑定服务间公平调度，否则进入共享服务池。"
       footer={
         <>
           <Button variant="ghost" onClick={onClose}>
@@ -120,11 +120,11 @@ export function CreateTaskModal({ open, onClose, onCreated }: CreateTaskModalPro
         onChange={setPromptCardIds}
       />
 
-      <ProjectInstanceSelect
+      <ProjectInstanceMultiSelect
         projectId={projectId}
         open={open}
-        value={instanceId}
-        onChange={setInstanceId}
+        value={instanceIds}
+        onChange={setInstanceIds}
       />
 
       <div className="ws-form-grid">

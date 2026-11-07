@@ -82,14 +82,17 @@ export function PromptCardPicker({ projectId, open, value, onChange }: PromptCar
   );
 }
 
-/** 拉取可调度的 DSH 服务（服务是共享资源，不绑定项目）。 */
-export function useProjectInstances(_projectId: string, enabled: boolean) {
-  const query = useAsync(() => api.instances(), [enabled], enabled);
-  const instances = useMemo(
-    () => (query.data ?? []).filter((instance) => instance.status !== 'revoked'),
-    [query.data],
-  );
-  return { ...query, instances };
+/** 拉取项目可调度服务：项目有绑定时只显示绑定服务，否则显示共享池。 */
+export function useProjectInstances(projectId: string, enabled: boolean) {
+  const query = useAsync(async () => {
+    const [instances, binding] = await Promise.all([api.instances(), api.projectServices(projectId)]);
+    const bound = new Set(binding.serviceIds);
+    return {
+      instances: instances.filter((instance) => instance.status !== 'revoked' && (bound.size === 0 || bound.has(instance.id))),
+      boundIds: binding.serviceIds,
+    };
+  }, [projectId, enabled], enabled);
+  return { ...query, instances: query.data?.instances ?? [], boundIds: query.data?.boundIds ?? [] };
 }
 
 export interface ProjectInstanceSelectProps {
@@ -125,6 +128,58 @@ export function ProjectInstanceSelect({ projectId, open, value, onChange }: Proj
         </Callout>
       ) : (
         <Select value={value} options={options} onChange={(event) => onChange(event.target.value)} />
+      )}
+    </Field>
+  );
+}
+
+export interface ProjectInstanceMultiSelectProps {
+  projectId: string;
+  open: boolean;
+  value: string[];
+  onChange: (next: string[]) => void;
+}
+
+/** 任务可指定一个或多个服务；空表示由项目绑定服务公平调度。 */
+export function ProjectInstanceMultiSelect({ projectId, open, value, onChange }: ProjectInstanceMultiSelectProps) {
+  const query = useProjectInstances(projectId, open);
+  const toggle = (id: string) => onChange(value.includes(id) ? value.filter((item) => item !== id) : [...value, id]);
+
+  return (
+    <Field
+      label={`DSH 服务范围${value.length ? `（已选 ${value.length} 个）` : ''}`}
+      hint="不选则由项目绑定服务公平调度；选择多个时任务只会在这些服务中分配。"
+    >
+      {query.loading && !query.data ? (
+        <Skeleton h={48} />
+      ) : query.error ? (
+        <Callout tone="red" icon="alert">
+          加载服务失败：{query.error}
+        </Callout>
+      ) : query.instances.length === 0 ? (
+        <Callout tone="amber" icon="info">
+          项目未绑定服务且服务池为空；任务会留在队列等待服务上线。
+        </Callout>
+      ) : (
+        <div className="stack" style={{ gap: 6 }}>
+          {query.instances.map((instance) => (
+            <Checkbox
+              key={instance.id}
+              checked={value.includes(instance.id)}
+              onChange={() => toggle(instance.id)}
+              label={
+                <span className="hstack gap-6">
+                  <span>{instance.name}</span>
+                  <span className="tiny dim mono">{instance.id}</span>
+                  <span className="tiny dim">{instance.status === 'online' ? '在线' : '离线'}</span>
+                </span>
+              }
+            />
+          ))}
+          {query.boundIds.length === 0 ? (
+            <span className="tiny dim">项目未绑定服务：以上为共享服务池。</span>
+          ) : null}
+        </div>
       )}
     </Field>
   );

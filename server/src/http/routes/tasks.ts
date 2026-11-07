@@ -39,6 +39,7 @@ export interface TaskRow {
   priority: number;
   lease_until: string | null;
   instance_id: string | null;
+  allowed_service_ids: string;
   created_by: string | null;
   executor_person_id: string | null;
   created_at: string;
@@ -130,6 +131,16 @@ function cardsForTask(db: Db, ids: string[]): WorkItem['promptCards'] {
   return rows.map((row) => ({ id: row.id, name: row.name, category: row.category as PromptCardCategory }));
 }
 
+function serviceNamesForTask(db: Db, ids: string[]): string[] {
+  if (ids.length === 0) return [];
+  const placeholders = ids.map(() => '?').join(', ');
+  return rowsOf<{ id: string; name: string }>(
+    db,
+    `SELECT id, name FROM dsh_instances WHERE id IN (${placeholders}) ORDER BY name ASC`,
+    ids,
+  ).map((row) => row.name);
+}
+
 export function executorLabel(name: string | null | undefined): string {
   const value = String(name ?? '').trim();
   return value ? `${value}@Aiwo` : 'Aiwo';
@@ -159,6 +170,8 @@ export function mapWorkItem(row: TaskRow): WorkItem {
   if (row.lease_until) item.leaseUntil = row.lease_until;
   if (row.instance_id) item.instanceId = row.instance_id;
   if (row.instance_name) item.instanceName = row.instance_name;
+  const allowedServiceIds = parseStringArray(row.allowed_service_ids);
+  if (allowedServiceIds.length) item.allowedServiceIds = allowedServiceIds;
   if (row.created_by) item.createdBy = row.created_by;
   if (row.created_by_name) item.createdByName = row.created_by_name;
   if (row.started_at) item.startedAt = row.started_at;
@@ -191,6 +204,7 @@ export function getWorkItem(db: Db, id: string): WorkItem | null {
   if (!row) return null;
   const item = mapWorkItem(row);
   item.promptCards = cardsForTask(db, item.promptCardIds);
+  if (item.allowedServiceIds?.length) item.allowedServiceNames = serviceNamesForTask(db, item.allowedServiceIds);
   return item;
 }
 
@@ -251,6 +265,7 @@ export interface CreateTaskRecordInput {
   prompt: string;
   promptCardIds?: string[];
   instanceId?: string | null;
+  instanceIds?: string[];
   source?: TaskSource;
   type?: TaskType;
   priority?: number;
@@ -260,6 +275,43 @@ export interface CreateTaskRecordInput {
   actorName?: string;
   activitySummary?: string;
   eventMessage?: string;
+}
+
+const SERVICE_ONLINE_MS = 5 * 60_000;
+
+function projectServiceIds(db: Db, projectId: string): string[] {
+  return rowsOf<{ id: string }>(
+    db,
+    `SELECT i.id FROM instance_projects ip JOIN dsh_instances i ON i.id = ip.instance_id
+      WHERE ip.project_id = ? AND i.revoked_at IS NULL ORDER BY i.id ASC`,
+    [projectId],
+  ).map((row) => row.id);
+}
+
+function onlineServiceIds(db: Db, ids: string[]): string[] {
+  if (ids.length === 0) return [];
+  const placeholders = ids.map(() => '?').join(', ');
+  const cutoff = new Date(Date.now() - SERVICE_ONLINE_MS).toISOString();
+  return rowsOf<{ id: string }>(
+    db,
+    `SELECT id FROM dsh_instances WHERE id IN (${placeholders}) AND revoked_at IS NULL
+       AND last_seen_at IS NOT NULL AND last_seen_at >= ? ORDER BY id ASC`,
+    [...ids, cutoff],
+  ).map((row) => row.id);
+}
+
+/** 项目内轮询选择服务；在线候选按 ID 稳定排序，cursor 存在 meta 里。 */
+function fairPickService(db: Db, projectId: string, candidates: string[]): string | null {
+  if (candidates.length === 0) return null;
+  const key = `service_cursor:${projectId}`;
+  const row = rowOf<{ value: string }>(db, 'SELECT value FROM meta WHERE key = ?', [key]);
+  const cursor = Number.parseInt(row?.value ?? '0', 10) || 0;
+  const chosen = candidates[cursor % candidates.length]!;
+  db.prepare(
+    `INSERT INTO meta (key, value) VALUES (?, ?)
+     ON CONFLICT(key) DO UPDATE SET value = excluded.value`,
+  ).run(key, String(cursor + 1));
+  return chosen;
 }
 
 export function createTaskRecord(db: Db, bus: EventBus, input: CreateTaskRecordInput): WorkItem {
@@ -274,13 +326,26 @@ export function createTaskRecord(db: Db, bus: EventBus, input: CreateTaskRecordI
   if (!effectiveCreatedBy) throw errors.conflict('项目没有负责人，无法确定 人员@Aiwo 执行者');
   const creator = rowOf<{ name: string }>(db, 'SELECT name FROM persons WHERE id = ?', [effectiveCreatedBy]);
   if (!creator) throw errors.conflict('任务创建人不存在，无法确定 人员@Aiwo 执行者');
-  if (input.instanceId) {
+  const boundServiceIds = projectServiceIds(db, input.projectId);
+  const explicitServices = [...new Set(input.instanceIds ?? (input.instanceId ? [input.instanceId] : []))];
+  for (const serviceId of explicitServices) {
     const service = rowOf<{ ok: number }>(
       db,
       'SELECT 1 AS ok FROM dsh_instances WHERE id = ? AND revoked_at IS NULL',
-      [input.instanceId],
+      [serviceId],
     );
-    if (!service) throw errors.badRequest('指定的 DSH 服务不存在或已吊销');
+    if (!service) throw errors.badRequest(`DSH 服务不存在或已吊销：${serviceId}`);
+    if (boundServiceIds.length > 0 && !boundServiceIds.includes(serviceId)) {
+      throw errors.badRequest(`服务 ${serviceId} 未绑定当前项目`);
+    }
+  }
+  // 有项目绑定：只在绑定服务中轮询；无绑定：保持共享池。
+  const allowedServiceIds = explicitServices.length > 0 ? explicitServices : boundServiceIds;
+  let scheduledServiceId: string | null = null;
+  if (explicitServices.length === 1) {
+    scheduledServiceId = explicitServices[0]!;
+  } else if (allowedServiceIds.length > 0) {
+    scheduledServiceId = fairPickService(db, input.projectId, onlineServiceIds(db, allowedServiceIds));
   }
   const cardIds = [...new Set(input.promptCardIds ?? [])];
   if (cardIds.length > 0) {
@@ -312,8 +377,8 @@ export function createTaskRecord(db: Db, bus: EventBus, input: CreateTaskRecordI
   db.prepare(
     `INSERT INTO work_items
        (id, project_id, source, type, title, prompt, prompt_card_ids, status, priority, lease_until, instance_id,
-        created_by, executor_person_id, created_at, started_at, finished_at, result, error, metadata, dedupe_key)
-     VALUES (?, ?, ?, ?, ?, ?, ?, 'queued', ?, NULL, ?, ?, ?, ?, NULL, NULL, NULL, NULL, ?, ?)`,
+        allowed_service_ids, created_by, executor_person_id, created_at, started_at, finished_at, result, error, metadata, dedupe_key)
+     VALUES (?, ?, ?, ?, ?, ?, ?, 'queued', ?, NULL, ?, ?, ?, ?, ?, NULL, NULL, NULL, NULL, ?, ?)`,
   ).run(
     id,
     input.projectId,
@@ -323,7 +388,8 @@ export function createTaskRecord(db: Db, bus: EventBus, input: CreateTaskRecordI
     prompt,
     JSON.stringify(cardIds),
     input.priority ?? 0,
-    input.instanceId ?? null,
+    scheduledServiceId,
+    JSON.stringify(allowedServiceIds),
     effectiveCreatedBy,
     effectiveCreatedBy,
     createdAt,
@@ -336,7 +402,7 @@ export function createTaskRecord(db: Db, bus: EventBus, input: CreateTaskRecordI
     projectId: input.projectId,
     type: 'task.created',
     message: input.eventMessage ?? `创建任务：${title}`,
-    payload: { source, type, promptCardIds: cardIds },
+    payload: { source, type, promptCardIds: cardIds, allowedServiceIds, instanceId: scheduledServiceId },
     createdAt,
   });
   recordActivity(db, bus, {
@@ -420,6 +486,7 @@ const createTaskSchema = z.object({
   prompt: z.string().min(1).max(20_000),
   promptCardIds: z.array(z.string().min(1)).max(20).optional(),
   instanceId: z.string().min(1).optional(),
+  instanceIds: z.array(z.string().min(1)).max(50).optional(),
   priority: z.number().int().min(-100).max(100).optional(),
   source: z.enum(['human', 'automation', 'webhook', 'api', 'seed']).optional(),
   type: z.enum(TASK_TYPE_VALUES).optional(),
@@ -477,7 +544,10 @@ export function registerTaskRoutes(router: Router): void {
     const sql = `${TASK_SELECT}${where.length ? ` WHERE ${where.join(' AND ')}` : ''}
       ORDER BY w.priority DESC, w.created_at DESC LIMIT ?`;
     const items = rowsOf<TaskRow>(db, sql, args).map(mapWorkItem);
-    for (const item of items) item.promptCards = cardsForTask(db, item.promptCardIds);
+    for (const item of items) {
+      item.promptCards = cardsForTask(db, item.promptCardIds);
+      if (item.allowedServiceIds?.length) item.allowedServiceNames = serviceNamesForTask(db, item.allowedServiceIds);
+    }
     rc.json(items);
   });
 
@@ -517,6 +587,7 @@ export function registerTaskRoutes(router: Router): void {
       prompt: input.prompt,
       promptCardIds: input.promptCardIds,
       instanceId: input.instanceId,
+      instanceIds: input.instanceIds,
       source: input.source ?? 'human',
       type: input.type,
       priority: input.priority,

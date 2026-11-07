@@ -110,7 +110,7 @@ export function ProjectOverviewPage() {
           value={fmtInt(counts.instances)}
           icon="server"
           tone="green"
-          hint="共享调度池中的执行资源"
+          hint="项目绑定、参与公平调度的服务"
         />
       </div>
 

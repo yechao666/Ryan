@@ -193,7 +193,7 @@ export function ProjectLayout() {
             </span>
             <span className="ws-project-meta-item">
               <Icon name="server" size={13} />
-              服务池 {counts.instances}
+              绑定服务 {counts.instances}
             </span>
             {project.repoUrl ? (
               <a className="ws-project-meta-item ws-link" href={project.repoUrl} target="_blank" rel="noreferrer">

@@ -426,6 +426,23 @@ export function TaskDrawer({ taskId, onClose, onChanged, inline = false }: TaskD
               </div>
             ) : null}
 
+            {task.allowedServiceNames?.length ? (
+              <div className="ws-drawer-section">
+                <SectionHead
+                  title="服务调度范围"
+                  desc={`任务只会在这些服务上运行${task.instanceName ? `；当前：${task.instanceName}` : ''}`}
+                />
+                <div className="badge-dot-list">
+                  {task.allowedServiceNames.map((name, index) => (
+                    <span className="chip" key={`${name}-${index}`}>
+                      <Icon name="server" size={11} />
+                      {name}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            ) : null}
+
             <div className="ws-drawer-section">
               <SectionHead
                 title="任务输出"

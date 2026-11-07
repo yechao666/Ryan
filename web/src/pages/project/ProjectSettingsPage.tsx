@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import type { ProjectMember, ProjectRole, ProjectType, Visibility } from '@shared';
+import type { DshInstance, ProjectMember, ProjectRole, ProjectType, Visibility } from '@shared';
 import { PROJECT_TYPES, VISIBILITIES } from '@shared';
 import { api } from '@lib/api.ts';
 import { fmtDate, fmtMs } from '@lib/format.ts';
@@ -11,6 +11,7 @@ import {
   Button,
   Callout,
   Card,
+  Checkbox,
   ConfirmDialog,
   EmptyState,
   Field,
@@ -57,6 +58,7 @@ export function ProjectSettingsPage() {
   const toast = useToast();
 
   const teams = useAsync(() => api.teams(), []);
+  const services = useAsync(() => api.instances(), []);
   const [form, setForm] = useState<BasicForm>({
     name: detail.project.name,
     description: detail.project.description ?? '',
@@ -67,6 +69,13 @@ export function ProjectSettingsPage() {
     ownerTeamId: detail.project.ownerTeamId ?? '',
   });
   const [savingBasic, setSavingBasic] = useState(false);
+
+  const [serviceIds, setServiceIds] = useState<string[]>(detail.project.serviceIds ?? []);
+  const [savingServices, setSavingServices] = useState(false);
+
+  useEffect(() => {
+    setServiceIds(detail.project.serviceIds ?? []);
+  }, [detail.project.id, detail.project.serviceIds]);
 
   const [mnemosProjectId, setMnemosProjectId] = useState(detail.project.mnemosProjectId ?? '');
   const [mnemosApiKey, setMnemosApiKey] = useState('');
@@ -147,6 +156,25 @@ export function ProjectSettingsPage() {
     } finally {
       setSavingBasic(false);
     }
+  };
+
+  const handleSaveServices = async () => {
+    setSavingServices(true);
+    try {
+      await api.updateProjectServices(projectId, serviceIds);
+      toast.success('项目服务绑定已保存');
+      await reload();
+    } catch (cause) {
+      toast.error(cause instanceof Error ? cause.message : '保存项目服务绑定失败');
+    } finally {
+      setSavingServices(false);
+    }
+  };
+
+  const toggleService = (serviceId: string) => {
+    setServiceIds((current) => (
+      current.includes(serviceId) ? current.filter((id) => id !== serviceId) : [...current, serviceId]
+    ));
   };
 
   const handleSaveMnemos = async () => {
@@ -420,6 +448,50 @@ export function ProjectSettingsPage() {
           {testResult ? (
             <Callout tone={testResult.tone} icon={testResult.tone === 'green' ? 'checkCircle' : 'alert'}>
               {testResult.text}
+            </Callout>
+          ) : null}
+        </Card>
+
+        <Card className="card-pad">
+          <SectionHead
+            title={
+              <>
+                <Icon name="server" size={14} />
+                项目 DSH 服务
+              </>
+            }
+            desc="绑定后，项目任务只在绑定服务之间公平调度；不绑定则使用共享服务池。"
+            actions={
+              <Button size="sm" variant="primary" icon="check" loading={savingServices} onClick={() => void handleSaveServices()}>
+                保存绑定
+              </Button>
+            }
+          />
+          <div className="stack" style={{ gap: 8, marginTop: 10 }}>
+            {(services.data ?? []).filter((service: DshInstance) => service.status !== 'revoked').map((service: DshInstance) => (
+              <Checkbox
+                key={service.id}
+                checked={serviceIds.includes(service.id)}
+                onChange={() => toggleService(service.id)}
+                label={
+                  <span className="hstack gap-6">
+                    <span>{service.name}</span>
+                    <span className="tiny dim mono">{service.id}</span>
+                    <Badge size="sm" tone={service.status === 'online' ? 'green' : 'slate'} dot>
+                      {service.status === 'online' ? '在线' : '离线'}
+                    </Badge>
+                  </span>
+                }
+              />
+            ))}
+            {!services.loading && !services.error && (services.data ?? []).filter((service: DshInstance) => service.status !== 'revoked').length === 0 ? (
+              <span className="tiny dim">暂无可用 DSH 服务。</span>
+            ) : null}
+            {services.error ? <Callout tone="red" icon="alert">加载服务列表失败：{services.error}</Callout> : null}
+          </div>
+          {serviceIds.length === 0 ? (
+            <Callout tone="amber" icon="info">
+              未绑定服务：项目任务会进入共享服务池，由任意在线服务领取。
             </Callout>
           ) : null}
         </Card>

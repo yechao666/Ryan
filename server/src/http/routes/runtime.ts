@@ -213,8 +213,19 @@ export function registerRuntimeRoutes(router: Router): void {
       `SELECT COUNT(*) AS c FROM work_items w
         JOIN projects p ON p.id = w.project_id
        WHERE p.status = 'active' AND w.status = 'queued'
-         AND (w.instance_id IS NULL OR w.instance_id = ?)`,
-      [instance.id],
+         AND (
+           w.instance_id = ?
+           OR (
+             w.instance_id IS NULL
+             AND (w.allowed_service_ids = '[]'
+                  OR EXISTS (SELECT 1 FROM json_each(w.allowed_service_ids) WHERE value = ?))
+             AND (
+               NOT EXISTS (SELECT 1 FROM instance_projects ip WHERE ip.project_id = w.project_id)
+               OR EXISTS (SELECT 1 FROM instance_projects ip WHERE ip.project_id = w.project_id AND ip.instance_id = ?)
+             )
+           )
+         )`,
+      [instance.id, instance.id, instance.id],
     );
     const row = getInstanceRow(rc.app.db, instance.id);
     rc.json({ ok: true, instance: row ? buildInstance(rc.app.db, row) : null, pending: Number(pending?.c ?? 0) });
@@ -240,9 +251,20 @@ export function registerRuntimeRoutes(router: Router): void {
         `SELECT w.id FROM work_items w
            JOIN projects p ON p.id = w.project_id
           WHERE p.status = 'active' AND w.status = 'queued'
-            AND (w.instance_id IS NULL OR w.instance_id = ?)
+            AND (
+              w.instance_id = ?
+              OR (
+                w.instance_id IS NULL
+                AND (w.allowed_service_ids = '[]'
+                     OR EXISTS (SELECT 1 FROM json_each(w.allowed_service_ids) WHERE value = ?))
+                AND (
+                  NOT EXISTS (SELECT 1 FROM instance_projects ip WHERE ip.project_id = w.project_id)
+                  OR EXISTS (SELECT 1 FROM instance_projects ip WHERE ip.project_id = w.project_id AND ip.instance_id = ?)
+                )
+              )
+            )
           ORDER BY w.priority DESC, w.created_at ASC LIMIT 1`,
-        [instance.id],
+        [instance.id, instance.id, instance.id],
       );
       if (!candidate) return null;
       db.prepare(

@@ -78,6 +78,9 @@ export interface Project {
   prompt: string;
   repoUrl?: string;
   status: 'active' | 'archived';
+  /** 项目绑定的 DSH 服务；空表示共享池。 */
+  serviceIds?: string[];
+  serviceNames?: string[];
   mnemosProjectId?: string;
   mnemosConfigured: boolean;
   /** Mnemos 项目级记忆身份；为空时使用 aiwo_<slug>。 */
@@ -211,6 +214,9 @@ export interface WorkItem {
   leaseUntil?: string;
   instanceId?: string;
   instanceName?: string;
+  /** 任务允许运行的 DSH 服务；为空表示项目池/自动。 */
+  allowedServiceIds?: string[];
+  allowedServiceNames?: string[];
   createdBy?: string;
   createdByName?: string;
   createdAt: string;
@@ -444,6 +450,7 @@ export interface CreateTaskInput {
   prompt: string;
   promptCardIds?: string[];
   instanceId?: string;
+  instanceIds?: string[];
   priority?: number;
   source?: TaskSource;
   type?: TaskType;

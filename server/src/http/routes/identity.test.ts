@@ -244,3 +244,36 @@ test('助手 manifest：包含稳定 API 清单，不泄露凭证', async () => 
   assert.ok(manifest.navigation.taskLookup.length >= 2);
   assert.equal(JSON.stringify(manifest).includes('Bearer aiwo'), false);
 });
+
+test('项目绑定服务：任务只在绑定服务间公平轮询', async () => {
+  const second = ok(await call('/api/instances', {
+    token: tokenLin,
+    method: 'POST',
+    body: { name: '绑定服务 B', kind: 'remote' },
+  }));
+  ok(await call('/api/runtime/instances/register', {
+    token: second.token,
+    method: 'POST',
+    body: { name: '绑定服务 B', host: '127.0.0.1', version: '0.1.0' },
+  }));
+  ok(await call('/api/projects/prj_calc/services', {
+    token: tokenLin,
+    method: 'PATCH',
+    body: { serviceIds: ['ins_local', second.instance.id] },
+  }));
+  const firstTask = ok(await call('/api/projects/prj_calc/tasks', {
+    token: tokenLin,
+    method: 'POST',
+    body: { title: '轮询任务 A', prompt: 'echo A', type: 'ops' },
+  }));
+  const secondTask = ok(await call('/api/projects/prj_calc/tasks', {
+    token: tokenLin,
+    method: 'POST',
+    body: { title: '轮询任务 B', prompt: 'echo B', type: 'ops' },
+  }));
+  assert.deepEqual(new Set(firstTask.allowedServiceIds), new Set(['ins_local', second.instance.id]));
+  assert.deepEqual(new Set(secondTask.allowedServiceIds), new Set(['ins_local', second.instance.id]));
+  assert.ok(firstTask.instanceId);
+  assert.ok(secondTask.instanceId);
+  assert.notEqual(firstTask.instanceId, secondTask.instanceId, '两次任务应轮询到不同服务');
+});
