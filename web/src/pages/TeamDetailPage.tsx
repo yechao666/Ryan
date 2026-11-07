@@ -33,6 +33,7 @@ import {
   useResource,
 } from '../components/projects/helpers.tsx';
 import { ProjectCard } from '../components/projects/index.tsx';
+import { PersonPicker } from '../components/people/PersonPicker.tsx';
 
 /** 团队详情：成员管理 + 团队项目。负责人 / 组织管理员可增删成员。 */
 export function TeamDetailPage() {
@@ -49,6 +50,7 @@ export function TeamDetailPage() {
 
   const [addOpen, setAddOpen] = useState(false);
   const [addPersonId, setAddPersonId] = useState('');
+  const [personPickerOpen, setPersonPickerOpen] = useState(false);
   const [addRole, setAddRole] = useState<TeamRole>('member');
   const [addError, setAddError] = useState<string | null>(null);
   const [adding, setAdding] = useState(false);
@@ -62,10 +64,12 @@ export function TeamDetailPage() {
   const canManage = Boolean(person?.isAdmin || (team && person?.id === team.leadPersonId));
   const memberIds = new Set(members.map((member) => member.personId));
   const candidates = (persons.data ?? []).filter((item) => !memberIds.has(item.id));
+  const selectedCandidate = candidates.find((item) => item.id === addPersonId);
 
   const openAdd = () => {
     setAddError(null);
     setAddPersonId('');
+    setPersonPickerOpen(false);
     setAddRole('member');
     setAddOpen(true);
   };
@@ -325,17 +329,25 @@ export function TeamDetailPage() {
                     : undefined
             }
           >
-            <Select
-              id="team-member-person"
+            {selectedCandidate ? (
+              <div className="ws-pick-item">
+                <Avatar name={selectedCandidate.name} tone={toneFor(selectedCandidate.email)} size="sm" />
+                <div className="ws-pick-main grow">
+                  <span className="ws-pick-name">{selectedCandidate.name}</span>
+                  <span className="tiny dim">{selectedCandidate.title || '—'} · {selectedCandidate.email}</span>
+                </div>
+                <Button size="sm" variant="ghost" icon="users" onClick={() => setPersonPickerOpen(true)}>更换</Button>
+              </div>
+            ) : (
+              <Button variant="outline" icon="users" onClick={() => setPersonPickerOpen(true)}>选择人员</Button>
+            )}
+            <PersonPicker
+              open={personPickerOpen}
+              people={candidates}
               value={addPersonId}
-              onChange={(event) => setAddPersonId(event.target.value)}
-              options={[
-                { value: '', label: candidates.length === 0 ? '没有可添加的人员' : '选择人员…' },
-                ...candidates.map((candidate) => ({
-                  value: candidate.id,
-                  label: `${candidate.name} · ${candidate.email}`,
-                })),
-              ]}
+              loading={persons.loading && !persons.data}
+              onClose={() => setPersonPickerOpen(false)}
+              onSelect={(selected) => setAddPersonId(selected.id)}
             />
           </Field>
 

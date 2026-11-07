@@ -29,6 +29,7 @@ import {
   type Tone,
 } from '@ui';
 import { useProject } from '../ProjectLayout.tsx';
+import { PersonPicker } from '../../components/people/PersonPicker.tsx';
 import {
   PROJECT_ROLE_OPTIONS,
   projectRoleLabel,
@@ -70,6 +71,7 @@ export function ProjectSettingsPage() {
 
   const [addOpen, setAddOpen] = useState(false);
   const [newPersonId, setNewPersonId] = useState('');
+  const [personPickerOpen, setPersonPickerOpen] = useState(false);
   const [newRole, setNewRole] = useState<ProjectRole>('developer');
   const [adding, setAdding] = useState(false);
   const [removeTarget, setRemoveTarget] = useState<ProjectMember | null>(null);
@@ -93,6 +95,7 @@ export function ProjectSettingsPage() {
   useEffect(() => {
     if (!addOpen) return;
     setNewPersonId('');
+    setPersonPickerOpen(false);
     setNewRole('developer');
   }, [addOpen]);
 
@@ -105,10 +108,7 @@ export function ProjectSettingsPage() {
     [persons.data, existingMemberIds],
   );
 
-  useEffect(() => {
-    if (!addOpen || newPersonId) return;
-    if (availablePersons[0]) setNewPersonId(availablePersons[0].id);
-  }, [addOpen, newPersonId, availablePersons]);
+  const selectedPerson = availablePersons.find((item) => item.id === newPersonId);
 
   const teamOptions = useMemo(
     () => [{ value: '', label: '不归属团队' }, ...(teams.data ?? []).map((team) => ({ value: team.id, label: team.name }))],
@@ -392,34 +392,32 @@ export function ProjectSettingsPage() {
           </>
         }
       >
-        <Field label="成员" required>
+        <Field label="成员" required hint="人员较多时可在对话框中搜索姓名、邮箱或职位。">
           {persons.loading && !persons.data ? (
-            <div className="vstack gap-8">
-              {[0, 1, 2].map((item) => (
-                <Skeleton key={item} h={46} style={{ borderRadius: 10 }} />
-              ))}
-            </div>
+            <Skeleton h={46} style={{ borderRadius: 10 }} />
           ) : persons.error ? (
-            <Callout tone="red" icon="alert">
-              加载成员列表失败：{persons.error}
-            </Callout>
+            <Callout tone="red" icon="alert">加载成员列表失败：{persons.error}</Callout>
           ) : !availablePersons.length ? (
-            <EmptyState
-              icon="users"
-              title="没有可添加的成员"
-              description="组织内成员都已在项目中。"
-              compact
-            />
+            <EmptyState icon="users" title="没有可添加的成员" description="组织内成员都已在项目中。" compact />
+          ) : selectedPerson ? (
+            <div className="ws-pick-item">
+              <Avatar name={selectedPerson.name} tone={(selectedPerson.avatarColor as never) ?? 'violet'} size="sm" />
+              <div className="ws-pick-main grow">
+                <span className="ws-pick-name">{selectedPerson.name}</span>
+                <span className="tiny dim">{selectedPerson.title || '—'} · {selectedPerson.email}</span>
+              </div>
+              <Button size="sm" variant="ghost" icon="users" onClick={() => setPersonPickerOpen(true)}>更换</Button>
+            </div>
           ) : (
-            <Select
-              value={newPersonId}
-              options={availablePersons.map((item) => ({
-                value: item.id,
-                label: `${item.name} · ${item.title || item.email}`,
-              }))}
-              onChange={(event) => setNewPersonId(event.target.value)}
-            />
+            <Button variant="outline" icon="users" onClick={() => setPersonPickerOpen(true)}>选择人员</Button>
           )}
+          <PersonPicker
+            open={personPickerOpen}
+            people={availablePersons}
+            value={newPersonId}
+            onClose={() => setPersonPickerOpen(false)}
+            onSelect={(selected) => setNewPersonId(selected.id)}
+          />
         </Field>
         <Field label="项目角色" required hint="所有者可删除项目，维护者可管理服务、提示卡与自动化，开发者可创建任务，观察者只读。">
           <Select
