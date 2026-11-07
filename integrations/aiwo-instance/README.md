@@ -262,3 +262,13 @@ node --check agent.mjs && node --check lib/*.mjs
 - `$DSH_HOME/.credentials.yaml` 的 `DEEPSEEK_API_KEY` 只在环境变量缺失时读取并注入子进程，不打印。
 - 代理不向 DSH 暴露文件系统/终端 ACP 能力（`clientCapabilities` 为 false），工具执行仍由 DSH 宿主自己负责。
 - 建议以独立系统用户运行，workspace 只放任务相关代码。
+
+## 项目记忆工具
+
+任务执行时，代理会通过 `--patch aiwo-memory-tools.cordis.yml` 向 DSH 注册：
+
+- `aiwo_memory_search`
+- `aiwo_memory_context`
+- `aiwo_memory_add`
+
+工具只调用当前任务项目下的 runtime 记忆 API，不接受任意 projectId；服务 token 通过临时 `HIVE_AUTH_FILE` 注入，不写入日志。

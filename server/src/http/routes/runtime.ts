@@ -35,7 +35,7 @@ import {
   truncateSummary,
   type TaskRow,
 } from './tasks.ts';
-import { addMemory, buildMemoryContext, memoryAgentIdOf, taskMemoryText } from '../../memory/store.ts';
+import { addMemory, buildMemoryContext, memoryAgentIdOf, searchMemories, taskMemoryText } from '../../memory/store.ts';
 import { buildInstance, getInstanceRow } from './identity-helpers.ts';
 
 const LEASE_MS = 3 * 60_000;
@@ -115,6 +115,21 @@ const runtimeEventsSchema = z.object({
     payload: z.record(z.unknown()).optional(),
     at: z.string().optional(),
   })).min(1).max(100),
+});
+
+const memorySearchSchema = z.object({
+  query: z.string().trim().min(1).max(1_000),
+  topK: z.number().int().min(1).max(20).optional().default(8),
+});
+
+const memoryAddSchema = z.object({
+  content: z.string().trim().min(1).max(20_000),
+  title: z.string().trim().max(200).optional(),
+  category: z.enum(['fact', 'decision', 'note', 'task_result']).optional(),
+});
+
+const memoryContextSchema = z.object({
+  query: z.string().trim().max(1_000).optional(),
 });
 
 const completeSchema = z.object({
@@ -332,6 +347,48 @@ export function registerRuntimeRoutes(router: Router): void {
     const instance = authenticateInstance(rc);
     const task = requireInstanceTask(rc.app.db, rc.params.id, instance.id);
     rc.json({ id: task.id, status: task.status, updatedAt: task.finished_at ?? task.started_at ?? task.created_at });
+  });
+
+  router.get('/api/runtime/tasks/current', (rc) => {
+    const instance = authenticateInstance(rc);
+    const task = rowOf<{ id: string; project_id: string; title: string }>(
+      rc.app.db,
+      "SELECT id, project_id, title FROM work_items WHERE instance_id = ? AND status IN ('running','waiting_input') ORDER BY started_at DESC LIMIT 1",
+      [instance.id],
+    );
+    if (!task) { noContent(rc); return; }
+    rc.json({ taskId: task.id, projectId: task.project_id, title: task.title });
+  });
+
+  router.post('/api/runtime/tasks/:id/memory/search', async (rc) => {
+    const instance = authenticateInstance(rc);
+    const task = requireInstanceTask(rc.app.db, rc.params.id, instance.id);
+    const input = await rc.body(memorySearchSchema);
+    rc.json(searchMemories(rc.app.db, task.project_id, input.query, input.topK));
+  });
+
+  router.get('/api/runtime/tasks/:id/memory/context', (rc) => {
+    const instance = authenticateInstance(rc);
+    const task = requireInstanceTask(rc.app.db, rc.params.id, instance.id);
+    const params = rc.query(memoryContextSchema);
+    rc.json(buildMemoryContext(rc.app.db, task.project_id, params.query ?? '', 1200));
+  });
+
+  router.post('/api/runtime/tasks/:id/memory/add', async (rc) => {
+    const instance = authenticateInstance(rc);
+    const task = requireInstanceTask(rc.app.db, rc.params.id, instance.id);
+    const input = await rc.body(memoryAddSchema);
+    const memory = addMemory(rc.app.db, {
+      projectId: task.project_id,
+      content: input.content,
+      title: input.title,
+      category: input.category ?? 'note',
+      source: 'agent',
+      taskId: task.id,
+      createdBy: task.created_by,
+      metadata: { sourceTaskId: task.id, instanceId: instance.id },
+    });
+    rc.json(memory, 201);
   });
 
   router.post('/api/runtime/tasks/:id/progress', async (rc) => {

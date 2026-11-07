@@ -343,6 +343,25 @@ test('内置记忆：写入、claim 注入、完成写回', async () => {
   assert.equal(claim.task.id, task.id);
   assert.ok(claim.memory.enabled);
   assert.match(claim.memory.context, /支付回调必须验证签名/);
+  const current = ok(await call('/api/runtime/tasks/current', { token: service.token }));
+  assert.equal(current.taskId, task.id);
+  const toolSearch = ok(await call(`/api/runtime/tasks/${task.id}/memory/search`, {
+    token: service.token,
+    method: 'POST',
+    body: { query: '支付回调', topK: 5 },
+  }));
+  assert.ok(toolSearch.hits.some((hit: Json) => hit.id === memory.id));
+  const toolContext = ok(await call(`/api/runtime/tasks/${task.id}/memory/context?query=支付回调`, {
+    token: service.token,
+  }));
+  assert.match(toolContext.prompt, /支付回调必须验证签名/);
+  const toolAdd = ok(await call(`/api/runtime/tasks/${task.id}/memory/add`, {
+    token: service.token,
+    method: 'POST',
+    body: { content: 'DSH 工具写入的项目记忆', category: 'note' },
+  }));
+  assert.equal(toolAdd.category, 'note');
+  assert.equal(toolAdd.taskId, task.id);
   ok(await call(`/api/runtime/tasks/${task.id}/complete`, {
     token: service.token,
     method: 'POST',

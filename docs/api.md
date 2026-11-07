@@ -78,6 +78,11 @@ Aiwo 任务执行者固定为「创建人@Aiwo」；任务不支持对话，只�
 | POST | `/api/runtime/tasks/:id/progress` | 进展 + 续租 |
 | POST | `/api/runtime/tasks/:id/events` | 批量运行时事件（≤100） |
 | POST | `/api/runtime/tasks/:id/complete` | `{status,summary,decisions,lessons,sessionId}` |
+| GET | `/api/runtime/tasks/current` | 当前服务正在执行的任务 |
+| POST | `/api/runtime/tasks/:id/memory/search` | `{query,topK?}` 当前任务项目记忆检索 |
+| GET | `/api/runtime/tasks/:id/memory/context?query=` | 当前任务项目记忆简报 |
+| POST | `/api/runtime/tasks/:id/memory/add` | `{content,title?,category?}` 写入当前项目记忆 |
+
 | GET | `/api/tasks/:id/runtime-events?after=seq` | 控制台读取运行时事件 |
 
 ## 自动化

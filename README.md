@@ -103,6 +103,7 @@ node integrations/aiwo-instance/agent.mjs \
 - 服务：项目可绑定多个服务，任务在绑定服务间公平轮询；项目未绑定时使用默认服务（未设置默认服务则共享池）；任务可指定一个或多个允许服务
 - 状态：queued / assigned / running / done / failed / cancelled
 - 执行过程：`session / thinking / text / tool_call / tool_result / status / final`
+- 执行：DSH 自动注册 `aiwo_memory_search/context/add` 三个项目记忆工具
 - 完成：写任务结果 + 内置项目记忆
 - 无任务对话；任务详情页只读展示「结果 / 过程」
 

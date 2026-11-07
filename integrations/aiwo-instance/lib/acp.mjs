@@ -182,7 +182,9 @@ export class AcpRunner {
     this.closing = false;
     if (this.child) this.killChild();
 
-    const child = spawn(this.config.dshBin, ['--profile', this.config.profile], {
+    const args = ['--profile', this.config.profile];
+    if (this.config.memoryToolPatch) args.push('--patch', this.config.memoryToolPatch);
+    const child = spawn(this.config.dshBin, args, {
       cwd: this.config.workspace,
       env: buildDshEnv(this.config),
       stdio: ['pipe', 'pipe', 'pipe'],

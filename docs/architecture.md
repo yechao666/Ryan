@@ -77,6 +77,7 @@ POST /api/runtime/tasks/:id/complete
 
 - 项目级记忆表 `project_memories`，按 `project_id` 隔离
 - claim 时由 Aiwo 生成 memory context，随 `memory.context` 注入 prompt
+- 任务 DSH 通过 `--patch` 注册 `aiwo_memory_search/context/add`，工具只能访问当前任务所属项目
 - 完成后 Aiwo 直接写入 `project_memories`，不依赖外部服务
 - 记忆身份由项目决定：`aiwo_<slug>`
 - 检索采用本地词项/中文二元组 + 时间衰减评分；上下文有 token 预算

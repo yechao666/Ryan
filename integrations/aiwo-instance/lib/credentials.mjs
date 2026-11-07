@@ -5,7 +5,7 @@
  */
 import os from 'node:os';
 import path from 'node:path';
-import { readFileSync } from 'node:fs';
+import { readFileSync, writeFileSync } from 'node:fs';
 
 export function resolveDshHome(dshHome) {
   return dshHome || process.env.DSH_HOME || path.join(os.homedir(), '.dsh');
@@ -46,6 +46,16 @@ export function buildDshEnv(config, baseEnv = process.env) {
   if (config.credentials && !env.DEEPSEEK_API_KEY) {
     const key = readCredentialRef('DEEPSEEK_API_KEY', config.dshHome);
     if (key) env.DEEPSEEK_API_KEY = key;
+  }
+  if (config.base) env.AIWO_API_BASE = config.base;
+  if (config.token) {
+    const file = path.join(os.tmpdir(), `aiwo-instance-${process.pid}.token`);
+    try {
+      writeFileSync(file, config.token, { mode: 0o600 });
+      env.HIVE_AUTH_FILE = file;
+    } catch {
+      /* 记忆工具会报告缺少凭证；不影响任务执行 */
+    }
   }
   return env;
 }

@@ -26,7 +26,9 @@ function eventPayload(event) {
  * @param {{info: Function, warn: Function, debug: Function}} options.logger
  */
 export async function runHeadless({ config, prompt, onEvent, signal, logger }) {
-  const args = ['--profile', config.headlessProfile, '--json', '-'];
+  const args = ['--profile', config.headlessProfile, '--json'];
+  if (config.memoryToolPatch) args.push('--patch', config.memoryToolPatch);
+  args.push('-');
   const child = spawn(config.dshBin, args, {
     cwd: config.workspace,
     env: buildDshEnv(config),

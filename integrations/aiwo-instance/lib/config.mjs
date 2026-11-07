@@ -11,6 +11,7 @@ import { fileURLToPath } from 'node:url';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const pkg = JSON.parse(readFileSync(path.join(here, '..', 'package.json'), 'utf8'));
+export const MEMORY_TOOL_PATCH = path.join(here, '..', 'aiwo-memory-tools.cordis.yml');
 
 export const PLUGIN_VERSION = pkg.version ?? '0.0.0';
 export const DEFAULT_BASE = 'http://127.0.0.1:4500';
@@ -241,6 +242,7 @@ export function parseConfig(argv, env = process.env) {
     dshBin: cli['dsh-bin'] ?? env.AIWO_DSH_BIN ?? 'dsh',
     profile: cli.profile ?? env.AIWO_DSH_PROFILE ?? 'acp',
     headlessProfile: cli['headless-profile'] ?? env.AIWO_HEADLESS_PROFILE ?? 'headless',
+    memoryToolPatch: env.AIWO_MEMORY_TOOL_PATCH || MEMORY_TOOL_PATCH,
     dshHome,
     name: cli.name ?? env.AIWO_INSTANCE_NAME ?? os.hostname(),
     host: cli.host ?? env.AIWO_INSTANCE_HOST ?? os.hostname(),
