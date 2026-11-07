@@ -25,6 +25,7 @@ import {
   SectionHead,
   Select,
   Skeleton,
+  Switch,
   Table,
   Textarea,
   useToast,
@@ -115,12 +116,12 @@ export function ProjectMemoryPage() {
   const [dreamEnabled, setDreamEnabled] = useState(true);
   const [dreamInterval, setDreamInterval] = useState('24');
   const [dreamUnit, setDreamUnit] = useState('hours');
-  const [savingDream, setSavingDream] = useState(false);
   const [dreaming, setDreaming] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [savingSettings, setSavingSettings] = useState(false);
 
   const brief = useAsync(() => api.memoryBrief(projectId), [projectId], true);
   const [briefMax, setBriefMax] = useState('500');
-  const [savingBrief, setSavingBrief] = useState(false);
 
   useEffect(() => {
     if (brief.data) setBriefMax(String(brief.data.maxChars));
@@ -225,23 +226,57 @@ export function ProjectMemoryPage() {
     }
   };
 
-  const saveDream = async () => {
+  const intervalLabel = (minutes: number): string => {
+    if (minutes % 1440 === 0) return `${minutes / 1440} 天`;
+    if (minutes % 60 === 0) return `${minutes / 60} 小时`;
+    return `${minutes} 分钟`;
+  };
+
+  const openSettings = () => {
+    const settings = dream.data?.settings;
+    if (settings) {
+      setDreamEnabled(settings.enabled);
+      if (settings.intervalMinutes % 1440 === 0) {
+        setDreamInterval(String(settings.intervalMinutes / 1440));
+        setDreamUnit('days');
+      } else if (settings.intervalMinutes % 60 === 0) {
+        setDreamInterval(String(settings.intervalMinutes / 60));
+        setDreamUnit('hours');
+      } else {
+        setDreamInterval(String(settings.intervalMinutes));
+        setDreamUnit('minutes');
+      }
+    }
+    setBriefMax(String(brief.data?.maxChars ?? 500));
+    setSettingsOpen(true);
+  };
+
+  const saveSettings = async () => {
     const value = Number(dreamInterval);
+    const briefChars = Number(briefMax);
     if (!Number.isFinite(value) || value <= 0) {
       toast.error('请输入有效的做梦间隔');
       return;
     }
+    if (!Number.isFinite(briefChars) || briefChars < 100 || briefChars > 5000) {
+      toast.error('简报字数需在 100–5000 之间');
+      return;
+    }
     const multiplier = dreamUnit === 'days' ? 1440 : dreamUnit === 'hours' ? 60 : 1;
     const minutes = Math.max(1, Math.round(value * multiplier));
-    setSavingDream(true);
+    setSavingSettings(true);
     try {
-      await api.updateMemoryDream(projectId, { enabled: dreamEnabled, intervalMinutes: minutes });
-      toast.success('做梦设置已保存');
-      await dream.refresh();
+      await Promise.all([
+        api.updateMemoryDream(projectId, { enabled: dreamEnabled, intervalMinutes: minutes }),
+        api.updateMemoryBrief(projectId, briefChars),
+      ]);
+      toast.success('记忆整理设置已保存');
+      setSettingsOpen(false);
+      await Promise.all([dream.refresh(), brief.refresh()]);
     } catch (cause) {
-      toast.error(cause instanceof Error ? cause.message : '保存做梦设置失败');
+      toast.error(cause instanceof Error ? cause.message : '保存设置失败');
     } finally {
-      setSavingDream(false);
+      setSavingSettings(false);
     }
   };
 
@@ -380,54 +415,54 @@ export function ProjectMemoryPage() {
         </Card>
       </div>
 
-      <Card className="card-pad">
+      <Card className="card-pad ws-memory-dream-card">
         <SectionHead
           title={<><Icon name="sparkles" size={14} />记忆做梦</>}
-          desc="增量巩固：只处理上次做梦后新增的记忆，归纳成高层洞见；不会重跑旧记忆，也不会执行任务。"
+          desc="增量巩固：只处理上次做梦后新增的候选记忆，归纳为有效洞见；不会重跑旧记忆，也不会执行任务。"
           actions={
-            <Button size="sm" variant="primary" icon="sparkles" loading={dreaming} onClick={() => void runDreamNow()}>
-              立即做梦
-            </Button>
+            <div className="hstack gap-6">
+              <Button size="sm" variant="ghost" icon="settings" onClick={openSettings}>
+                设置
+              </Button>
+              <Button size="sm" variant="primary" icon="sparkles" loading={dreaming} onClick={() => void runDreamNow()}>
+                立即做梦
+              </Button>
+            </div>
           }
         />
-        <div className="mt-12" style={{ display: 'flex', alignItems: 'flex-end', gap: 12, flexWrap: 'wrap' }}>
-          <Checkbox
-            checked={dreamEnabled}
-            onChange={() => setDreamEnabled((value) => !value)}
-            label="启用定时做梦"
-          />
-          <Field label="每隔">
-            <div className="hstack gap-4">
-              <Input
-                style={{ width: 88 }}
-                value={dreamInterval}
-                inputMode="numeric"
-                onChange={(event) => setDreamInterval(event.target.value.replace(/[^0-9.]/g, ''))}
-              />
-              <Select
-                value={dreamUnit}
-                options={[
-                  { value: 'minutes', label: '分钟' },
-                  { value: 'hours', label: '小时' },
-                  { value: 'days', label: '天' },
-                ]}
-                onChange={(event) => setDreamUnit(event.target.value)}
-              />
-            </div>
-          </Field>
-          <Button size="sm" variant="outline" icon="check" loading={savingDream} onClick={() => void saveDream()}>
-            保存设置
-          </Button>
-          <span className="tiny dim">
-            待整理 <strong>{dream.data?.pendingCount ?? 0}</strong> 条
-            {dream.data?.settings.lastAt ? ` · 上次 ${fmtRelative(dream.data.settings.lastAt)}` : ' · 尚未做梦'}
-          </span>
+        <div className="ws-dream-status-grid mt-12">
+          <div>
+            <span className="pm-label">状态</span>
+            <Badge tone={dream.data?.settings.enabled ? 'green' : 'slate'} dot>
+              {dream.data?.settings.enabled ? '已启用' : '已停用'}
+            </Badge>
+          </div>
+          <div>
+            <span className="pm-label">周期</span>
+            <strong>{dream.data?.settings.enabled ? intervalLabel(dream.data.settings.intervalMinutes) : '—'}</strong>
+          </div>
+          <div>
+            <span className="pm-label">待整理</span>
+            <strong>{dream.data?.pendingCount ?? 0} 条</strong>
+          </div>
+          <div>
+            <span className="pm-label">上次做梦</span>
+            <span>{dream.data?.settings.lastAt ? fmtRelative(dream.data.settings.lastAt) : '尚未做梦'}</span>
+          </div>
         </div>
         {dream.error ? <Callout tone="red" icon="alert">{dream.error}</Callout> : null}
         {dream.data?.lastRun ? (
-          <div className="tiny dim mt-8">
-            最近一次：{dream.data.lastRun.status} · 输入 {dream.data.lastRun.inputCount} 条 · 产出 {dream.data.lastRun.insightCount} 条
-            {dream.data.lastRun.summary ? ` · ${dream.data.lastRun.summary}` : ''}
+          <div className="ws-dream-last-run">
+            <div className="hstack gap-6 wrap">
+              <span className="tiny dim">最近一次</span>
+              <Badge size="sm" tone={dream.data.lastRun.status === 'completed' ? 'green' : dream.data.lastRun.status === 'failed' ? 'red' : 'slate'}>
+                {dream.data.lastRun.status}
+              </Badge>
+              <span className="tiny dim">输入 {dream.data.lastRun.inputCount} 条 · 产出 {dream.data.lastRun.insightCount} 条洞见</span>
+            </div>
+            {dream.data.lastRun.summary ? (
+              <p className="tiny dim clamp-2" style={{ margin: '6px 0 0' }}>{dream.data.lastRun.summary}</p>
+            ) : null}
           </div>
         ) : null}
       </Card>
@@ -508,49 +543,19 @@ export function ProjectMemoryPage() {
       <Card className="card-pad">
         <SectionHead
           title={<><Icon name="sparkles" size={14} />记忆简报</>}
-          desc="只取最近的持久记忆/洞见，按字数上限生成；任务领取时会作为记忆上下文注入 DSH。"
+          desc="只取最近的持久记忆/洞见，由本机 DSH 归纳成有字数上限的上下文，任务领取时注入。"
           actions={
-            <Button size="sm" variant="ghost" icon="refresh" onClick={() => void brief.refresh()}>
-              刷新
-            </Button>
+            <div className="hstack gap-6">
+              <span className="tiny dim">上限 {brief.data?.maxChars ?? 500} 字</span>
+              <Button size="sm" variant="ghost" icon="settings" onClick={openSettings}>
+                设置
+              </Button>
+              <Button size="sm" variant="ghost" icon="refresh" onClick={() => void brief.refresh()}>
+                刷新
+              </Button>
+            </div>
           }
         />
-        <div className="mt-12" style={{ display: 'flex', alignItems: 'flex-end', gap: 12, flexWrap: 'wrap' }}>
-          <Field label="最大字数">
-            <Input
-              style={{ width: 100 }}
-              value={briefMax}
-              inputMode="numeric"
-              onChange={(event) => setBriefMax(event.target.value.replace(/[^0-9]/g, ''))}
-            />
-          </Field>
-          <Button
-            size="sm"
-            variant="outline"
-            icon="check"
-            loading={savingBrief}
-            onClick={async () => {
-              const value = Number(briefMax);
-              if (!Number.isFinite(value) || value < 100 || value > 5000) {
-                toast.error('简报字数需在 100–5000 之间');
-                return;
-              }
-              setSavingBrief(true);
-              try {
-                await api.updateMemoryBrief(projectId, value);
-                toast.success('记忆简报字数已保存');
-                await brief.refresh();
-              } catch (cause) {
-                toast.error(cause instanceof Error ? cause.message : '保存简报设置失败');
-              } finally {
-                setSavingBrief(false);
-              }
-            }}
-          >
-            保存
-          </Button>
-          <span className="tiny dim">默认 500 字 · 仅最近记忆/洞见</span>
-        </div>
         <div className="mt-12">
           {brief.loading && !brief.data ? (
             <Skeleton h={140} style={{ borderRadius: 12 }} />
@@ -567,6 +572,59 @@ export function ProjectMemoryPage() {
           )}
         </div>
       </Card>
+
+      <Modal
+        open={settingsOpen}
+        onClose={() => setSettingsOpen(false)}
+        title="记忆整理设置"
+        description="配置定时做梦和任务记忆简报。"
+        footer={
+          <>
+            <Button variant="ghost" onClick={() => setSettingsOpen(false)}>取消</Button>
+            <Button variant="primary" icon="check" loading={savingSettings} onClick={() => void saveSettings()}>
+              保存设置
+            </Button>
+          </>
+        }
+      >
+        <div className="vstack gap-16">
+          <div className="ws-settings-row">
+            <div>
+              <div className="strong">启用定时做梦</div>
+              <div className="tiny dim">后台按周期整理候选记忆，只处理新增内容。</div>
+            </div>
+            <Switch checked={dreamEnabled} onChange={setDreamEnabled} />
+          </div>
+          <Field label="做梦周期" hint="最短 1 分钟，最长 30 天。">
+            <div className="ws-dream-cycle">
+              <Input
+                value={dreamInterval}
+                inputMode="numeric"
+                className="ws-dream-number"
+                onChange={(event) => setDreamInterval(event.target.value.replace(/[^0-9.]/g, ''))}
+              />
+              <Select
+                value={dreamUnit}
+                className="ws-dream-unit"
+                options={[
+                  { value: 'minutes', label: '分钟' },
+                  { value: 'hours', label: '小时' },
+                  { value: 'days', label: '天' },
+                ]}
+                onChange={(event) => setDreamUnit(event.target.value)}
+              />
+            </div>
+          </Field>
+          <Field label="记忆简报最大字数" hint="100–5000 字，默认 500；仅取最近记忆/洞见。">
+            <Input
+              value={briefMax}
+              inputMode="numeric"
+              className="ws-dream-number"
+              onChange={(event) => setBriefMax(event.target.value.replace(/[^0-9]/g, ''))}
+            />
+          </Field>
+        </div>
+      </Modal>
 
       <Modal
         open={addOpen}

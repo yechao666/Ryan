@@ -1949,3 +1949,42 @@
   cursor: pointer;
 }
 .ws-memory-hit[role='button'] { cursor: pointer; }
+
+/* 记忆做梦/简报设置 */
+.ws-dream-status-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+  padding: 12px 14px;
+  border: 1px solid var(--border-faint);
+  border-radius: 10px;
+  background: var(--surface-sunken);
+}
+.ws-dream-status-grid > div {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+.ws-dream-status-grid .pm-label { margin: 0; }
+.ws-dream-last-run {
+  margin-top: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--border-faint);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.015);
+}
+.ws-settings-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--border-faint);
+}
+.ws-dream-cycle { display: flex; align-items: center; gap: 8px; }
+.ws-dream-number { width: 110px !important; }
+.ws-dream-unit { width: 120px !important; }
+@media (max-width: 760px) {
+  .ws-dream-status-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
