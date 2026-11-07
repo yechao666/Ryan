@@ -59,6 +59,22 @@ async function streamText(res: ServerResponse, text: string): Promise<void> {
   }
 }
 
+/** 思考块逐片下发；第一片带 start，前端据此新开一个折叠块。 */
+async function streamThinking(res: ServerResponse, text: string): Promise<void> {
+  const chars = Array.from(text);
+  if (chars.length === 0) return;
+  const maxChunks = 40;
+  const size = Math.max(1, Math.ceil(chars.length / maxChunks));
+  for (let index = 0; index < chars.length; index += size) {
+    if (res.writableEnded || res.destroyed) return;
+    sseWrite(res, 'thinking', {
+      delta: chars.slice(index, index + size).join(''),
+      start: index === 0,
+    });
+    if (chars.length > size) await sleep(8);
+  }
+}
+
 export function registerAssistantRoutes(router: Router): void {
   // POST /api/assistant/chat/stream —— SSE 流式助手；DSH 事件实时转发。
   router.post('/api/assistant/chat/stream', async (rc) => {
@@ -126,15 +142,17 @@ export function registerAssistantRoutes(router: Router): void {
               await streamText(res, delta);
             }
           } else if (type === 'thinking' && typeof event.text === 'string' && event.text.trim()) {
-            sseWrite(res, 'thinking', { text: event.text });
+            await streamThinking(res, event.text);
           } else if (type === 'status') {
             sseWrite(res, 'status', { phase: event.phase ?? '', turn: event.turn, step: event.step });
           } else if (type === 'tool' || type === 'tool_call' || type === 'tool_result') {
             sseWrite(res, 'tool', {
               kind: type === 'tool_result' ? 'tool_result' : 'tool_call',
+              callId: event.callId,
               tool: event.tool ?? event.title ?? 'tool',
+              input: event.input,
               status: event.status,
-              detail: event.detail ?? event.content,
+              result: event.result ?? event.content,
             });
           } else if (type === 'error') {
             sseWrite(res, 'error', { message: String(event.message ?? '助手运行错误') });

@@ -4,11 +4,25 @@ import { api, ApiError } from '@lib/api.ts';
 import { Badge, Button, Icon, IconButton, Textarea, useToast } from '@ui';
 import { Markdown } from '../project/Markdown.tsx';
 
-interface ToolStep {
+interface ThinkingBlock {
   id: string;
-  tool: string;
-  status?: string;
+  kind: 'thinking';
+  text: string;
+  done: boolean;
 }
+
+interface ToolBlock {
+  id: string;
+  kind: 'tool';
+  callId?: string;
+  tool: string;
+  input?: unknown;
+  result?: string;
+  status?: string;
+  done: boolean;
+}
+
+type ProcessBlock = ThinkingBlock | ToolBlock;
 
 interface ChatMessage {
   id: string;
@@ -17,8 +31,8 @@ interface ChatMessage {
   tone?: 'error';
   streaming?: boolean;
   status?: string;
-  thinking?: string;
-  tools?: ToolStep[];
+  process?: ProcessBlock[];
+  processOpen?: boolean;
 }
 
 const WELCOME =
@@ -36,6 +50,78 @@ function statusLabel(phase: string): string {
     case 'turn_end': return '正在收尾…';
     default: return '正在处理…';
   }
+}
+
+function inputText(input: unknown): string {
+  if (!input || typeof input !== 'object') return typeof input === 'string' ? input : '';
+  const record = input as Record<string, unknown>;
+  if (typeof record.command === 'string') return record.command;
+  if (typeof record.path === 'string') return record.path;
+  try {
+    return JSON.stringify(input);
+  } catch {
+    return '';
+  }
+}
+
+function ProcessPanel({ message, onToggle }: { message: ChatMessage; onToggle: () => void }) {
+  const blocks = message.process ?? [];
+  if (blocks.length === 0) return null;
+  const toolCount = blocks.filter((block) => block.kind === 'tool').length;
+  const showBody = Boolean(message.processOpen);
+  return (
+    <div className={`cx-process ${message.streaming ? 'is-live' : ''}`}>
+      <button type="button" className="cx-process-head" onClick={onToggle} aria-expanded={showBody}>
+        <span className="cx-process-title">
+          <Icon name="brain" size={12} />
+          过程
+        </span>
+        <span className="cx-process-count">
+          {blocks.length} 段{toolCount ? ` · ${toolCount} 个工具` : ''}
+        </span>
+        <span className="cx-process-toggle">{message.streaming ? '实时' : message.processOpen ? '收起' : '展开'}</span>
+      </button>
+      {showBody ? (
+        <div className="cx-process-body">
+          {blocks.map((block, index) => {
+            const active = message.streaming && index === blocks.length - 1;
+            const bodyVisible = message.streaming ? active : Boolean(message.processOpen);
+            return (
+              <div className={`cx-process-step${active ? ' is-active' : ''}`} key={block.id}>
+                <div className="cx-process-step__head">
+                  <span className={`cx-process-step__icon tone-${block.kind === 'thinking' ? 'violet' : 'amber'}`}>
+                    <Icon name={block.kind === 'thinking' ? 'brain' : 'terminal'} size={11} />
+                  </span>
+                  <span className="cx-process-step__name">
+                    {block.kind === 'thinking' ? '思考' : block.tool}
+                  </span>
+                  {block.kind === 'thinking' ? (
+                    <span className="cx-process-step__meta">{block.text.length} 字</span>
+                  ) : (
+                    <span className="cx-process-step__meta">
+                      {block.done ? block.result?.trim().slice(0, 24) || '完成' : block.status === 'completed' ? '完成' : '执行中…'}
+                    </span>
+                  )}
+                </div>
+                {bodyVisible ? (
+                  <div className="cx-process-step__body">
+                    {block.kind === 'thinking' ? (
+                      <div className="cx-process-thinking">{block.text}</div>
+                    ) : (
+                      <>
+                        {inputText(block.input) ? <pre className="cx-process-code">{inputText(block.input)}</pre> : null}
+                        {block.result?.trim() ? <pre className="cx-process-result">{block.result.trim().slice(0, 4_000)}</pre> : null}
+                      </>
+                    )}
+                  </div>
+                ) : null}
+              </div>
+            );
+          })}
+        </div>
+      ) : null}
+    </div>
+  );
 }
 
 export function Assistant() {
@@ -83,6 +169,16 @@ export function Assistant() {
     setMessages((current) => current.map((message) => (message.id === id ? { ...message, ...patch(message) } : message)));
   };
 
+  const updateProcess = (id: string, updater: (blocks: ProcessBlock[]) => ProcessBlock[]): void => {
+    setMessages((current) => current.map((message) => (
+      message.id === id ? { ...message, process: updater(message.process ?? []) } : message
+    )));
+  };
+
+  const finishProcess = (id: string): void => {
+    updateProcess(id, (blocks) => blocks.map((block) => ({ ...block, done: true })));
+  };
+
   const send = async (raw?: string): Promise<void> => {
     const message = (raw ?? input).trim();
     if (!message || busy) return;
@@ -91,7 +187,15 @@ export function Assistant() {
     setMessages((current) => [
       ...current,
       { id: uid(), role: 'user', text: message },
-      { id: assistantId, role: 'assistant', text: '', streaming: true, status: '正在连接 DSH 助手…', tools: [] },
+      {
+        id: assistantId,
+        role: 'assistant',
+        text: '',
+        streaming: true,
+        status: '正在连接 DSH 助手…',
+        process: [],
+        processOpen: true,
+      },
     ]);
     setBusy(true);
     const controller = new AbortController();
@@ -112,57 +216,116 @@ export function Assistant() {
               status: current.text ? undefined : statusLabel(data.phase),
             }));
           },
-          onThinking: (text) => {
-            if (text.trim()) patchMessage(assistantId, () => ({ thinking: text }));
+          onThinking: (delta, start) => {
+            if (!delta) return;
+            updateProcess(assistantId, (blocks) => {
+              const last = blocks[blocks.length - 1];
+              if (!start && last?.kind === 'thinking' && !last.done) {
+                return [...blocks.slice(0, -1), { ...last, text: last.text + delta }];
+              }
+              return [...blocks, { id: uid(), kind: 'thinking', text: delta, done: false }];
+            });
+            patchMessage(assistantId, () => ({ status: '正在思考…', processOpen: true }));
           },
           onTool: (data) => {
-            patchMessage(assistantId, (current) => {
-              const tools = current.tools ?? [];
-              const existing = tools.findIndex((item) => item.tool === data.tool);
-              const next = existing >= 0
-                ? tools.map((item, index) => (index === existing ? { ...item, status: data.status ?? item.status } : item))
-                : [...tools, { id: `${Date.now()}_${tools.length}`, tool: data.tool, status: data.status }];
-              return { tools: next, status: data.kind === 'tool_call' ? `正在调用 ${data.tool}…` : undefined };
+            updateProcess(assistantId, (blocks) => {
+              const next = blocks.map((block) => (
+                block.kind === 'thinking' ? { ...block, done: true } : block
+              ));
+              if (data.kind === 'tool_call') {
+                const index = data.callId ? next.findIndex((block) => block.kind === 'tool' && block.callId === data.callId) : -1;
+                const toolBlock: ToolBlock = {
+                  id: data.callId || uid(),
+                  kind: 'tool',
+                  callId: data.callId,
+                  tool: data.tool || 'tool',
+                  input: data.input,
+                  status: data.status,
+                  done: false,
+                };
+                if (index >= 0) {
+                  return next.map((block, position) => (position === index ? { ...toolBlock } : block));
+                }
+                return [...next, toolBlock];
+              }
+              const index = data.callId ? next.findIndex((block) => block.kind === 'tool' && block.callId === data.callId) : -1;
+              if (index >= 0) {
+                return next.map((block, position) => (
+                  position === index && block.kind === 'tool'
+                    ? { ...block, result: data.result, status: data.status, done: true }
+                    : block
+                ));
+              }
+              return [...next, {
+                id: data.callId || uid(),
+                kind: 'tool',
+                callId: data.callId,
+                tool: data.tool || 'tool',
+                result: data.result,
+                status: data.status,
+                done: true,
+              }];
             });
+            patchMessage(assistantId, () => ({
+              status: data.kind === 'tool_call' ? `正在调用 ${data.tool || '工具'}…` : undefined,
+              processOpen: true,
+            }));
           },
           onText: (delta) => {
+            finishProcess(assistantId);
             patchMessage(assistantId, (current) => ({
               text: current.text + delta,
               status: undefined,
-              thinking: undefined,
+              processOpen: false,
             }));
           },
           onDone: (result) => {
+            finishProcess(assistantId);
             patchMessage(assistantId, (current) => ({
               text: result.reply || current.text || '已完成。',
               streaming: false,
               status: undefined,
-              thinking: undefined,
+              processOpen: false,
             }));
             window.dispatchEvent(new CustomEvent('aiwo:assistant-refresh'));
             if (result.navigate) navigate(result.navigate);
           },
           onError: (text) => {
             failed = true;
-            patchMessage(assistantId, () => ({ text, tone: 'error', streaming: false, status: undefined, thinking: undefined }));
+            finishProcess(assistantId);
+            patchMessage(assistantId, () => ({
+              text,
+              tone: 'error',
+              streaming: false,
+              status: undefined,
+              processOpen: false,
+            }));
             toast.error(text);
           },
         },
         controller.signal,
       );
-      patchMessage(assistantId, (current) => ({ streaming: false, status: undefined }));
+      patchMessage(assistantId, () => ({ streaming: false, status: undefined }));
       if (!failed) window.dispatchEvent(new CustomEvent('aiwo:assistant-refresh'));
     } catch (error) {
       if (controller.signal.aborted) {
+        finishProcess(assistantId);
         patchMessage(assistantId, (current) => ({
           text: current.text || '已停止生成。',
           streaming: false,
           status: undefined,
-          thinking: undefined,
+          processOpen: false,
         }));
       } else {
         const text = error instanceof ApiError ? error.message : error instanceof Error ? error.message : '助手请求失败';
-        patchMessage(assistantId, () => ({ text, tone: 'error', streaming: false, status: undefined, thinking: undefined }));
+        finishProcess(assistantId);
+        patchMessage(assistantId, () => ({
+          text,
+          tone: 'error',
+          streaming: false,
+          status: undefined,
+          processOpen: false,
+        }));
         toast.error(text);
       }
     } finally {
@@ -228,33 +391,25 @@ export function Assistant() {
               <div key={message.id} className={`cx-assistant-msg cx-assistant-msg--${message.role}`}>
                 {message.role === 'assistant' ? <span className="cx-assistant-avatar">A</span> : null}
                 <div className="cx-assistant-bubble">
-                  {message.tools?.length ? (
-                    <div className="cx-assistant-tools">
-                      {message.tools.map((tool) => (
-                        <span key={tool.id} className="cx-assistant-tool">
-                          <Icon name="terminal" size={11} />
-                          {tool.tool}
-                          {tool.status ? <span className="cx-assistant-tool__state">{tool.status}</span> : null}
-                        </span>
-                      ))}
-                    </div>
+                  {message.role === 'assistant' ? (
+                    <ProcessPanel
+                      message={message}
+                      onToggle={() => patchMessage(message.id, (current) => ({ processOpen: !current.processOpen }))}
+                    />
                   ) : null}
                   <div className={`cx-assistant-text${message.tone ? ' cx-assistant-text--error' : ''}`}>
                     {message.role === 'assistant' ? <Markdown text={message.text} /> : message.text}
                   </div>
-                  {message.streaming && !message.text ? (
+                  {message.streaming && !message.text && (!message.process || message.process.length === 0) ? (
                     <div className="cx-assistant-streaming">
                       <span className="cx-assistant-typing"><span /><span /><span /></span>
                       <span className="cx-assistant-stream-status">{message.status ?? '正在思考…'}</span>
                     </div>
                   ) : null}
-                  {message.streaming && message.text && message.status ? (
+                  {message.streaming && message.status && message.text ? (
                     <div className="cx-assistant-streaming cx-assistant-streaming--text">
                       <span className="cx-assistant-stream-status">{message.status}</span>
                     </div>
-                  ) : null}
-                  {message.thinking && message.streaming ? (
-                    <div className="cx-assistant-thinking">{message.thinking.slice(0, 180)}</div>
                   ) : null}
                 </div>
               </div>

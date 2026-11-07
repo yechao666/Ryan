@@ -111,8 +111,15 @@ export interface CreateTaskResult {
 export interface AssistantStreamHandlers {
   onMeta?: (data: { person?: { id: string; name: string }; pathname?: string }) => void;
   onStatus?: (data: { phase: string; turn?: number; step?: number }) => void;
-  onThinking?: (text: string) => void;
-  onTool?: (data: { kind: string; tool: string; status?: string; detail?: string }) => void;
+  onThinking?: (text: string, start: boolean) => void;
+  onTool?: (data: {
+    kind: 'tool_call' | 'tool_result';
+    callId?: string;
+    tool?: string;
+    input?: unknown;
+    status?: string;
+    result?: string;
+  }) => void;
   onText?: (delta: string) => void;
   onDone?: (result: { reply: string; navigate?: string; sessionId?: string; instance?: string }) => void;
   onError?: (message: string) => void;
@@ -362,7 +369,7 @@ export const api = {
       switch (event) {
         case 'meta': handlers.onMeta?.(data); break;
         case 'status': handlers.onStatus?.(data); break;
-        case 'thinking': handlers.onThinking?.(String(data.text ?? '')); break;
+        case 'thinking': handlers.onThinking?.(String(data.delta ?? ''), Boolean(data.start)); break;
         case 'tool': handlers.onTool?.(data); break;
         case 'text': handlers.onText?.(String(data.delta ?? '')); break;
         case 'done': handlers.onDone?.(data); break;

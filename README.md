@@ -9,7 +9,7 @@ Aiwo 是一个管理 **DSH 实例资源** 的团队协作与任务平台。它�
 - **DSH 实例**：Aiwo 的独立资源；本机或远端，带 token、心跳、绑定项目、当前任务、插件版本。
 - **任务**：项目任务，执行身份 `姓名@Aiwo`；一次性 `/goal`，执行过程只读。
 - **项目 / 团队 / 人员**：与 Hive 一致。
-- **助手**：右侧常驻的 DSH 助手，SSE 流式输出（状态/思考/工具/文本），可读项目/实例/任务/提示词卡片并直接调用 Aiwo 开放 API。
+- **助手**：右侧常驻的 DSH 助手，SSE 流式输出（状态/思考/工具/文本）。思考与工具调用按过程块逐段出现：执行中折叠历史、展开当前；最终答案开始后自动折叠全部过程，点击「展开」可回看。可读项目/实例/任务/提示词卡片并直接调用 Aiwo 开放 API。
 - **记忆**：项目接入 Mnemos；任务开始注入项目记忆，完成写回结论/决策/经验。
 - **安全检查**：任务与助手输入可经独立 LLM 检查；系统设置里配置 endpoint，空则关闭。
 
@@ -165,6 +165,14 @@ pnpm --dir integrations/aiwo-instance test   # 8 个实例代理测试
 | 助手流式输出 | 新建任务引用提示词 |
 | --- | --- |
 | ![流式](docs/screenshots/09-aiwo-assistant-streaming.png) | ![新建任务](docs/screenshots/09-aiwo-create-task.png) |
+
+| 过程实时展开 | 完成后自动折叠 |
+| --- | --- |
+| ![过程](docs/screenshots/10-aiwo-assistant-process.png) | ![折叠](docs/screenshots/11-aiwo-assistant-collapsed.png) |
+
+| 展开历史过程 |
+| --- |
+| ![历史](docs/screenshots/12-aiwo-assistant-history.png) |
 
 ## 目录
 

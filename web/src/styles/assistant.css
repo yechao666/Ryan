@@ -844,3 +844,146 @@
   color: var(--text-dim);
   font-family: var(--font-mono, monospace);
 }
+
+/* DSH 式过程折叠：思考 / 工具调用逐段出现，完成后整体折叠 */
+
+.cx-process {
+  margin-bottom: 9px;
+  border: 1px solid var(--border-faint);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.012);
+  overflow: hidden;
+}
+
+.cx-process.is-live {
+  border-color: rgba(167, 139, 250, 0.22);
+}
+
+.cx-process-head {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  width: 100%;
+  min-height: 28px;
+  padding: 5px 8px;
+  border: 0;
+  background: transparent;
+  color: var(--text-muted);
+  font: inherit;
+  font-size: 10px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.cx-process-head:hover {
+  background: rgba(255, 255, 255, 0.025);
+}
+
+.cx-process-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--text-secondary, var(--text-muted));
+  font-weight: 600;
+}
+
+.cx-process-count {
+  color: var(--text-dim);
+}
+
+.cx-process-toggle {
+  margin-left: auto;
+  color: var(--text-dim);
+  font-size: 10px;
+}
+
+.cx-process-body {
+  padding: 2px 8px 7px;
+  border-top: 1px solid var(--border-faint);
+}
+
+.cx-process-step {
+  padding: 5px 0;
+}
+
+.cx-process-step + .cx-process-step {
+  border-top: 1px dashed rgba(255, 255, 255, 0.055);
+}
+
+.cx-process-step__head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  font-size: 10px;
+  color: var(--text-muted);
+}
+
+.cx-process-step__icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  flex: none;
+  border-radius: 5px;
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.cx-process-step__icon.tone-violet { color: var(--violet); }
+.cx-process-step__icon.tone-amber { color: var(--amber); }
+
+.cx-process-step__name {
+  color: var(--text-secondary, var(--text-muted));
+  font-weight: 600;
+}
+
+.cx-process-step.is-active .cx-process-step__name {
+  color: var(--text);
+}
+
+.cx-process-step__meta {
+  min-width: 0;
+  margin-left: auto;
+  overflow: hidden;
+  color: var(--text-dim);
+  font-family: var(--font-mono, monospace);
+  font-size: 9px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cx-process-step__body {
+  margin-top: 5px;
+  padding-left: 24px;
+}
+
+.cx-process-thinking {
+  max-height: 260px;
+  overflow: auto;
+  color: var(--text-dim);
+  font-size: 11px;
+  line-height: 1.6;
+  white-space: pre-wrap;
+}
+
+.cx-process-code,
+.cx-process-result {
+  max-height: 220px;
+  margin: 0 0 4px;
+  padding: 6px 7px;
+  overflow: auto;
+  border: 1px solid var(--border-faint);
+  border-radius: 5px;
+  background: rgba(0, 0, 0, 0.22);
+  color: var(--text-muted);
+  font-family: var(--font-mono, monospace);
+  font-size: 9.5px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.cx-process-result {
+  color: var(--text-dim);
+}
