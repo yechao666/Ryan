@@ -262,10 +262,9 @@ await testCase('ACP：claim → 提示词 → session/update → complete(done)'
       {
         name: mock.state.register?.name,
         host: mock.state.register?.host,
-        workspacePath: mock.state.register?.workspacePath,
         pluginVersion: mock.state.register?.pluginVersion,
       },
-      { name: 'smoke-agent', host: 'smoke-host', workspacePath: workspace, pluginVersion: '0.1.0' },
+      { name: 'smoke-agent', host: 'smoke-host', pluginVersion: '0.1.0' },
     );
     assert.match(mock.state.register?.version ?? '', /fake-dsh/);
     assert.ok(mock.state.heartbeats >= 1, '应至少有一次心跳');

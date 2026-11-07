@@ -234,7 +234,7 @@ export function ProjectTasksPage() {
     },
     {
       key: 'instance',
-      header: '实例',
+      header: '服务',
       width: 150,
       render: (row) => (
         <span className={row.instanceName ? 'truncate' : 'dim truncate'} title={row.instanceName || '自动分配'}>
@@ -307,7 +307,7 @@ export function ProjectTasksPage() {
     <div className="ws-page">
       <PageHead
         title="任务"
-        desc="新建任务后由绑定项目的 DSH 实例领取并交给 Aiwo 执行；支持按类型、状态与关键词筛选，点击行查看执行详情。"
+        desc="新建任务后由共享调度池中的 DSH 服务领取并交给 Aiwo 执行；支持按类型、状态与关键词筛选，点击行查看执行详情。"
       />
 
       <div className="toolbar">
@@ -347,7 +347,7 @@ export function ProjectTasksPage() {
           <SearchInput
             value={keyword}
             onChange={setKeyword}
-            placeholder="搜索标题 / 短 ID / 执行人 / 实例"
+            placeholder="搜索标题 / 短 ID / 执行人 / 服务"
             className="ws-search"
             onSubmit={applySearch}
           />
@@ -410,7 +410,7 @@ export function ProjectTasksPage() {
                 <EmptyState
                   icon="list"
                   title="还没有任务"
-                  description="创建第一个任务，由绑定项目的 DSH 实例交给 Aiwo 执行。"
+                  description="创建第一个任务，由共享调度池中的 DSH 服务交给 Aiwo 执行。"
                   action={
                     <Button
                       size="sm"

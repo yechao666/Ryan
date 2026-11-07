@@ -341,7 +341,7 @@ export function ProjectSettingsPage() {
             </Field>
             <Field
               label="项目工作区"
-              hint="DSH 实例上的绝对目录；同一项目的任务与对话共用此目录，可共享工作区数据。"
+              hint="DSH 服务上的绝对目录；同一项目的任务与对话共用此目录，可共享工作区数据。"
             >
               <Input
                 value={form.workspacePath}
@@ -543,7 +543,7 @@ export function ProjectSettingsPage() {
             />
           )}
         </Field>
-        <Field label="项目角色" required hint="所有者可删除项目，维护者可管理实例、提示词与自动化，开发者可创建任务，观察者只读。">
+        <Field label="项目角色" required hint="所有者可删除项目，维护者可管理服务、提示词与自动化，开发者可创建任务，观察者只读。">
           <Select
             value={newRole}
             options={PROJECT_ROLE_OPTIONS}

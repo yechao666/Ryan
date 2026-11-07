@@ -1,5 +1,5 @@
 /**
- * Aiwo 共享契约：以 DSH 实例为资源，人员 @Aiwo 直接执行项目任务。
+ * Aiwo 共享契约：以 DSH 服务为资源，人员 @Aiwo 直接执行项目任务。
  * 前后端唯一事实来源；HTTP JSON 均为 camelCase。
  */
 
@@ -77,7 +77,7 @@ export interface Project {
   type: ProjectType;
   prompt: string;
   repoUrl?: string;
-  /** 项目在 DSH 实例上的工作区绝对目录；任务与对话共用同一目录。 */
+  /** 项目在 DSH 服务上的工作区绝对目录；任务与对话共用同一目录。 */
   workspacePath?: string;
   status: 'active' | 'archived';
   mnemosProjectId?: string;
@@ -149,7 +149,6 @@ export interface DshInstance {
   host: string;
   port?: number;
   baseUrl?: string;
-  workspacePath: string;
   version: string;
   pluginVersion?: string;
   status: InstanceStatus;
@@ -158,8 +157,6 @@ export interface DshInstance {
   revokedAt?: string;
   createdBy?: string;
   createdAt: string;
-  projectIds: string[];
-  projectNames: string[];
   currentTask?: {
     id: string;
     title: string;
@@ -177,8 +174,6 @@ export interface DshInstanceInput {
   host?: string;
   port?: number;
   baseUrl?: string;
-  workspacePath?: string;
-  projectIds?: string[];
 }
 
 export interface InstanceRegisterInput {
@@ -186,7 +181,6 @@ export interface InstanceRegisterInput {
   kind?: InstanceKind;
   host: string;
   port?: number;
-  workspacePath: string;
   version: string;
   pluginVersion?: string;
 }

@@ -30,8 +30,8 @@ import { fmtInt, fmtRelative } from '../lib/format.ts';
 import { useAsync, useInterval } from '../lib/hooks.ts';
 
 /**
- * Aiwo 概览：项目、DSH 实例、提示词卡片与任务的总览。
- * 人员不再拥有「智员」，任务由人员 @Aiwo 直接创建，由 DSH 实例领取执行。
+ * Aiwo 概览：项目、DSH 服务、提示词卡片与任务的总览。
+ * 人员不再拥有「智员」，任务由人员 @Aiwo 直接创建，由 DSH 服务领取执行。
  */
 export function DashboardPage() {
   const { person } = useAuth();
@@ -53,8 +53,8 @@ export function DashboardPage() {
         title={`${greeting()}，${displayName}`}
         desc={
           data
-            ? `当前有 ${fmtInt(data.tasks.queued)} 个任务排队、${fmtInt(data.tasks.running)} 个正在执行，${fmtInt(online)} 个 DSH 实例在线。`
-            : '项目、DSH 实例、提示词卡片与任务的总览。'
+            ? `当前有 ${fmtInt(data.tasks.queued)} 个任务排队、${fmtInt(data.tasks.running)} 个正在执行，${fmtInt(online)} 个 DSH 服务在线。`
+            : '项目、DSH 服务、提示词卡片与任务的总览。'
         }
         actions={
           <>
@@ -81,7 +81,7 @@ export function DashboardPage() {
               hint={`${fmtInt(data.teams.length)} 个团队`}
             />
             <Stat
-              label="在线实例"
+              label="在线服务"
               value={fmtInt(online)}
               unit={`/ ${fmtInt(data.instances.length)}`}
               icon="server"
@@ -275,7 +275,7 @@ function ProjectTile({ project, onOpen }: { project: ProjectSummary; onOpen: () 
         </div>
         <div>
           <div className="pm-value">{counts.instances}</div>
-          <div className="pm-label">DSH 实例</div>
+          <div className="pm-label">DSH 服务</div>
         </div>
       </div>
 
@@ -310,7 +310,7 @@ function ProjectSection({ projects, onOpen }: { projects: ProjectSummary[]; onOp
             compact
             icon="folder"
             title="还没有可见项目"
-            description="创建第一个项目，把提示词卡片、DSH 实例与任务组织起来。"
+            description="创建第一个项目，把提示词卡片、DSH 服务与任务组织起来。"
             action={
               <Link to="/projects?new=1" className="btn btn-secondary btn-sm">
                 新建项目
@@ -342,7 +342,7 @@ function InstancesSection({ instances }: { instances: DshInstance[] }) {
         <div>
           <div className="card-title">
             <Icon name="server" size={15} />
-            DSH 实例
+            DSH 服务
           </div>
           <div className="card-sub">
             {instances.filter((item) => item.status === 'online').length} 在线 · 共 {instances.length} 个
@@ -369,7 +369,7 @@ function InstancesSection({ instances }: { instances: DshInstance[] }) {
                       <div className="tiny dim truncate">
                         {instanceKindLabel(instance.kind)} · {instance.host || '未设置主机'}
                         {instance.port ? `:${instance.port}` : ''} ·{' '}
-                        {instance.projectNames.length ? instance.projectNames.join(' / ') : '未绑定项目'}
+                        {instance.currentTask ? instance.currentTask.projectName : '空闲'}
                       </div>
                     </div>
                     <Badge size="sm" tone={status.tone as Tone} dot>
@@ -381,7 +381,7 @@ function InstancesSection({ instances }: { instances: DshInstance[] }) {
             })}
             {instances.length > 5 ? (
               <div className="tiny dim" style={{ padding: '8px 10px 0' }}>
-                还有 {instances.length - 5} 个实例，前往实例页查看
+                还有 {instances.length - 5} 个服务，前往服务页查看
               </div>
             ) : null}
           </div>
@@ -389,11 +389,11 @@ function InstancesSection({ instances }: { instances: DshInstance[] }) {
           <EmptyState
             compact
             icon="server"
-            title="还没有 DSH 实例"
-            description="新增并接入 DSH 实例后，任务才会被领取执行。"
+            title="还没有 DSH 服务"
+            description="新增并接入 DSH 服务后，任务才会被领取执行。"
             action={
               <Link to="/instances?new=1" className="btn btn-secondary btn-sm">
-                新增实例
+                新增服务
               </Link>
             }
           />
@@ -510,7 +510,7 @@ function TaskSummary({ tasks }: { tasks: DashboardSummary['tasks'] }) {
             icon="clock"
             tone="slate"
             label="排队中"
-            desc="等待 DSH 实例领取"
+            desc="等待 DSH 服务领取"
             value={tasks.queued}
           />
           <MetricRow
@@ -518,7 +518,7 @@ function TaskSummary({ tasks }: { tasks: DashboardSummary['tasks'] }) {
             icon="zap"
             tone="violet"
             label="执行中"
-            desc="DSH 实例正在处理"
+            desc="DSH 服务正在处理"
             value={tasks.running}
           />
           <MetricRow
@@ -574,7 +574,7 @@ function ActivitySection({ activity }: { activity: ActivityEvent[] }) {
             <Icon name="activity" size={15} />
             最近活动
           </div>
-          <div className="card-sub">项目、任务与 DSH 实例的实时事件</div>
+          <div className="card-sub">项目、任务与 DSH 服务的实时事件</div>
         </div>
         <Badge size="sm" tone="slate">
           {activity.length} 条
@@ -628,7 +628,7 @@ function ActivitySection({ activity }: { activity: ActivityEvent[] }) {
 function QuickLinks() {
   const links: { to: string; icon: IconName; tone: Tone; label: string }[] = [
     { to: '/projects?new=1', icon: 'plus', tone: 'violet', label: '新建项目' },
-    { to: '/instances?new=1', icon: 'server', tone: 'green', label: '新增实例' },
+    { to: '/instances?new=1', icon: 'server', tone: 'green', label: '新增服务' },
     { to: '/prompt-cards?new=1', icon: 'book', tone: 'cyan', label: '提示词卡片' },
     { to: '/tasks', icon: 'list', tone: 'amber', label: '查看任务' },
   ];

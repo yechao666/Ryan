@@ -8,7 +8,7 @@ export interface TaskCardProps {
   onClick: (task: WorkItem) => void;
 }
 
-/** 看板任务卡：标题、执行人（姓名@Aiwo）、实例、状态、来源、优先级与时间。 */
+/** 看板任务卡：标题、执行人（姓名@Aiwo）、服务、状态、来源、优先级与时间。 */
 export function TaskCard({ task, onClick }: TaskCardProps) {
   const status = taskStatusMeta(task.status);
   const priority = priorityMeta(task.priority);

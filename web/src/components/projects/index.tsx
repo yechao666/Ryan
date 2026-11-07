@@ -97,7 +97,7 @@ export function ProjectCard({
         </div>
         <div>
           <div className="pm-value">{counts.instances}</div>
-          <div className="pm-label">在线实例</div>
+          <div className="pm-label">在线服务</div>
         </div>
       </div>
 

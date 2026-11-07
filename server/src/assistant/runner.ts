@@ -69,7 +69,7 @@ async function deepseekKey(): Promise<string> {
 
 function buildPrompt(input: AssistantTurn): string {
   return [
-    '你是 Aiwo 平台内置的 DSH 系统助手，运行在一个真实的 DSH headless 实例中。',
+    '你是 Aiwo 平台内置的 DSH 系统助手，运行在一个真实的 DSH headless 服务中。',
     'Aiwo 没有智员概念：任务执行者固定为「人员@Aiwo」。你的职责是直接帮助当前人员操作系统，而不是只给出操作步骤。',
     '',
     `当前人员：${input.personName}（${input.personId}）`,
@@ -80,7 +80,7 @@ function buildPrompt(input: AssistantTurn): string {
     '',
     '你可以通过 bash 直接调用 Aiwo 的开放 API。API 文档在：',
     API_GUIDE,
-    '先读取该文档了解所有接口；需要时自行查询项目、DSH 实例、任务、提示词卡片、自动化、记忆等数据。Aiwo 没有智员。',
+    '先读取该文档了解所有接口；需要时自行查询项目、DSH 服务、任务、提示词卡片、自动化、记忆等数据。Aiwo 没有智员。',
     '',
     '推荐调用方式（token 已在环境变量中，不要打印 token）：',
     `  node ${API_HELPER} GET /api/projects`,

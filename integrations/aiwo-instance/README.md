@@ -1,4 +1,4 @@
-# aiwo-instance — Aiwo DSH 实例代理
+# aiwo-instance — Aiwo DSH 服务代理
 
 把一台安装了 **DSH** 的机器接入 **Aiwo**：代理 outbound 连接 Aiwo 运行时，领取任务后用
 DSH 的 **ACP** 模式执行；ACP 不可用时自动回退 **headless**。适合本地与远端（远端无需暴露端口）。
@@ -19,7 +19,7 @@ Aiwo 控制台 ──创建任务──► Aiwo API ◄── register / heartbe
 | `lib/headless.mjs` | headless 回退执行器（`dsh --profile headless --json -`） |
 | `lib/prompt.mjs` | 提示词组装（`/goal` 开头 + 项目提示词 + 引用卡片 + 执行者） |
 | `lib/events.mjs` | 运行时事件批量上报（100 条/批，1s 节流） |
-| `lib/http.mjs` | Aiwo 运行时 API 客户端（实例 token 鉴权） |
+| `lib/http.mjs` | Aiwo 运行时 API 客户端（服务 token 鉴权） |
 | `lib/credentials.mjs` | 从 `$DSH_HOME/.credentials.yaml` 注入 headless 所需 `DEEPSEEK_API_KEY` |
 | `test/smoke.mjs` | mock Aiwo + fake ACP/headless 冒烟测试（不依赖真实 DSH） |
 | `scripts/install-local.sh` | 本地安装依赖并启动 |
@@ -36,12 +36,12 @@ Aiwo 控制台 ──创建任务──► Aiwo API ◄── register / heartbe
 
   `acp` 是 DSH 自带 profile；首次启动时 `$DSH_HOME` 需要可写（DSH 会创建 profile 目录）。
   若 `DSH_HOME` 不可写或 profile 不存在，代理会记录原因并回退 headless。
-- 一个 Aiwo **实例 token**（`aiwo_ins_...`）：Aiwo 控制台 → 实例 → 创建/重置 token；
+- 一个 Aiwo **服务 token**（`aiwo_ins_...`）：Aiwo 控制台 → 服务 → 创建/重置 token；
   页面会给出可直接复制的启动命令。
 
 ## 从 Aiwo 下载代理包（远端推荐）
 
-实例 token 可以直接拉取代理包，不需要先克隆 Aiwo 仓库：
+服务 token 可以直接拉取代理包，不需要先克隆 Aiwo 仓库：
 
 ```bash
 TOKEN=aiwo_ins_xxx
@@ -73,9 +73,9 @@ bash scripts/install-local.sh --base http://127.0.0.1:4500 --token aiwo_ins_xxx 
 
 启动后：
 
-1. 立即 `POST /api/runtime/instances/register` 上报 `name/host/workspacePath/version/pluginVersion`；
+1. 立即 `POST /api/runtime/instances/register` 上报 `name/host/version/pluginVersion`；服务登记不要求项目或工作目录；
 2. 每 20s 心跳；
-3. 每 5s 轮询 claim，一个实例同时只执行一个任务；
+3. 每 5s 轮询 claim，一个服务同时只执行一个任务；
 4. 任务结束上报 `complete`，控制台「任务 → 运行日志」实时查看事件。
 
 ### 联调 / 一次性执行
@@ -97,7 +97,7 @@ curl -s -X POST http://127.0.0.1:4500/api/runtime/instances/heartbeat \
 # 期望：{"ok":true,"instance":{...,"status":"online"},"pending":N}
 ```
 
-Aiwo 控制台实例页应显示 `online`，`pluginVersion` 为 `0.1.0`。
+Aiwo 控制台服务页应显示 `online`，`pluginVersion` 为 `0.1.0`。
 
 ## 环境变量
 
@@ -106,16 +106,16 @@ Aiwo 控制台实例页应显示 `online`，`pluginVersion` 为 `0.1.0`。
 | 变量 | 默认 | 说明 |
 | --- | --- | --- |
 | `AIWO_BASE_URL` | `http://127.0.0.1:4500` | Aiwo 地址（`--base`） |
-| `AIWO_INSTANCE_TOKEN` / `AIWO_TOKEN` | 空（必填） | 实例 token（`--token`） |
+| `AIWO_INSTANCE_TOKEN` / `AIWO_TOKEN` | 空（必填） | 服务 token（`--token`） |
 | `AIWO_WORKSPACE` | 当前目录 | 默认任务工作区；项目 `workspacePath`（或 `repoUrl`）为绝对目录时优先使用项目工作区（`--workspace`） |
 | `AIWO_DSH_BIN` | `dsh` | DSH 可执行文件（`--dsh-bin`） |
 | `AIWO_DSH_PROFILE` | `acp` | ACP profile（`--profile`） |
 | `AIWO_HEADLESS_PROFILE` | `headless` | 回退 profile（`--headless-profile`） |
 | `DSH_HOME` | `~/.dsh` | DSH home（`--dsh-home`） |
-| `AIWO_INSTANCE_NAME` | 主机名 | 实例展示名（`--name`） |
+| `AIWO_INSTANCE_NAME` | 主机名 | 服务展示名（`--name`） |
 | `AIWO_INSTANCE_HOST` | 主机名 | 主机（`--host`） |
 | `AIWO_INSTANCE_KIND` | 沿用服务端 | `local` / `remote`（`--kind`） |
-| `AIWO_INSTANCE_PORT` | 空 | 实例端口（`--port`） |
+| `AIWO_INSTANCE_PORT` | 空 | 服务端口（`--port`） |
 | `AIWO_HEARTBEAT_MS` | `20000` | 心跳间隔，≥200（`--heartbeat`） |
 | `AIWO_POLL_MS` | `5000` | claim 轮询，≥100（`--poll`） |
 | `AIWO_LEASE_RENEW_MS` | `90000` | 任务运行中续租间隔；`0` 关闭（`--lease-renew`） |
@@ -134,7 +134,7 @@ Aiwo 控制台实例页应显示 `online`，`pluginVersion` 为 `0.1.0`。
    → `# 任务`（task.title + 去掉 `/goal` 前缀的 task.prompt）→ `# 执行者`（executor.label）。
    最终 stdin 一定以 `/goal` 开头。
 2. **ACP**：常驻 `dsh --profile acp`，每任务用项目工作区 `session/new {cwd}` → `session/prompt`；
-   项目 `workspacePath`（优先）或兼容旧数据的 `repoUrl` 若是实例上的绝对目录则作为该会话 `cwd`，否则用 `--workspace` 默认工作区。
+   项目 `workspacePath`（优先）或兼容旧数据的 `repoUrl` 若是服务上的绝对目录则作为该会话 `cwd`，否则用 `--workspace` 默认工作区。
    消费 `session/update`：
    - `agent_message_chunk` → `text`
    - `agent_thought_chunk` → `thinking`
@@ -149,7 +149,7 @@ Aiwo 控制台实例页应显示 `online`，`pluginVersion` 为 `0.1.0`。
    用 `dsh --profile headless --json -` 重跑当前任务，后续任务继续使用 headless。
 6. **失败**：ACP prompt 错误、headless 非零退出、超时都会 `complete {status:'failed', error}`。
 7. **停止**：`SIGINT`/`SIGTERM` 停止心跳/轮询；正在执行的任务发送 ACP `session/cancel` 并上报
-   `failed`（实例停止），随后退出；再次信号强退（130）。
+   `failed`（服务停止），随后退出；再次信号强退（130）。
 8. **任务取消**：代理每 5s 查询任务状态，控制台取消后中止 ACP/headless 会话；`decisions/lessons` 从最终输出的「决策 / 经验」小节提取后写回。
 
 ## 远端安装
@@ -238,8 +238,8 @@ launchctl load ~/Library/LaunchAgents/com.aiwo.instance.plist
 
 | 现象 | 处理 |
 | --- | --- |
-| 注册 401 / 心跳 401 | token 错误或已吊销：Aiwo 实例页重置 token 后重启代理 |
-| claim 一直 204 | 实例未绑定项目、没有 queued 任务，或已有任务在跑（单任务串行） |
+| 注册 401 / 心跳 401 | token 错误或已吊销：Aiwo 服务页重置 token 后重启代理 |
+| claim 一直 204 | 共享调度池没有 queued 任务，或当前服务已有任务在跑（单任务串行） |
 | 日志 `回退 headless` | `dsh --profile acp` 不可用：检查 `$DSH_HOME` 可写、`dsh --profile acp --help`、`npm install` 是否完成 |
 | headless 报 `MISSING_CREDENTIAL` | 导出 `DEEPSEEK_API_KEY`，或确认 `$DSH_HOME/.credentials.yaml` 的 `refs.DEEPSEEK_API_KEY` |
 | ACP 权限请求 | 默认 `--permission allow` 自动选择 allow_once；需要人工审批时改为 `reject` 并在控制台观察失败 |
@@ -257,7 +257,7 @@ node --check agent.mjs && node --check lib/*.mjs
 
 ## 安全
 
-- 实例 token 只放在 `Authorization` 头，不写日志；建议用环境变量 / EnvironmentFile，避免进入 shell history。
+- 服务 token 只放在 `Authorization` 头，不写日志；建议用环境变量 / EnvironmentFile，避免进入 shell history。
 - `$DSH_HOME/.credentials.yaml` 的 `DEEPSEEK_API_KEY` 只在环境变量缺失时读取并注入子进程，不打印。
 - 代理不向 DSH 暴露文件系统/终端 ACP 能力（`clientCapabilities` 为 false），工具执行仍由 DSH 宿主自己负责。
 - 建议以独立系统用户运行，workspace 只放任务相关代码。

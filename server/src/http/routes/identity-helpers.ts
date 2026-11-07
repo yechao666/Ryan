@@ -207,7 +207,7 @@ export function buildProjectSummary(db: Db, row: ProjectRow): ProjectSummary {
         "SELECT COUNT(*) AS c FROM work_items WHERE project_id = ? AND status IN ('queued','assigned','running','waiting_input')",
         row.id,
       ),
-      instances: countRows(db, 'SELECT COUNT(*) AS c FROM instance_projects WHERE project_id = ?', row.id),
+      instances: countRows(db, "SELECT COUNT(*) AS c FROM dsh_instances WHERE revoked_at IS NULL"),
       members: countRows(db, 'SELECT COUNT(*) AS c FROM project_members WHERE project_id = ?', row.id),
     },
     lastActivityAt:
@@ -216,12 +216,6 @@ export function buildProjectSummary(db: Db, row: ProjectRow): ProjectSummary {
 }
 
 export function buildInstance(db: Db, row: InstanceRow, now = Date.now()): DshInstance {
-  const projects = db
-    .prepare(
-      `SELECT p.id, p.name FROM instance_projects ip JOIN projects p ON p.id = ip.project_id
-        WHERE ip.instance_id = ? ORDER BY p.name ASC`,
-    )
-    .all(row.id) as unknown as { id: string; name: string }[];
   const current = db
     .prepare(
       `SELECT w.id, w.title, p.name AS project_name
@@ -237,7 +231,6 @@ export function buildInstance(db: Db, row: InstanceRow, now = Date.now()): DshIn
     host: row.host,
     port: row.port ?? undefined,
     baseUrl: row.base_url ?? undefined,
-    workspacePath: row.workspace_path,
     version: row.version,
     pluginVersion: row.plugin_version ?? undefined,
     status: computeInstanceStatus(row, now),
@@ -246,8 +239,6 @@ export function buildInstance(db: Db, row: InstanceRow, now = Date.now()): DshIn
     revokedAt: row.revoked_at ?? undefined,
     createdBy: row.created_by ?? undefined,
     createdAt: row.created_at,
-    projectIds: projects.map((project) => project.id),
-    projectNames: projects.map((project) => project.name),
     currentTask: current ? { id: current.id, title: current.title, projectName: current.project_name } : undefined,
     hasToken: Boolean(row.token_hash),
   };

@@ -190,7 +190,7 @@ export function ProjectsPage() {
             <EmptyState
               icon="folder"
               title="还没有项目"
-              description="创建第一个项目，把任务、DSH 实例与项目记忆组织到一起。"
+              description="创建第一个项目，把任务、DSH 服务与项目记忆组织到一起。"
               action={
                 <Button variant="primary" icon="plus" onClick={openCreate}>
                   新建项目
@@ -211,7 +211,7 @@ export function ProjectsPage() {
         open={createOpen}
         onClose={closeCreate}
         title="新建项目"
-        description="创建后可在项目工作区绑定实例、创建任务与配置记忆。"
+        description="创建后可在项目工作区绑定服务、创建任务与配置记忆。"
         size="lg"
         footer={
           <>

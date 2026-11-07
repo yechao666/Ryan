@@ -1,5 +1,5 @@
 /**
- * 身份与权限路由：人员 / 团队 / 项目 / 项目成员 / 实例 / 仪表盘。
+ * 身份与权限路由：人员 / 团队 / 项目 / 项目成员 / 服务 / 仪表盘。
  *
  * 权限统一走 server/src/lib/access.ts 与 http/auth.ts 的 requirePerson / requireAdmin /
  * requireProject / requireTeam；所有响应形状严格对齐 shared/src/types.ts。

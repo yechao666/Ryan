@@ -125,7 +125,7 @@ export interface AssistantStreamHandlers {
   onError?: (message: string) => void;
 }
 
-/** 新增 DSH 实例的响应：token 与安装命令只返回一次。 */
+/** 新增 DSH 服务的响应：token 与安装命令只返回一次。 */
 export interface InstanceCreateResult {
   instance: DshInstance;
   token: string;

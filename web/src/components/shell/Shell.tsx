@@ -8,7 +8,7 @@ const NAV: { to: string; label: string; icon: IconName; end?: boolean }[] = [
   { to: '/', label: '概览', icon: 'dashboard', end: true },
   { to: '/projects', label: '项目', icon: 'folder' },
   { to: '/teams', label: '团队', icon: 'users' },
-  { to: '/instances', label: '实例', icon: 'server' },
+  { to: '/instances', label: '服务', icon: 'server' },
   { to: '/tasks', label: '任务', icon: 'list' },
   { to: '/prompt-cards', label: '提示词', icon: 'book' },
   { to: '/settings', label: '系统设置', icon: 'settings' },
@@ -46,7 +46,7 @@ export function Shell() {
         </nav>
         <div className="sidebar-hint">
           <div className="sidebar-hint__title">工作方式</div>
-          <p>人员 @Aiwo 创建项目与任务，提示词卡片定义工作方式，DSH 实例负责执行；安全检查组拦截高风险输入。</p>
+          <p>人员 @Aiwo 创建项目与任务，提示词卡片定义工作方式，DSH 服务负责执行；安全检查组拦截高风险输入。</p>
         </div>
         <div className="sidebar-footer">
           <div className="sidebar-person">

@@ -73,7 +73,7 @@ export function ProjectOverviewPage() {
             <Icon name="dashboard" size={15} />
             项目概览
           </div>
-          <div className="card-sub">实时掌握任务进展、DSH 实例与项目记忆状态。</div>
+          <div className="card-sub">实时掌握任务进展、DSH 服务与项目记忆状态。</div>
         </div>
         <div className="hstack gap-8">
           <Link className="ws-link small" to={`${base}/tasks`}>
@@ -106,11 +106,11 @@ export function ProjectOverviewPage() {
           hint="项目级提示词卡片"
         />
         <Stat
-          label="DSH 实例"
+          label="DSH 服务"
           value={fmtInt(counts.instances)}
           icon="server"
           tone="green"
-          hint="已绑定项目的运行时"
+          hint="共享调度池中的执行资源"
         />
       </div>
 
@@ -145,7 +145,7 @@ export function ProjectOverviewPage() {
                 <EmptyState
                   icon="list"
                   title="当前没有正在执行的任务"
-                  description="创建任务后，绑定项目的 DSH 实例会领取并交给 Aiwo 执行。"
+                  description="创建任务后，在线 DSH 服务会从共享调度池领取并交给 Aiwo 执行。"
                   action={
                     <Link className="btn btn-sm btn-outline" to={`${base}/tasks?new=1`}>
                       <Icon name="plus" size={13} />
@@ -199,7 +199,7 @@ export function ProjectOverviewPage() {
                   最近活动
                 </>
               }
-              desc="项目内任务与实例的最新动态"
+              desc="项目内任务与服务的最新动态"
               actions={
                 <Link className="ws-link small" to={`${base}/activity`}>
                   实时活动
@@ -251,7 +251,7 @@ export function ProjectOverviewPage() {
                 <EmptyState
                   icon="list"
                   title="还没有任务"
-                  description="创建第一个任务，由 DSH 实例交给 Aiwo 执行。"
+                  description="创建第一个任务，由 DSH 服务交给 Aiwo 执行。"
                   action={
                     <Link className="btn btn-sm btn-outline" to={`${base}/tasks?new=1`}>
                       <Icon name="plus" size={13} />

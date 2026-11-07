@@ -36,7 +36,7 @@ interface ChatMessage {
 }
 
 const WELCOME =
-  '我是 Aiwo 系统助手，运行在 DSH 实例中。可以读取项目、任务、实例与提示词卡片，并通过 Aiwo API 直接创建任务、配置实例或查询状态。';
+  '我是 Aiwo 系统助手，运行在 DSH 服务中。可以读取项目、任务、服务与提示词卡片，并通过 Aiwo API 直接创建任务、配置服务或查询状态。';
 
 function uid(): string {
   return `m_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
@@ -134,7 +134,7 @@ export function Assistant() {
   const pageTitle =
     (pathname.startsWith('/prompt-cards') && '提示词卡片') ||
     (pathname.startsWith('/settings') && '系统设置') ||
-    (pathname.startsWith('/instances') && 'DSH 实例') ||
+    (pathname.startsWith('/instances') && 'DSH 服务') ||
     (pathname.startsWith('/tasks') && '全局任务') ||
     (pathname.includes('/tasks') && '项目任务') ||
     (pathname.startsWith('/projects') && '项目') ||
@@ -351,7 +351,7 @@ export function Assistant() {
 
   const suggestions = [
     '创建一个任务：为计算器补充乘法边界测试',
-    '列出当前项目的 DSH 实例和绑定情况',
+    '列出当前项目的 DSH 服务和绑定情况',
     '帮我生成一个每日开发简报自动化',
   ];
 
@@ -366,7 +366,7 @@ export function Assistant() {
               <div style={{ minWidth: 0 }}>
                 <div className="cx-assistant-brand__title">
                   Aiwo 助手
-                  <Badge size="sm" tone="cyan">DSH 实例</Badge>
+                  <Badge size="sm" tone="cyan">DSH 服务</Badge>
                 </div>
                 <div className="cx-assistant-brand__sub">人员 @Aiwo · 可直接调用 Aiwo API</div>
               </div>
@@ -434,7 +434,7 @@ export function Assistant() {
             <Textarea
               rows={2}
               value={input}
-              placeholder="描述你想让 Aiwo 做的事，例如：创建任务、查看实例、生成自动化…"
+              placeholder="描述你想让 Aiwo 做的事，例如：创建任务、查看服务、生成自动化…"
               onChange={(event) => setInput(event.target.value)}
               onKeyDown={(event) => {
                 if (event.key === 'Enter' && !event.shiftKey) {
@@ -449,7 +449,7 @@ export function Assistant() {
           </form>
           <footer className="cx-assistant-foot">
             <span>Enter 发送 · Shift+Enter 换行</span>
-            <span className="dim">DSH 实例 · Aiwo API</span>
+            <span className="dim">DSH 服务 · Aiwo API</span>
           </footer>
         </section>
       ) : (

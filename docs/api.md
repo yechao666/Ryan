@@ -1,6 +1,6 @@
 # Aiwo API
 
-Base URL: `http://127.0.0.1:4500`。控制台使用会话 Bearer token；实例运行时使用 `aiwo_ins_...` token；助手使用当前人员 token。
+Base URL: `http://127.0.0.1:4500`。控制台使用会话 Bearer token；服务运行时使用 `aiwo_ins_...` token；助手使用当前人员 token。
 
 ## 认证 / 人员 / 团队 / 项目
 
@@ -16,7 +16,7 @@ Base URL: `http://127.0.0.1:4500`。控制台使用会话 Bearer token；实例�
 | GET/PATCH/DELETE | `/api/projects/:id` | 项目详情 / 更新 / 删除 |
 | POST/DELETE | `/api/projects/:id/members` | 项目成员 |
 
-项目字段：`name,slug,description,ownerTeamId,visibility,type,prompt,repoUrl,workspacePath,mnemosProjectId,mnemosApiKey,memoryAgentId`。`workspacePath` 是项目在 DSH 实例上的绝对工作区目录，同一项目的任务与助手对话共用。
+项目字段：`name,slug,description,ownerTeamId,visibility,type,prompt,repoUrl,workspacePath,mnemosProjectId,mnemosApiKey,memoryAgentId`。`workspacePath` 是项目在 DSH 服务上的绝对工作区目录，同一项目的任务与助手对话共用。
 
 ## 提示词卡片（Aiwo 没有智员，用卡片复用工作流/风格/标准）
 
@@ -29,25 +29,25 @@ Base URL: `http://127.0.0.1:4500`。控制台使用会话 Bearer token；实例�
 
 scope：`org | team | project`；category：`workflow | style | standard | role | other`。
 
-## DSH 实例资源
+## DSH 服务资源
 
 | Method | Path | 说明 |
 | --- | --- | --- |
-| GET | `/api/instances` | 实例列表（含绑定项目/状态/当前任务） |
+| GET | `/api/instances` | 服务列表（状态/当前任务；不绑定项目） |
 | POST | `/api/instances` | 管理员创建；返回一次性 `token` 与安装命令 |
-| PATCH | `/api/instances/:id` | 名称/host/端口/workspace/绑定项目 |
-| POST | `/api/instances/:id/token` | 轮换实例 token |
-| POST | `/api/instances/:id/start` | 本机实例：服务端自动启动实例代理（轮换 token） |
+| PATCH | `/api/instances/:id` | 名称/host/端口/Base URL |
+| POST | `/api/instances/:id/token` | 轮换服务 token |
+| POST | `/api/instances/:id/start` | 本机服务：服务端自动启动服务代理（轮换 token） |
 | POST | `/api/instances/:id/test` | 测试插件心跳/在线状态 |
-| DELETE | `/api/instances/:id` | 吊销实例 |
+| DELETE | `/api/instances/:id` | 吊销服务 |
 
 创建示例：
 
 ```json
-{"name":"远端 DSH","kind":"remote","host":"192.168.1.50","port":4501,"workspacePath":"/srv/aiwo","projectIds":["prj_calc"]}
+{"name":"远端 DSH 服务","kind":"remote","host":"192.168.1.50","port":4501}
 ```
 
-实例插件安装：
+服务插件安装：
 
 ```bash
 node integrations/aiwo-instance/agent.mjs --base http://<aiwo>:4500 --token aiwo_ins_xxx
@@ -64,15 +64,15 @@ node integrations/aiwo-instance/agent.mjs --base http://<aiwo>:4500 --token aiwo
 
 Aiwo 任务执行者固定为「创建人@Aiwo」；任务不支持对话，只展示执行过程。
 
-## 运行时（实例代理使用）
+## 运行时（服务代理使用）
 
 | Method | Path | 说明 |
 | --- | --- | --- |
-| GET | `/api/runtime/instances/agent-package` | 实例 token 拉取实例代理 tar.gz，用于远端安装 |
-| POST | `/api/runtime/instances/register` | 实例 token 注册/更新资源信息 |
+| GET | `/api/runtime/instances/agent-package` | 服务 token 拉取服务代理 tar.gz，用于远端安装 |
+| POST | `/api/runtime/instances/register` | 服务 token 注册/更新资源信息 |
 | POST | `/api/runtime/instances/heartbeat` | 心跳，返回 pending |
 | POST | `/api/runtime/tasks/claim` | 领取任务；返回 `{task,project,executor,promptCards,memory}` |
-| GET | `/api/runtime/tasks/:id/status` | 实例侧查询任务状态（用于感知取消） |
+| GET | `/api/runtime/tasks/:id/status` | 服务侧查询任务状态（用于感知取消） |
 | POST | `/api/runtime/tasks/:id/progress` | 进展 + 续租 |
 | POST | `/api/runtime/tasks/:id/events` | 批量运行时事件（≤100） |
 | POST | `/api/runtime/tasks/:id/complete` | `{status,summary,decisions,lessons,sessionId}` |
@@ -112,4 +112,4 @@ Aiwo 任务执行者固定为「创建人@Aiwo」；任务不支持对话，只�
 | POST | `/api/assistant/chat` | `{message,pathname,projectId?,taskId?}` → `{reply,navigate?,sessionId?,instance}` |
 | POST | `/api/assistant/chat/stream` | 同上请求体，SSE 返回 `meta/status/thinking/tool/text/done/error`；文本逐段下发 |
 
-助手运行在 DSH headless 实例中，使用当前人员 token 调用上面的开放 API。
+助手运行在 DSH headless 服务中，使用当前人员 token 调用上面的开放 API。

@@ -193,7 +193,7 @@ export function ProjectLayout() {
             </span>
             <span className="ws-project-meta-item">
               <Icon name="server" size={13} />
-              {counts.instances} 个实例
+              服务池 {counts.instances}
             </span>
             {project.workspacePath ? (
               <span className="ws-project-meta-item mono tiny" title={`DSH 工作区：${project.workspacePath}`}>

@@ -136,10 +136,12 @@ test('实例资源：管理员创建返回一次性 token，测试未接入状�
   const created = ok(await call('/api/instances', {
     token: tokenLin,
     method: 'POST',
-    body: { name: '测试实例', kind: 'remote', host: '10.0.0.2', projectIds: ['prj_calc'] },
+    body: { name: '测试服务', kind: 'remote', host: '10.0.0.2' },
   }));
   assert.match(created.token, /^aiwo_ins_/);
   assert.ok(created.command.includes('agent-package') && created.command.includes('AIWO_INSTANCE_TOKEN='));
+  assert.equal('projectIds' in created.instance, false);
+  assert.equal('workspacePath' in created.instance, false);
   const tested = ok(await call(`/api/instances/${created.instance.id}/test`, { token: tokenLin, method: 'POST' }));
   assert.equal(tested.ok, false);
   assert.equal(tested.status, 'unconfigured');
@@ -201,7 +203,7 @@ test('多实例调度：两个实例分别领取不同任务，不会抢同一�
   const second = ok(await call('/api/instances', {
     token: tokenLin,
     method: 'POST',
-    body: { name: '并发实例', kind: 'remote', projectIds: ['prj_calc'] },
+    body: { name: '并发服务', kind: 'remote' },
   }));
   const first = ok(await call('/api/projects/prj_calc/tasks', {
     token: tokenLin,

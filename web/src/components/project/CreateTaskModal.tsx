@@ -19,7 +19,7 @@ interface FormErrors {
   prompt?: string;
 }
 
-/** 新建任务弹窗：填写目标与提示词，可选提示词卡片与 DSH 实例。 */
+/** 新建任务弹窗：填写目标与提示词，可选提示词卡片与 DSH 服务。 */
 export function CreateTaskModal({ open, onClose, onCreated }: CreateTaskModalProps) {
   const { detail } = useProject();
   const projectId = detail.project.id;
@@ -79,7 +79,7 @@ export function CreateTaskModal({ open, onClose, onCreated }: CreateTaskModalPro
       onClose={onClose}
       size="lg"
       title="新建任务"
-      description="任务会进入排队队列，由绑定项目的 DSH 实例领取后交给 Aiwo 执行。"
+      description="任务会进入排队队列，由共享调度池中的 DSH 服务领取后交给 Aiwo 执行。"
       footer={
         <>
           <Button variant="ghost" onClick={onClose}>

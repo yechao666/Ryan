@@ -7,7 +7,7 @@ import { useAsync } from '../../lib/hooks.ts';
 
 /**
  * 控制台核心页面共享的小工具。
- * 项目/团队/实例/任务页面都在此取色、取状态文案与错误态，避免各页重复。
+ * 项目/团队/服务/任务页面都在此取色、取状态文案与错误态，避免各页重复。
  */
 
 const TONES: Tone[] = ['violet', 'cyan', 'pink', 'amber', 'lime', 'blue'];
@@ -67,7 +67,7 @@ export function taskStatusMeta(status: string): { label: string; tone: Tone } {
   return meta ? { label: meta.label, tone: meta.tone as Tone } : { label: status, tone: 'slate' };
 }
 
-/** 实例状态展示元数据。 */
+/** 服务状态展示元数据。 */
 export const INSTANCE_STATUS_META: Record<InstanceStatus, { label: string; tone: Tone; pulse?: boolean }> = {
   online: { label: '在线', tone: 'green', pulse: true },
   offline: { label: '离线', tone: 'slate' },

@@ -15,7 +15,7 @@ import { toneFor } from '../components/projects/helpers.tsx';
 const VALUE_POINTS: { icon: IconName; title: string; desc: string }[] = [
   { icon: 'users', title: '人员与团队', desc: '人员组队、管理项目，按可见性与角色协作。' },
   { icon: 'brain', title: '项目记忆', desc: '每个项目独立记忆身份，任务结论自动沉淀。' },
-  { icon: 'server', title: '实例执行', desc: 'DSH 实例注册、领取任务，进展实时回流控制台。' },
+  { icon: 'server', title: '服务执行', desc: 'DSH 服务注册、领取任务，进展实时回流控制台。' },
 ];
 
 export function LoginPage() {
@@ -72,8 +72,8 @@ export function LoginPage() {
             都拥有自己的 DSH 执行网络
           </h1>
           <p>
-            人员创建任务，DSH 实例执行，提示词卡片沉淀工作方式，项目记忆保留上下文。
-            一个控制台管理众多实例的即时、周期与响应式任务。
+            人员创建任务，DSH 服务执行，提示词卡片沉淀工作方式，项目记忆保留上下文。
+            一个控制台管理众多服务的即时、周期与响应式任务。
           </p>
 
           <div className="login-points cx-login-points">

@@ -1,6 +1,6 @@
 /**
- * Aiwo 运行时 API：DSH 实例注册、心跳、领单、进展、完成与运行时事件。
- * 鉴权只用实例 token；任务的执行者固定为创建人 @Aiwo。
+ * Aiwo 运行时 API：DSH 服务注册、心跳、领单、进展、完成与运行时事件。
+ * 鉴权只用服务 token；任务的执行者固定为创建人 @Aiwo。
  */
 import { execFile } from 'node:child_process';
 import { createReadStream, mkdirSync } from 'node:fs';
@@ -61,17 +61,8 @@ function leaseUntil(): string {
 function requireInstanceTask(db: Db, taskId: string, instanceId: string): TaskRow {
   const task = getTaskRow(db, taskId);
   if (!task) throw errors.notFound('任务不存在');
-  if (task.instance_id !== instanceId) throw errors.forbidden('任务不属于当前实例');
+  if (task.instance_id !== instanceId) throw errors.forbidden('任务不属于当前服务');
   return task;
-}
-
-function projectBindingError(db: Db, projectId: string, instanceId: string): void {
-  const bound = rowOf<{ ok: number }>(
-    db,
-    'SELECT 1 AS ok FROM instance_projects WHERE instance_id = ? AND project_id = ?',
-    [instanceId, projectId],
-  );
-  if (!bound) throw errors.forbidden('该实例未绑定此项目');
 }
 
 async function writeBackTaskMemory(rc: RequestContext, task: TaskRow, input: CompleteTaskInput): Promise<void> {
@@ -108,7 +99,6 @@ const registerSchema = z.object({
   kind: z.enum(['local', 'remote']).optional(),
   host: z.string().trim().max(200).optional().default(''),
   port: z.number().int().min(1).max(65535).optional(),
-  workspacePath: z.string().trim().max(500).optional().default(''),
   version: z.string().trim().max(80).optional().default(''),
   pluginVersion: z.string().trim().max(80).optional(),
 });
@@ -153,7 +143,7 @@ const execFileAsync = promisify(execFile);
 const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../../../..');
 let agentPackagePromise: Promise<string> | null = null;
 
-/** 生成可下载的实例代理包；实例 token 即可拉取，方便远端主机安装。 */
+/** 生成可下载的服务代理包；服务 token 即可拉取，方便远端主机安装。 */
 async function buildAgentPackage(): Promise<string> {
   if (agentPackagePromise) return agentPackagePromise;
   agentPackagePromise = (async () => {
@@ -175,17 +165,17 @@ async function buildAgentPackage(): Promise<string> {
 }
 
 export function registerRuntimeRoutes(router: Router): void {
-  // 实例注册：token 由 Aiwo 管理端预先创建；插件首次上线时更新资源信息。
+  // 服务注册：token 由 Aiwo 管理端预先创建；插件首次上线时更新资源信息。
   router.post('/api/runtime/instances/register', async (rc) => {
     const instance = authenticateInstance(rc);
     const input = await rc.body(registerSchema);
     const now = nowIso();
     const current = getInstanceRow(rc.app.db, instance.id);
-    if (!current) throw errors.notFound('实例不存在');
+    if (!current) throw errors.notFound('服务不存在');
     rc.app.db
       .prepare(
         `UPDATE dsh_instances
-            SET name = ?, kind = ?, host = ?, port = ?, workspace_path = ?, version = ?,
+            SET name = ?, kind = ?, host = ?, port = ?, version = ?,
                 plugin_version = ?, status = 'online', registered_at = ?, last_seen_at = ?, updated_at = ?
           WHERE id = ?`,
       )
@@ -194,7 +184,6 @@ export function registerRuntimeRoutes(router: Router): void {
         input.kind ?? current.kind,
         input.host || current.host,
         input.port ?? current.port,
-        input.workspacePath || current.workspace_path,
         input.version || current.version,
         input.pluginVersion ?? current.plugin_version,
         current.registered_at,
@@ -203,7 +192,7 @@ export function registerRuntimeRoutes(router: Router): void {
         instance.id,
       );
     const row = getInstanceRow(rc.app.db, instance.id);
-    if (!row) throw errors.internal('实例注册后读取失败');
+    if (!row) throw errors.internal('服务注册后读取失败');
     rc.json({ instance: buildInstance(rc.app.db, row) });
   });
 
@@ -222,9 +211,9 @@ export function registerRuntimeRoutes(router: Router): void {
     const pending = rowOf<{ c: number }>(
       rc.app.db,
       `SELECT COUNT(*) AS c FROM work_items w
-        JOIN instance_projects ip ON ip.project_id = w.project_id
         JOIN projects p ON p.id = w.project_id
-       WHERE ip.instance_id = ? AND w.status = 'queued' AND p.status = 'active'`,
+       WHERE p.status = 'active' AND w.status = 'queued'
+         AND (w.instance_id IS NULL OR w.instance_id = ?)`,
       [instance.id],
     );
     const row = getInstanceRow(rc.app.db, instance.id);
@@ -250,11 +239,10 @@ export function registerRuntimeRoutes(router: Router): void {
         db,
         `SELECT w.id FROM work_items w
            JOIN projects p ON p.id = w.project_id
-           JOIN instance_projects ip ON ip.project_id = w.project_id
-          WHERE ip.instance_id = ? AND p.status = 'active' AND w.status = 'queued'
+          WHERE p.status = 'active' AND w.status = 'queued'
             AND (w.instance_id IS NULL OR w.instance_id = ?)
           ORDER BY w.priority DESC, w.created_at ASC LIMIT 1`,
-        [instance.id, instance.id],
+        [instance.id],
       );
       if (!candidate) return null;
       db.prepare(
@@ -278,7 +266,7 @@ export function registerRuntimeRoutes(router: Router): void {
       projectId: task.project_id,
       instanceId: instance.id,
       type: 'task.claimed',
-      message: `实例 ${instance.name} 接单`,
+      message: `服务 ${instance.name} 接单`,
       payload: { instanceId: instance.id },
     });
     recordActivity(db, rc.app.bus, {
@@ -286,7 +274,7 @@ export function registerRuntimeRoutes(router: Router): void {
       projectName: project.name,
       type: 'task.claimed',
       actor: item.executorLabel,
-      summary: `实例接单：${task.title}`,
+      summary: `服务接单：${task.title}`,
       taskId: task.id,
     });
 
@@ -422,11 +410,6 @@ export function registerRuntimeRoutes(router: Router): void {
   router.get('/api/runtime/me', (rc) => {
     const instance = authenticateInstance(rc);
     const row = getInstanceRow(rc.app.db, instance.id);
-    const projects = rowsOf<{ id: string; name: string; slug: string }>(
-      rc.app.db,
-      'SELECT p.id, p.name, p.slug FROM projects p JOIN instance_projects ip ON ip.project_id = p.id WHERE ip.instance_id = ?',
-      [instance.id],
-    );
-    rc.json({ instance: row ? buildInstance(rc.app.db, row) : null, projects });
+    rc.json({ instance: row ? buildInstance(rc.app.db, row) : null });
   });
 }

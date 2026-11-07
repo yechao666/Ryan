@@ -275,12 +275,12 @@ export function createTaskRecord(db: Db, bus: EventBus, input: CreateTaskRecordI
   const creator = rowOf<{ name: string }>(db, 'SELECT name FROM persons WHERE id = ?', [effectiveCreatedBy]);
   if (!creator) throw errors.conflict('任务创建人不存在，无法确定 人员@Aiwo 执行者');
   if (input.instanceId) {
-    const bound = rowOf<{ ok: number }>(
+    const service = rowOf<{ ok: number }>(
       db,
-      'SELECT 1 AS ok FROM instance_projects WHERE instance_id = ? AND project_id = ?',
-      [input.instanceId, input.projectId],
+      'SELECT 1 AS ok FROM dsh_instances WHERE id = ? AND revoked_at IS NULL',
+      [input.instanceId],
     );
-    if (!bound) throw errors.badRequest('该 DSH 实例未绑定当前项目');
+    if (!service) throw errors.badRequest('指定的 DSH 服务不存在或已吊销');
   }
   const cardIds = [...new Set(input.promptCardIds ?? [])];
   if (cardIds.length > 0) {

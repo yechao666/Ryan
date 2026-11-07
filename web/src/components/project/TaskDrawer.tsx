@@ -315,7 +315,7 @@ export function TaskDrawer({ taskId, onClose, onChanged, inline = false }: TaskD
                   {task.executorLabel || 'Aiwo'}
                 </span>
               </MetaItem>
-              <MetaItem label="实例">{task.instanceName || '自动分配'}</MetaItem>
+              <MetaItem label="服务">{task.instanceName || '自动分配'}</MetaItem>
               <MetaItem label="创建人">{task.createdByName || '—'}</MetaItem>
               <MetaItem label="创建时间">{fmtDateTime(task.createdAt)}</MetaItem>
               <MetaItem label="开始时间">{task.startedAt ? fmtDateTime(task.startedAt) : '—'}</MetaItem>

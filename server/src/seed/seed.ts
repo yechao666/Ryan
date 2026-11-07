@@ -1,4 +1,4 @@
-/** Aiwo 演示数据：人员 / 团队 / 项目 / 提示词卡片 / DSH 实例 / 任务 / 自动化。 */
+/** Aiwo 演示数据：人员 / 团队 / 项目 / 提示词卡片 / DSH 服务 / 任务 / 自动化。 */
 import type { DatabaseSync } from 'node:sqlite';
 import { DEMO_PASSWORD } from '../../../shared/src/constants.ts';
 import { hashPassword } from '../lib/password.ts';
@@ -7,7 +7,7 @@ import { nowIso, sha256 } from '../lib/ids.ts';
 const NOW = Date.now();
 const iso = (minutesAgo: number): string => new Date(NOW - minutesAgo * 60_000).toISOString();
 
-/** 演示实例令牌（仅演示环境；生产请在 UI 重新生成）。 */
+/** 演示服务令牌（仅演示环境；生产请在 UI 重新生成）。 */
 export const DEMO_TOKENS = {
   local: 'aiwo_ins_demo_local_7f3a2c',
   remote: 'aiwo_ins_demo_remote_9b1d4e',
@@ -21,7 +21,7 @@ const PEOPLE = [
 ] as const;
 
 const TEAMS = [
-  { id: 'tm_platform', name: '平台组', slug: 'platform', desc: '负责 Aiwo 平台、DSH 实例与基础设施。', lead: 'per_linwei' },
+  { id: 'tm_platform', name: '平台组', slug: 'platform', desc: '负责 Aiwo 平台、DSH 服务与基础设施。', lead: 'per_linwei' },
   { id: 'tm_rnd', name: '研发一组', slug: 'rnd-one', desc: '业务系统与交付。', lead: 'per_chenhao' },
 ] as const;
 
@@ -133,7 +133,6 @@ export function seedDatabase(db: DatabaseSync): void {
     'ins_remote', '远端 DSH · 待接入', 'remote', '192.168.1.50', 4501, '/srv/aiwo-workspace',
     sha256(remoteToken), remoteToken.slice(0, 18), iso(60 * 24 * 2), 'per_linwei', iso(60 * 24 * 2), iso(60 * 24 * 2),
   );
-  db.prepare('INSERT INTO instance_projects (instance_id, project_id, created_at) VALUES (?, ?, ?)').run('ins_local', 'prj_calc', iso(60 * 24 * 3));
 
   db.prepare(
     `INSERT INTO work_items

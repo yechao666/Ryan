@@ -78,8 +78,8 @@ export function requireAdmin(rc: RequestContext): Person {
   return person;
 }
 
-/** 运行时鉴权：Agent token（注册实例时）或 Instance token（实例运行期）。 */
-/** Aiwo 实例令牌：只认证实例本身。 */
+/** 运行时鉴权：Agent token（注册服务时）或 Instance token（服务运行期）。 */
+/** Aiwo 服务令牌：只认证服务本身。 */
 export function authenticateInstance(rc: RequestContext): { id: string; name: string } {
   const header = String(rc.req.headers.authorization ?? '');
   const token = header.startsWith('Bearer ') ? header.slice(7).trim() : '';
@@ -93,7 +93,7 @@ export function authenticateInstance(rc: RequestContext): { id: string; name: st
     .get(sha256(token)) as unknown as
     | { id: string; name: string; status: string; revoked_at: string | null }
     | undefined;
-  if (!row || row.revoked_at) throw errors.unauthorized('实例令牌无效或已吊销');
+  if (!row || row.revoked_at) throw errors.unauthorized('服务令牌无效或已吊销');
   rc.app.db
     .prepare("UPDATE dsh_instances SET last_seen_at = ?, status = 'online' WHERE id = ?")
     .run(nowIso(), row.id);

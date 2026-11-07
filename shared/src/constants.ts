@@ -90,7 +90,7 @@ export const PROMPT_CARD_SCOPES: { value: PromptCardScope; label: string; desc: 
 ];
 
 export const INSTANCE_KINDS: { value: InstanceKind; label: string; tone: string; desc: string }[] = [
-  { value: 'local', label: '本机 DSH', tone: 'cyan', desc: '由 Aiwo 在本机拉起实例代理' },
+  { value: 'local', label: '本机 DSH', tone: 'cyan', desc: '由 Aiwo 在本机拉起服务代理' },
   { value: 'remote', label: '远端 DSH', tone: 'violet', desc: '远端需安装 Aiwo 通讯插件' },
 ];
 

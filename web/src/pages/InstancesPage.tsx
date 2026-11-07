@@ -1,13 +1,12 @@
 import { useMemo, useState, type FormEvent } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import type { DshInstance, InstanceKind, ProjectSummary } from '@shared';
+import type { DshInstance, InstanceKind } from '@shared';
 import { INSTANCE_KINDS, INSTANCE_STATUSES } from '@shared';
 import {
   Badge,
   Button,
   Callout,
   Card,
-  Checkbox,
   CodeBlock,
   ConfirmDialog,
   EmptyState,
@@ -36,8 +35,6 @@ interface InstanceFormState {
   host: string;
   port: string;
   baseUrl: string;
-  workspacePath: string;
-  projectIds: string[];
 }
 
 interface SecretState {
@@ -53,8 +50,6 @@ const EMPTY_FORM: InstanceFormState = {
   host: '127.0.0.1',
   port: '4501',
   baseUrl: '',
-  workspacePath: '',
-  projectIds: [],
 };
 
 function instanceStatusMeta(status: string) {
@@ -76,16 +71,15 @@ function errorMessage(cause: unknown, fallback: string): string {
 }
 
 /**
- * Aiwo DSH 实例资源：本机 / 远端实例的创建、接入、测试、token 轮换与吊销。
- * 实例是任务的执行者；创建时的一次性 token 与安装命令只展示一次。
+ * Aiwo DSH 服务资源：本机 / 远端服务的创建、接入、测试、token 轮换与吊销。
+ * 服务是任务的执行者；创建时的一次性 token 与安装命令只展示一次。
  */
 export function InstancesPage() {
   const { person } = useAuth();
   const toast = useToast();
   const isAdmin = Boolean(person?.isAdmin);
   const instances = useAsync(() => api.instances(), []);
-  const projects = useAsync(() => api.projects(), []);
-  // 实例靠心跳更新在线状态，页面每 15s 静默刷新一次资源视图。
+  // 服务靠心跳更新在线状态，页面每 15s 静默刷新一次资源视图。
   useInterval(() => {
     void instances.refresh();
   }, 15_000);
@@ -124,19 +118,10 @@ export function InstancesPage() {
     setParams({}, { replace: true });
   };
 
-  const toggleProject = (projectId: string) => {
-    setForm((prev) => ({
-      ...prev,
-      projectIds: prev.projectIds.includes(projectId)
-        ? prev.projectIds.filter((id) => id !== projectId)
-        : [...prev.projectIds, projectId],
-    }));
-  };
-
   const handleCreate = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!form.name.trim()) {
-      setFormError('请填写实例名称。');
+      setFormError('请填写服务名称。');
       return;
     }
     let port: number | undefined;
@@ -157,21 +142,19 @@ export function InstancesPage() {
         host: form.host.trim() || undefined,
         port,
         baseUrl: form.baseUrl.trim() || undefined,
-        workspacePath: form.workspacePath.trim() || undefined,
-        projectIds: form.projectIds.length ? form.projectIds : undefined,
       });
-      toast.success(`实例「${created.instance.name}」已创建`);
+      toast.success(`服务「${created.instance.name}」已创建`);
       setForm(EMPTY_FORM);
       setParams({}, { replace: true });
       setSecret({
-        title: '实例已创建',
+        title: '服务已创建',
         instanceName: created.instance.name,
         token: created.token,
         command: created.command,
       });
       await instances.refresh();
     } catch (cause) {
-      const message = errorMessage(cause, '创建实例失败');
+      const message = errorMessage(cause, '创建服务失败');
       setFormError(message);
       toast.error(message);
     } finally {
@@ -183,11 +166,11 @@ export function InstancesPage() {
     setStartingId(instance.id);
     try {
       const result = await api.startInstance(instance.id);
-      toast.success(`已启动「${instance.name}」本机实例代理，等待注册`);
+      toast.success(`已启动「${instance.name}」本机服务代理，等待注册`);
       if (result.logPath) toast.info(`代理日志：${result.logPath}`);
       await instances.refresh();
     } catch (cause) {
-      toast.error(errorMessage(cause, '启动实例代理失败'));
+      toast.error(errorMessage(cause, '启动服务代理失败'));
     } finally {
       setStartingId(null);
     }
@@ -217,7 +200,7 @@ export function InstancesPage() {
     setRotating(true);
     try {
       const result = await api.rotateInstanceToken(rotateTarget.id);
-      toast.success(`实例「${rotateTarget.name}」的 token 已轮换`);
+      toast.success(`服务「${rotateTarget.name}」的 token 已轮换`);
       setSecret({
         title: 'Token 已轮换',
         instanceName: rotateTarget.name,
@@ -238,11 +221,11 @@ export function InstancesPage() {
     setRevoking(true);
     try {
       await api.revokeInstance(revokeTarget.id);
-      toast.success(`实例「${revokeTarget.name}」已吊销`);
+      toast.success(`服务「${revokeTarget.name}」已吊销`);
       setRevokeTarget(null);
       await instances.refresh();
     } catch (cause) {
-      toast.error(errorMessage(cause, '吊销实例失败'));
+      toast.error(errorMessage(cause, '吊销服务失败'));
     } finally {
       setRevoking(false);
     }
@@ -253,15 +236,15 @@ export function InstancesPage() {
   return (
     <div className="page">
       <PageHead
-        eyebrow="实例 · DSH Instances"
-        title="DSH 实例"
-        desc="实例是 Aiwo 的执行资源：本机或远端 DSH 通过实例代理接入，领取任务并回传执行过程。"
+        eyebrow="服务 · DSH Services"
+        title="DSH 服务"
+        desc="服务是 Aiwo 的执行资源：本机或远端 DSH 通过服务代理接入，领取任务并回传执行过程。"
         actions={
           <>
-            <IconButton icon="refresh" label="刷新实例" onClick={() => void instances.refresh()} />
+            <IconButton icon="refresh" label="刷新服务" onClick={() => void instances.refresh()} />
             {isAdmin ? (
               <Button variant="primary" icon="plus" onClick={openCreate}>
-                新增实例
+                新增服务
               </Button>
             ) : null}
           </>
@@ -270,15 +253,15 @@ export function InstancesPage() {
 
       {!isAdmin ? (
         <Callout tone="amber" icon="shield">
-          当前账号不是组织管理员：可以查看实例状态，但新增、测试、轮换 token 与吊销需要管理员权限。
+          当前账号不是组织管理员：可以查看服务状态，但新增、测试、轮换 token 与吊销需要管理员权限。
         </Callout>
       ) : null}
 
       <div className="kpi-grid">
-        <Stat label="在线实例" value={online} icon="server" tone="green" hint="心跳正常，可领取任务" />
+        <Stat label="在线服务" value={online} icon="server" tone="green" hint="心跳正常，可领取任务" />
         <Stat label="待接入" value={unconfigured} icon="package" tone="amber" hint="已创建，等待安装通讯插件" />
         <Stat label="离线 / 异常" value={offline + abnormal} icon="alert" tone="red" hint={`离线 ${offline} · 异常 ${abnormal}`} />
-        <Stat label="实例总数" value={list.length} icon="layers" tone="violet" hint={`${revoked} 个已吊销`} />
+        <Stat label="服务总数" value={list.length} icon="layers" tone="violet" hint={`${revoked} 个已吊销`} />
       </div>
 
       {instances.error && !instances.data ? (
@@ -301,12 +284,12 @@ export function InstancesPage() {
         <Card>
           <EmptyState
             icon="server"
-            title="还没有 DSH 实例"
-            description="新增本机或远端实例，复制安装命令启动实例代理；任务会由在线实例领取执行。"
+            title="还没有 DSH 服务"
+            description="新增本机或远端服务，复制安装命令启动服务代理；任务会由在线服务领取执行。"
             action={
               isAdmin ? (
                 <Button variant="primary" icon="plus" onClick={openCreate}>
-                  新增实例
+                  新增服务
                 </Button>
               ) : undefined
             }
@@ -347,20 +330,9 @@ export function InstancesPage() {
                 <div className="hstack gap-6 wrap" style={{ marginTop: 10 }}>
                   <span className="chip mono">{hostLabel(instance)}</span>
                 </div>
-                <div className="tiny dim mono truncate" style={{ marginTop: 6 }} title={instance.workspacePath}>
-                  {instance.workspacePath || '未设置 workspace'}
-                </div>
-
                 <div className="badge-dot-list" style={{ marginTop: 8 }}>
-                  {instance.projectNames.length ? (
-                    instance.projectIds.map((projectId, index) => (
-                      <Link key={projectId} to={`/projects/${encodeURIComponent(projectId)}`} className="chip chip-clickable">
-                        {instance.projectNames[index] ?? projectId}
-                      </Link>
-                    ))
-                  ) : (
-                    <span className="tiny dim">尚未绑定项目</span>
-                  )}
+                  <span className="chip">共享调度池</span>
+                  <span className="tiny dim">工作目录由任务所属项目决定</span>
                 </div>
 
                 <div className="metric-grid" style={{ marginTop: 12 }}>
@@ -375,7 +347,7 @@ export function InstancesPage() {
                     <span className="metric-value mono">{instance.pluginVersion || '—'}</span>
                   </div>
                   <div className="metric">
-                    <span className="metric-label">实例 token</span>
+                    <span className="metric-label">服务 token</span>
                     <span className="metric-value">{instance.hasToken ? '已签发' : '未签发'}</span>
                   </div>
                   <div className="metric">
@@ -425,7 +397,7 @@ export function InstancesPage() {
                       </Button>
                       <IconButton
                         icon="trash"
-                        label={`吊销实例 ${instance.name}`}
+                        label={`吊销服务 ${instance.name}`}
                         size="sm"
                         onClick={() => setRevokeTarget(instance)}
                       />
@@ -440,25 +412,25 @@ export function InstancesPage() {
 
       <Card className="card-pad">
         <SectionHead
-          title="如何接入 DSH 实例"
-          desc="实例创建后，用一次性 token 在目标机器启动实例代理；代理会注册、心跳并领取任务。"
+          title="如何接入 DSH 服务"
+          desc="服务只登记连接信息，不绑定项目或工作目录；注册后进入共享调度池，从项目任务队列领取任务。"
         />
         <ol className="cx-guide-steps" style={{ marginTop: 10 }}>
           <li>
             <span className="cx-guide-step__num">1</span>
-            <div>新增实例，选择本机 / 远端，设置 host、端口、workspace，并按需绑定项目。</div>
+            <div>新增服务，选择本机 / 远端，填写 host、端口等连接信息。</div>
           </li>
           <li>
             <span className="cx-guide-step__num">2</span>
-            <div>本机实例可直接点「启动本机代理」；远端实例复制创建后的一次性安装命令，在目标机器执行；token 只展示一次。</div>
+            <div>本机服务可直接点「启动本机代理」；远端服务复制一次性安装命令在目标机器执行；token 只展示一次。</div>
           </li>
           <li>
             <span className="cx-guide-step__num">3</span>
-            <div>启动后实例会自动注册与心跳，状态从「待接入」变为「在线」。</div>
+            <div>启动后服务会自动注册与心跳，状态从「待接入」变为「在线」，加入调度池。</div>
           </li>
           <li>
             <span className="cx-guide-step__num">4</span>
-            <div>在实例卡片上点击「测试连接」确认插件心跳，然后即可在项目中派发任务。</div>
+            <div>在服务卡片上点击「测试连接」确认心跳，然后即可在任意项目中派发任务。</div>
           </li>
         </ol>
         <CodeBlock
@@ -470,8 +442,8 @@ export function InstancesPage() {
       <Modal
         open={createOpen}
         onClose={closeCreate}
-        title="新增 DSH 实例"
-        description="创建后会返回一次性 token 与安装命令，用于在目标机器接入实例代理。"
+        title="新增 DSH 服务"
+        description="创建后会返回一次性 token 与安装命令，用于在目标机器接入服务代理。"
         size="lg"
         footer={
           <>
@@ -479,19 +451,19 @@ export function InstancesPage() {
               取消
             </Button>
             <Button variant="primary" type="submit" form="create-instance-form" loading={submitting} icon="plus">
-              创建实例
+              创建服务
             </Button>
           </>
         }
       >
         <form id="create-instance-form" className="stack" style={{ gap: 14 }} onSubmit={handleCreate}>
           <div className="grid grid-2">
-            <Field label="实例名称" htmlFor="instance-name" required>
+            <Field label="服务名称" htmlFor="instance-name" required>
               <Input
                 id="instance-name"
                 value={form.name}
                 autoFocus
-                placeholder="例如：本机 DSH"
+                placeholder="例如：本机 DSH 服务"
                 onChange={(event) => update('name', event.target.value)}
               />
             </Field>
@@ -535,44 +507,6 @@ export function InstancesPage() {
             </Field>
           </div>
 
-          <Field label="Workspace" htmlFor="instance-workspace" hint="DSH 执行任务的工作目录。">
-            <Input
-              id="instance-workspace"
-              value={form.workspacePath}
-              placeholder="/path/to/workspace"
-              className="mono"
-              onChange={(event) => update('workspacePath', event.target.value)}
-            />
-          </Field>
-
-          <Field
-            label="绑定项目"
-            hint={
-              projects.error
-                ? '项目列表暂不可用，可先创建实例，稍后再绑定。'
-                : '实例只会领取已绑定项目的任务；可多选。'
-            }
-          >
-            <div className="stack" style={{ gap: 6, maxHeight: 160, overflowY: 'auto' }}>
-              {(projects.data ?? []).map((project: ProjectSummary) => (
-                <Checkbox
-                  key={project.id}
-                  checked={form.projectIds.includes(project.id)}
-                  onChange={() => toggleProject(project.id)}
-                  label={
-                    <span className="hstack gap-6">
-                      <span>{project.name}</span>
-                      <span className="tiny dim mono">{project.slug}</span>
-                    </span>
-                  }
-                />
-              ))}
-              {!projects.loading && !projects.error && (projects.data ?? []).length === 0 ? (
-                <span className="tiny dim">暂无可绑定项目。</span>
-              ) : null}
-            </div>
-          </Field>
-
           {formError ? (
             <Callout tone="red" icon="xCircle">
               {formError}
@@ -584,7 +518,7 @@ export function InstancesPage() {
       <Modal
         open={Boolean(secret)}
         onClose={() => setSecret(null)}
-        title={secret?.title ?? '实例凭据'}
+        title={secret?.title ?? '服务凭据'}
         description="凭据只展示一次，关闭后无法再次查看。"
         footer={
           <Button variant="primary" onClick={() => setSecret(null)}>
@@ -595,16 +529,16 @@ export function InstancesPage() {
         {secret ? (
           <div className="stack" style={{ gap: 12 }}>
             <Callout tone="amber" icon="alert">
-              <strong>token 只显示一次。</strong>请立即复制保存；如遗失，可在实例卡片上轮换 token。
+              <strong>token 只显示一次。</strong>请立即复制保存；如遗失，可在服务卡片上轮换 token。
             </Callout>
             <div className="hstack gap-8 wrap">
-              <span className="metric-label">实例</span>
+              <span className="metric-label">服务</span>
               <span className="strong">{secret.instanceName}</span>
             </div>
             <CodeBlock title="一次性 token" code={secret.token} language="text" />
             <CodeBlock title="安装命令" code={secret.command} />
             <div className="tiny dim">
-              在目标机器执行安装命令即可启动实例代理；实例会注册、心跳并领取已绑定项目的任务。
+              在目标机器执行安装命令即可启动服务代理；服务会注册、心跳并领取项目任务队列中的任务。
             </div>
           </div>
         ) : null}
@@ -615,7 +549,7 @@ export function InstancesPage() {
         onClose={() => setRotateTarget(null)}
         onConfirm={() => void handleRotate()}
         loading={rotating}
-        title="轮换实例 token"
+        title="轮换服务 token"
         description={
           rotateTarget
             ? `轮换「${rotateTarget.name}」的 token 后，旧 token 立即失效，已运行的代理需要重新配置。`
@@ -629,13 +563,13 @@ export function InstancesPage() {
         onClose={() => setRevokeTarget(null)}
         onConfirm={() => void handleRevoke()}
         loading={revoking}
-        title="吊销实例"
+        title="吊销服务"
         description={
           revokeTarget
-            ? `吊销「${revokeTarget.name}」后，该实例会立即离线且无法再领取任务。`
+            ? `吊销「${revokeTarget.name}」后，该服务会立即离线且无法再领取任务。`
             : undefined
         }
-        confirmLabel="吊销实例"
+        confirmLabel="吊销服务"
       />
     </div>
   );

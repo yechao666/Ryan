@@ -101,7 +101,6 @@ class Agent {
     const payload = {
       name: this.config.name,
       host: this.config.host,
-      workspacePath: this.config.workspace,
       version,
       pluginVersion: this.config.pluginVersion,
     };
@@ -115,9 +114,6 @@ class Agent {
         this.logger.info(
           `实例已注册：${this.instance?.name ?? this.config.name}（${this.instance?.id ?? '未知 id'}）`,
         );
-        if (this.instance?.workspacePath && this.instance.workspacePath !== this.config.workspace) {
-          this.logger.warn(`服务端工作区为 ${this.instance.workspacePath}，本进程使用 ${this.config.workspace}`);
-        }
         return;
       } catch (error) {
         if (error instanceof ApiError && error.status === 401) {
