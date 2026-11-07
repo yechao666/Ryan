@@ -26,6 +26,7 @@ const NAV_GROUPS: { label: string; items: NavItem[] }[] = [
     label: '系统',
     items: [
       { to: '/instances', label: 'DSH 服务', icon: 'server' },
+      { to: '/chats', label: '聊天记录', icon: 'terminal' },
       { to: '/settings', label: '系统设置', icon: 'settings' },
     ],
   },

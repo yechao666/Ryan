@@ -21,6 +21,7 @@ import { ProjectSettingsPage } from '../pages/project/ProjectSettingsPage.tsx';
 import { ProjectServicesPage } from '../pages/project/ProjectServicesPage.tsx';
 import { AccountPage } from '../pages/AccountPage.tsx';
 import { AccountsPage } from '../pages/AccountsPage.tsx';
+import { ChatRecordsPage } from '../pages/ChatRecordsPage.tsx';
 
 function RequireAuth({ children }: { children: React.ReactNode }) {
   const { person, loading } = useAuth();
@@ -65,6 +66,7 @@ export function AppRoutes() {
         <Route path="/prompt-cards" element={<PromptCardsPage />} />
         <Route path="/account" element={<AccountPage />} />
         <Route path="/accounts" element={<AccountsPage />} />
+        <Route path="/chats" element={<ChatRecordsPage />} />
         <Route path="/settings" element={<SettingsPage />} />
         <Route path="/tasks" element={<TasksPage />} />
         <Route path="*" element={<Navigate to="/" replace />} />

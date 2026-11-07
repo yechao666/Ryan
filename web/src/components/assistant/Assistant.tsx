@@ -613,7 +613,10 @@ export function Assistant() {
               <div className="cx-assistant-conv-menu">
                 <div className="cx-assistant-conv-menu__head">
                   <span>最近会话</span>
-                  <Button size="sm" variant="ghost" icon="plus" onClick={startNewConversation}>新会话</Button>
+                  <div className="hstack gap-4">
+                    <Button size="sm" variant="ghost" icon="list" onClick={() => { setMenuOpen(false); navigate('/chats'); }}>全部记录</Button>
+                    <Button size="sm" variant="ghost" icon="plus" onClick={startNewConversation}>新会话</Button>
+                  </div>
                 </div>
                 <div className="cx-assistant-conv-list">
                   {sortedConversations.map((conversation) => (
@@ -721,6 +724,14 @@ export function Assistant() {
                       ) : null}
                       {message.role === 'assistant' && editing?.id !== message.id ? (
                         <>
+                          {message.process?.length ? (
+                            <IconButton
+                              icon="terminal"
+                              label={message.processOpen ? '收起过程' : '查看过程'}
+                              size="sm"
+                              onClick={() => patchMessage(active.id, message.id, (current) => ({ processOpen: !current.processOpen }))}
+                            />
+                          ) : null}
                           <IconButton icon="copy" label="复制" size="sm" onClick={() => void copyMessage(message.text)} />
                           {messages.slice(0, messages.indexOf(message)).some((item) => item.role === 'user') && !message.streaming ? (
                             <IconButton icon="refresh" label="重新生成" size="sm" disabled={busy} onClick={() => regenerate(message)} />

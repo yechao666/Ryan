@@ -7,7 +7,7 @@ import { DEMO_PASSWORD } from '../../../shared/src/constants.ts';
 
 const here = dirname(fileURLToPath(import.meta.url));
 export type Db = DatabaseSync;
-export const SCHEMA_VERSION = 12;
+export const SCHEMA_VERSION = 13;
 
 export function openDatabase(dbPath: string): Db {
   if (dbPath !== ':memory:') mkdirSync(dirname(dbPath), { recursive: true });

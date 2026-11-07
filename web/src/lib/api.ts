@@ -114,7 +114,7 @@ export interface CreateTaskResult {
 }
 
 export interface AssistantStreamHandlers {
-  onMeta?: (data: { person?: { id: string; name: string }; pathname?: string }) => void;
+  onMeta?: (data: { person?: { id: string; name: string }; pathname?: string; conversationId?: string; userMessageId?: string; assistantMessageId?: string }) => void;
   onStatus?: (data: { phase: string; turn?: number; step?: number }) => void;
   onThinking?: (text: string, start: boolean) => void;
   onTool?: (data: {
@@ -126,8 +126,45 @@ export interface AssistantStreamHandlers {
     result?: string;
   }) => void;
   onText?: (delta: string) => void;
-  onDone?: (result: { reply: string; navigate?: string; sessionId?: string; instance?: string }) => void;
+  onDone?: (result: { reply: string; navigate?: string; sessionId?: string; instance?: string; conversationId?: string; userMessageId?: string; assistantMessageId?: string }) => void;
   onError?: (message: string) => void;
+}
+
+export interface AssistantProcessBlock {
+  id: string;
+  kind: 'thinking' | 'tool';
+  text?: string;
+  tool?: string;
+  callId?: string;
+  input?: unknown;
+  result?: string;
+  status?: string;
+  done: boolean;
+}
+
+export interface AssistantStoredMessage {
+  id: string;
+  role: 'user' | 'assistant';
+  content: string;
+  process: AssistantProcessBlock[];
+  createdAt: string;
+}
+
+export interface AssistantConversationSummary {
+  id: string;
+  title: string;
+  personId: string;
+  personName: string;
+  pathname: string;
+  messageCount: number;
+  preview: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface AssistantConversationDetail {
+  conversation: Omit<AssistantConversationSummary, 'messageCount' | 'preview'>;
+  messages: AssistantStoredMessage[];
 }
 
 /** 新增 DSH 服务的响应：token 与安装命令只返回一次。 */
@@ -409,6 +446,22 @@ export const api = {
   },
 
   // ---- assistant ----
+  assistantConversations(params: { q?: string; personId?: string } = {}): Promise<{ conversations: AssistantConversationSummary[] }> {
+    return request(`/api/assistant/conversations${qs(params)}`);
+  },
+
+  assistantConversation(id: string): Promise<AssistantConversationDetail> {
+    return request(`/api/assistant/conversations/${id}`);
+  },
+
+  renameAssistantConversation(id: string, title: string): Promise<{ ok: boolean }> {
+    return request(`/api/assistant/conversations/${id}`, { method: 'PATCH', body: JSON.stringify({ title }) });
+  },
+
+  deleteAssistantConversation(id: string): Promise<{ ok: boolean }> {
+    return request(`/api/assistant/conversations/${id}`, { method: 'DELETE' });
+  },
+
   async assistantChatStream(
     input: {
       message: string;

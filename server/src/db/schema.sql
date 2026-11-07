@@ -334,3 +334,25 @@ CREATE TABLE IF NOT EXISTS system_settings (
 );
 
 INSERT OR IGNORE INTO meta (key, value) VALUES ('schema_version', '1');
+
+-- 助手会话与消息：会话可在“聊天记录”中统一管理，过程事件一并保存
+CREATE TABLE IF NOT EXISTS assistant_conversations (
+  id          TEXT PRIMARY KEY,
+  person_id   TEXT NOT NULL REFERENCES persons(id) ON DELETE CASCADE,
+  title       TEXT NOT NULL DEFAULT '新会话',
+  pathname    TEXT NOT NULL DEFAULT '/',
+  created_at  TEXT NOT NULL,
+  updated_at  TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_assistant_conv_person ON assistant_conversations(person_id, updated_at DESC);
+CREATE INDEX IF NOT EXISTS idx_assistant_conv_updated ON assistant_conversations(updated_at DESC);
+
+CREATE TABLE IF NOT EXISTS assistant_messages (
+  id              TEXT PRIMARY KEY,
+  conversation_id TEXT NOT NULL REFERENCES assistant_conversations(id) ON DELETE CASCADE,
+  role            TEXT NOT NULL,
+  content         TEXT NOT NULL DEFAULT '',
+  process         TEXT NOT NULL DEFAULT '[]',
+  created_at      TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_assistant_msg_conv ON assistant_messages(conversation_id, created_at ASC);
