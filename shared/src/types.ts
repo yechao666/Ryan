@@ -427,9 +427,8 @@ export interface ClaimedTask {
   memory: {
     agentId: string;
     enabled: boolean;
-    /** 项目记忆简报，可直接注入 prompt。 */
-    context: string;
-    citations: string[];
+    /** 记忆工具可用；记忆内容按需检索，不自动注入上下文。 */
+    tools: boolean;
   };
 }
 

@@ -167,7 +167,7 @@ export function ProjectMemoryPage() {
     <div className="ws-page">
       <PageHead
         title="项目记忆"
-        desc="Aiwo 内置的项目记忆浏览器：查看任务沉淀、手动维护，并预览任务执行时注入的上下文。"
+        desc="Aiwo 内置的项目记忆浏览器：查看任务沉淀、手动维护，并预览 DSH 可用的记忆上下文。"
         actions={
           <div className="hstack gap-6">
             <Button
@@ -309,7 +309,7 @@ export function ProjectMemoryPage() {
                 记忆详情
               </>
             }
-            desc="项目共享记忆，任务执行时会按相关性注入。"
+            desc="项目共享记忆，任务需要时通过记忆工具检索。"
           />
           {!selected ? (
             <EmptyState icon="brain" title="选择一条记忆" description="从左侧列表选择记忆查看完整内容。" compact />
@@ -363,7 +363,7 @@ export function ProjectMemoryPage() {
               任务上下文简报
             </>
           }
-          desc="模拟任务下发时注入的「项目记忆」段落，并估算 token 消耗。"
+          desc="模拟 DSH 按需检索时生成的「项目记忆」段落，并估算 token 消耗。"
           actions={
             <Button size="sm" variant="ghost" icon="refresh" onClick={() => setContextTick((tick) => tick + 1)}>
               重新生成

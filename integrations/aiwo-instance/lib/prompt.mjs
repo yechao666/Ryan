@@ -29,8 +29,9 @@ export function buildPrompt(claim) {
   if (project.prompt) projectLines.push(project.prompt);
   if (projectLines.length > 0) sections.push(`# 项目背景\n${projectLines.join('\n')}`);
 
-  if (typeof memory.context === 'string' && memory.context.trim()) {
-    sections.push(memory.context.trim());
+  if (memory.enabled) {
+    sections.push(`# 项目记忆
+项目记忆不会自动注入；需要项目背景、约定或历史决策时，使用 aiwo_memory_search / aiwo_memory_context 工具按需检索。不要假设记忆中一定有答案。`);
   }
 
   if (cards.length > 0) {

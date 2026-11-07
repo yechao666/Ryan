@@ -342,7 +342,8 @@ test('内置记忆：写入、claim 注入、完成写回', async () => {
   }));
   assert.equal(claim.task.id, task.id);
   assert.ok(claim.memory.enabled);
-  assert.match(claim.memory.context, /支付回调必须验证签名/);
+  assert.equal(claim.memory.tools, true);
+  assert.equal(claim.memory.context, undefined);
   const current = ok(await call('/api/runtime/tasks/current', { token: service.token }));
   assert.equal(current.taskId, task.id);
   const toolSearch = ok(await call(`/api/runtime/tasks/${task.id}/memory/search`, {

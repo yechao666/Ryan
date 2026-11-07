@@ -297,7 +297,6 @@ export function registerRuntimeRoutes(router: Router): void {
     const person = task.created_by ? rowOf<{ id: string; name: string }>(db, 'SELECT id, name FROM persons WHERE id = ?', [task.created_by]) : undefined;
     const memoryAgentId = memoryAgentIdOf(db, project.id) ?? '';
     const item = getWorkItem(db, task.id)!;
-    const memoryContext = buildMemoryContext(db, project.id, `${item.title}\n${item.prompt}`, 1200, memoryAgentId);
 
     insertTaskEvent(db, {
       taskId: task.id,
@@ -336,8 +335,7 @@ export function registerRuntimeRoutes(router: Router): void {
       memory: {
         agentId: memoryAgentId,
         enabled: true,
-        context: memoryContext.prompt,
-        citations: memoryContext.citations,
+        tools: true,
       },
     };
     rc.json(claimedTask);

@@ -300,7 +300,7 @@ export function ProjectOverviewPage() {
                   记忆简报
                 </>
               }
-              desc="任务执行时自动注入的项目记忆"
+              desc="任务需要时通过工具检索的项目记忆"
               actions={
                 <Link className="ws-link small" to={`${base}/memory`}>
                   记忆中心
