@@ -1,6 +1,7 @@
-import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
+import { useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { api, ApiError } from '@lib/api.ts';
+import { fmtRelative } from '@lib/format.ts';
 import { Badge, Button, Icon, IconButton, Textarea, useToast } from '@ui';
 import { Markdown } from '../project/Markdown.tsx';
 
@@ -35,11 +36,74 @@ interface ChatMessage {
   processOpen?: boolean;
 }
 
+interface Conversation {
+  id: string;
+  title: string;
+  messages: ChatMessage[];
+  updatedAt: string;
+}
+
 const WELCOME =
   '我是 Aiwo 系统助手，运行在 DSH 服务中。可以读取项目、任务、服务与提示词卡片，并通过 Aiwo API 直接创建任务、配置服务或查询状态。';
+const STORAGE_CONVERSATIONS = 'aiwo.assistant.conversations.v1';
+const STORAGE_ACTIVE = 'aiwo.assistant.activeConversation.v1';
 
-function uid(): string {
-  return `m_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+function uid(prefix = 'm'): string {
+  return `${prefix}_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+}
+
+function welcomeMessage(): ChatMessage {
+  return { id: uid('welcome'), role: 'assistant', text: WELCOME };
+}
+
+function createConversation(): Conversation {
+  return {
+    id: uid('conv'),
+    title: '新会话',
+    messages: [welcomeMessage()],
+    updatedAt: new Date().toISOString(),
+  };
+}
+
+function titleOf(messages: ChatMessage[]): string {
+  const first = messages.find((message) => message.role === 'user');
+  const text = first?.text.replace(/\s+/g, ' ').trim();
+  return text ? text.slice(0, 30) : '新会话';
+}
+
+function sanitizeMessages(input: unknown): ChatMessage[] {
+  if (!Array.isArray(input)) return [welcomeMessage()];
+  const messages = input
+    .filter((message): message is ChatMessage => Boolean(message && typeof message === 'object' && (message.role === 'user' || message.role === 'assistant')))
+    .map((message) => ({
+      ...message,
+      streaming: false,
+      status: undefined,
+      process: Array.isArray(message.process)
+        ? message.process.map((block) => ({ ...block, done: true }))
+        : undefined,
+      processOpen: false,
+    }));
+  return messages.length ? messages : [welcomeMessage()];
+}
+
+function loadConversations(): Conversation[] {
+  try {
+    const raw = localStorage.getItem(STORAGE_CONVERSATIONS);
+    if (!raw) return [createConversation()];
+    const parsed: unknown = JSON.parse(raw);
+    if (!Array.isArray(parsed) || parsed.length === 0) return [createConversation()];
+    return parsed
+      .filter((item): item is Conversation => Boolean(item && typeof item === 'object' && typeof item.id === 'string'))
+      .map((item) => ({
+        id: item.id,
+        title: typeof item.title === 'string' ? item.title : '新会话',
+        messages: sanitizeMessages(item.messages),
+        updatedAt: typeof item.updatedAt === 'string' ? item.updatedAt : new Date().toISOString(),
+      }));
+  } catch {
+    return [createConversation()];
+  }
 }
 
 function statusLabel(phase: string): string {
@@ -147,56 +211,182 @@ export function Assistant() {
     const saved = Number(localStorage.getItem('aiwo.assistant.width'));
     return Number.isFinite(saved) && saved >= 320 ? Math.min(720, saved) : 430;
   });
-  const [messages, setMessages] = useState<ChatMessage[]>([{ id: 'welcome', role: 'assistant', text: WELCOME }]);
+  const [conversations, setConversations] = useState<Conversation[]>(loadConversations);
+  const [activeId, setActiveId] = useState(() => localStorage.getItem(STORAGE_ACTIVE) || '');
+  const [menuOpen, setMenuOpen] = useState(false);
   const [input, setInput] = useState('');
   const [busy, setBusy] = useState(false);
+  const [editing, setEditing] = useState<{ id: string; text: string } | null>(null);
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const abortRef = useRef<AbortController | null>(null);
+
+  const active = conversations.find((conversation) => conversation.id === activeId) ?? conversations[0];
+  const messages = active?.messages ?? [];
+
+  useEffect(() => {
+    if (!active) {
+      const conversation = createConversation();
+      setConversations([conversation]);
+      setActiveId(conversation.id);
+    } else if (active.id !== activeId) {
+      setActiveId(active.id);
+    }
+  }, [active, activeId]);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      try { localStorage.setItem(STORAGE_CONVERSATIONS, JSON.stringify(conversations)); } catch { /* ignore */ }
+    }, 250);
+    return () => window.clearTimeout(timer);
+  }, [conversations]);
+
+  useEffect(() => {
+    if (activeId) localStorage.setItem(STORAGE_ACTIVE, activeId);
+  }, [activeId]);
 
   useEffect(() => {
     localStorage.setItem('aiwo.assistant.open', open ? '1' : '0');
   }, [open]);
+
   useEffect(() => {
     localStorage.setItem('aiwo.assistant.width', String(width));
   }, [width]);
+
   useEffect(() => {
     const el = scrollRef.current;
     if (el) el.scrollTop = el.scrollHeight;
-  }, [messages, busy]);
+  }, [messages, busy, activeId]);
+
   useEffect(() => () => abortRef.current?.abort(), []);
 
-  const patchMessage = (id: string, patch: (message: ChatMessage) => Partial<ChatMessage>): void => {
-    setMessages((current) => current.map((message) => (message.id === id ? { ...message, ...patch(message) } : message)));
+  const updateMessages = (
+    conversationId: string,
+    updater: (messages: ChatMessage[]) => ChatMessage[],
+  ): void => {
+    setConversations((current) => current.map((conversation) => {
+      if (conversation.id !== conversationId) return conversation;
+      const nextMessages = updater(conversation.messages);
+      return {
+        ...conversation,
+        messages: nextMessages,
+        title: titleOf(nextMessages),
+        updatedAt: new Date().toISOString(),
+      };
+    }));
   };
 
-  const updateProcess = (id: string, updater: (blocks: ProcessBlock[]) => ProcessBlock[]): void => {
-    setMessages((current) => current.map((message) => (
+  const patchMessage = (
+    conversationId: string,
+    id: string,
+    patch: (message: ChatMessage) => Partial<ChatMessage>,
+  ): void => {
+    updateMessages(conversationId, (current) => current.map((message) => (
+      message.id === id ? { ...message, ...patch(message) } : message
+    )));
+  };
+
+  const updateProcess = (conversationId: string, id: string, updater: (blocks: ProcessBlock[]) => ProcessBlock[]): void => {
+    updateMessages(conversationId, (current) => current.map((message) => (
       message.id === id ? { ...message, process: updater(message.process ?? []) } : message
     )));
   };
 
-  const finishProcess = (id: string): void => {
-    updateProcess(id, (blocks) => blocks.map((block) => ({ ...block, done: true })));
+  const finishProcess = (conversationId: string, id: string): void => {
+    updateProcess(conversationId, id, (blocks) => blocks.map((block) => ({ ...block, done: true })));
   };
 
-  const send = async (raw?: string): Promise<void> => {
-    const message = (raw ?? input).trim();
-    if (!message || busy) return;
+  const stop = (): void => {
+    abortRef.current?.abort();
+  };
+
+  const startNewConversation = (): void => {
+    if (busy) abortRef.current?.abort();
+    const conversation = createConversation();
+    setConversations((current) => [conversation, ...current]);
+    setActiveId(conversation.id);
     setInput('');
-    const assistantId = uid();
-    setMessages((current) => [
-      ...current,
-      { id: uid(), role: 'user', text: message },
-      {
-        id: assistantId,
-        role: 'assistant',
-        text: '',
-        streaming: true,
-        status: '正在连接 DSH 助手…',
-        process: [],
-        processOpen: true,
-      },
-    ]);
+    setEditing(null);
+    setMenuOpen(false);
+  };
+
+  const switchConversation = (id: string): void => {
+    if (id === activeId) {
+      setMenuOpen(false);
+      return;
+    }
+    if (busy) abortRef.current?.abort();
+    setActiveId(id);
+    setEditing(null);
+    setInput('');
+    setMenuOpen(false);
+  };
+
+  const deleteConversation = (id: string): void => {
+    if (id === activeId && busy) abortRef.current?.abort();
+    const remaining = conversations.filter((conversation) => conversation.id !== id);
+    const next = remaining.length ? remaining : [createConversation()];
+    setConversations(next);
+    if (id === activeId) {
+      setActiveId(next[0].id);
+      setEditing(null);
+      setInput('');
+    }
+    setMenuOpen(false);
+  };
+
+  const deleteTurn = (message: ChatMessage): void => {
+    if (busy || !active) return;
+    updateMessages(active.id, (current) => {
+      const index = current.findIndex((item) => item.id === message.id);
+      if (index < 0) return current;
+      const end = current[index + 1]?.role === 'assistant' ? index + 2 : index + 1;
+      return [...current.slice(0, index), ...current.slice(end)];
+    });
+  };
+
+  const regenerate = (message: ChatMessage): void => {
+    if (busy) return;
+    const index = messages.findIndex((item) => item.id === message.id);
+    const user = [...messages.slice(0, index)].reverse().find((item) => item.role === 'user');
+    if (user) void send(user.text, { editMessageId: user.id });
+  };
+
+  const copyMessage = async (text: string): Promise<void> => {
+    try {
+      await navigator.clipboard.writeText(text);
+      toast.success('已复制');
+    } catch {
+      toast.error('复制失败');
+    }
+  };
+
+  const send = async (raw?: string, options?: { editMessageId?: string }): Promise<void> => {
+    const message = (raw ?? input).trim();
+    if (!message || busy || !active) return;
+    const conversationId = active.id;
+    setInput('');
+    setEditing(null);
+    const assistantId = uid('a');
+    updateMessages(conversationId, (current) => {
+      let base = current;
+      if (options?.editMessageId) {
+        const index = current.findIndex((item) => item.id === options.editMessageId);
+        if (index >= 0) base = current.slice(0, index);
+      }
+      return [
+        ...base,
+        { id: uid('u'), role: 'user', text: message },
+        {
+          id: assistantId,
+          role: 'assistant',
+          text: '',
+          streaming: true,
+          status: '正在连接 DSH 助手…',
+          process: [],
+          processOpen: true,
+        },
+      ];
+    });
     setBusy(true);
     const controller = new AbortController();
     abortRef.current = controller;
@@ -209,33 +399,32 @@ export function Assistant() {
           pathname: fullPath,
           projectId: projectId ? decodeURIComponent(projectId) : undefined,
           taskId,
+          conversationId,
         },
         {
           onStatus: (data) => {
-            patchMessage(assistantId, (current) => ({
+            patchMessage(conversationId, assistantId, (current) => ({
               status: current.text ? undefined : statusLabel(data.phase),
             }));
           },
           onThinking: (delta, start) => {
             if (!delta) return;
-            updateProcess(assistantId, (blocks) => {
+            updateProcess(conversationId, assistantId, (blocks) => {
               const last = blocks[blocks.length - 1];
               if (!start && last?.kind === 'thinking' && !last.done) {
                 return [...blocks.slice(0, -1), { ...last, text: last.text + delta }];
               }
-              return [...blocks, { id: uid(), kind: 'thinking', text: delta, done: false }];
+              return [...blocks, { id: uid('t'), kind: 'thinking', text: delta, done: false }];
             });
-            patchMessage(assistantId, () => ({ status: '正在思考…', processOpen: true }));
+            patchMessage(conversationId, assistantId, () => ({ status: '正在思考…', processOpen: true }));
           },
           onTool: (data) => {
-            updateProcess(assistantId, (blocks) => {
-              const next = blocks.map((block) => (
-                block.kind === 'thinking' ? { ...block, done: true } : block
-              ));
+            updateProcess(conversationId, assistantId, (blocks) => {
+              const next = blocks.map((block) => (block.kind === 'thinking' ? { ...block, done: true } : block));
               if (data.kind === 'tool_call') {
                 const index = data.callId ? next.findIndex((block) => block.kind === 'tool' && block.callId === data.callId) : -1;
                 const toolBlock: ToolBlock = {
-                  id: data.callId || uid(),
+                  id: data.callId || uid('tool'),
                   kind: 'tool',
                   callId: data.callId,
                   tool: data.tool || 'tool',
@@ -257,7 +446,7 @@ export function Assistant() {
                 ));
               }
               return [...next, {
-                id: data.callId || uid(),
+                id: data.callId || uid('tool'),
                 kind: 'tool',
                 callId: data.callId,
                 tool: data.tool || 'tool',
@@ -266,22 +455,22 @@ export function Assistant() {
                 done: true,
               }];
             });
-            patchMessage(assistantId, () => ({
+            patchMessage(conversationId, assistantId, () => ({
               status: data.kind === 'tool_call' ? `正在调用 ${data.tool || '工具'}…` : undefined,
               processOpen: true,
             }));
           },
           onText: (delta) => {
-            finishProcess(assistantId);
-            patchMessage(assistantId, (current) => ({
+            finishProcess(conversationId, assistantId);
+            patchMessage(conversationId, assistantId, (current) => ({
               text: current.text + delta,
               status: undefined,
               processOpen: false,
             }));
           },
           onDone: (result) => {
-            finishProcess(assistantId);
-            patchMessage(assistantId, (current) => ({
+            finishProcess(conversationId, assistantId);
+            patchMessage(conversationId, assistantId, (current) => ({
               text: result.reply || current.text || '已完成。',
               streaming: false,
               status: undefined,
@@ -292,8 +481,8 @@ export function Assistant() {
           },
           onError: (text) => {
             failed = true;
-            finishProcess(assistantId);
-            patchMessage(assistantId, () => ({
+            finishProcess(conversationId, assistantId);
+            patchMessage(conversationId, assistantId, () => ({
               text,
               tone: 'error',
               streaming: false,
@@ -305,12 +494,12 @@ export function Assistant() {
         },
         controller.signal,
       );
-      patchMessage(assistantId, () => ({ streaming: false, status: undefined }));
+      patchMessage(conversationId, assistantId, () => ({ streaming: false, status: undefined }));
       if (!failed) window.dispatchEvent(new CustomEvent('aiwo:assistant-refresh'));
     } catch (error) {
       if (controller.signal.aborted) {
-        finishProcess(assistantId);
-        patchMessage(assistantId, (current) => ({
+        finishProcess(conversationId, assistantId);
+        patchMessage(conversationId, assistantId, (current) => ({
           text: current.text || '已停止生成。',
           streaming: false,
           status: undefined,
@@ -318,8 +507,8 @@ export function Assistant() {
         }));
       } else {
         const text = error instanceof ApiError ? error.message : error instanceof Error ? error.message : '助手请求失败';
-        finishProcess(assistantId);
-        patchMessage(assistantId, () => ({
+        finishProcess(conversationId, assistantId);
+        patchMessage(conversationId, assistantId, () => ({
           text,
           tone: 'error',
           streaming: false,
@@ -341,12 +530,12 @@ export function Assistant() {
     const move = (moveEvent: PointerEvent) => {
       setWidth(Math.min(720, Math.max(320, startWidth + (startX - moveEvent.clientX))));
     };
-    const stop = () => {
+    const stopResize = () => {
       window.removeEventListener('pointermove', move);
-      window.removeEventListener('pointerup', stop);
+      window.removeEventListener('pointerup', stopResize);
     };
     window.addEventListener('pointermove', move);
-    window.addEventListener('pointerup', stop);
+    window.addEventListener('pointerup', stopResize);
   };
 
   const suggestions = [
@@ -354,6 +543,10 @@ export function Assistant() {
     '列出当前项目的 DSH 服务和绑定情况',
     '帮我生成一个每日开发简报自动化',
   ];
+  const sortedConversations = useMemo(
+    () => [...conversations].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)),
+    [conversations],
+  );
 
   return (
     <div className={`cx-assistant ${open ? 'is-open' : ''}`} style={open ? { width } : undefined}>
@@ -368,11 +561,38 @@ export function Assistant() {
                   Aiwo 助手
                   <Badge size="sm" tone="cyan">DSH 服务</Badge>
                 </div>
-                <div className="cx-assistant-brand__sub">人员 @Aiwo · 可直接调用 Aiwo API</div>
+                <div className="cx-assistant-brand__sub">{active?.title && active.title !== '新会话' ? active.title : '人员 @Aiwo · 可直接调用 Aiwo API'}</div>
               </div>
             </div>
-            <IconButton icon="x" label="收起助手" size="sm" onClick={() => setOpen(false)} />
+            <div className="cx-assistant-head-actions">
+              <IconButton icon="plus" label="新会话" size="sm" onClick={startNewConversation} />
+              <IconButton icon="list" label="会话历史" size="sm" onClick={() => setMenuOpen((value) => !value)} />
+              <IconButton icon="x" label="收起助手" size="sm" onClick={() => setOpen(false)} />
+            </div>
           </header>
+
+          {menuOpen ? (
+            <>
+              <button type="button" className="cx-assistant-menu-scrim" aria-label="关闭会话历史" onClick={() => setMenuOpen(false)} />
+              <div className="cx-assistant-conv-menu">
+                <div className="cx-assistant-conv-menu__head">
+                  <span>最近会话</span>
+                  <Button size="sm" variant="ghost" icon="plus" onClick={startNewConversation}>新会话</Button>
+                </div>
+                <div className="cx-assistant-conv-list">
+                  {sortedConversations.map((conversation) => (
+                    <div className={`cx-assistant-conv-row${conversation.id === activeId ? ' active' : ''}`} key={conversation.id}>
+                      <button type="button" className="cx-assistant-conv-main" onClick={() => switchConversation(conversation.id)}>
+                        <span className="cx-assistant-conv-title">{conversation.title}</span>
+                        <span className="cx-assistant-conv-meta">{fmtRelative(conversation.updatedAt)} · {conversation.messages.length} 条</span>
+                      </button>
+                      <IconButton icon="trash" label="删除会话" size="sm" onClick={() => deleteConversation(conversation.id)} />
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </>
+          ) : null}
 
           <div className="cx-assistant-context">
             <div className="cx-assistant-context__main">
@@ -394,12 +614,43 @@ export function Assistant() {
                   {message.role === 'assistant' ? (
                     <ProcessPanel
                       message={message}
-                      onToggle={() => patchMessage(message.id, (current) => ({ processOpen: !current.processOpen }))}
+                      onToggle={() => patchMessage(active.id, message.id, (current) => ({ processOpen: !current.processOpen }))}
                     />
                   ) : null}
-                  <div className={`cx-assistant-text${message.tone ? ' cx-assistant-text--error' : ''}`}>
-                    {message.role === 'assistant' ? <Markdown text={message.text} /> : message.text}
-                  </div>
+                  {editing?.id === message.id ? (
+                    <div className="cx-assistant-edit">
+                      <Textarea
+                        rows={3}
+                        value={editing.text}
+                        onChange={(event) => setEditing({ id: message.id, text: event.target.value })}
+                        onKeyDown={(event) => {
+                          if (event.key === 'Enter' && !event.shiftKey) {
+                            event.preventDefault();
+                            const text = editing.text.trim();
+                            if (text) void send(text, { editMessageId: message.id });
+                          }
+                        }}
+                      />
+                      <div className="hstack gap-4">
+                        <Button
+                          size="sm"
+                          variant="primary"
+                          icon="check"
+                          onClick={() => {
+                            const text = editing.text.trim();
+                            if (text) void send(text, { editMessageId: message.id });
+                          }}
+                        >
+                          保存并重发
+                        </Button>
+                        <Button size="sm" variant="ghost" onClick={() => setEditing(null)}>取消</Button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className={`cx-assistant-text${message.tone ? ' cx-assistant-text--error' : ''}`}>
+                      {message.role === 'assistant' ? <Markdown text={message.text} /> : message.text}
+                    </div>
+                  )}
                   {message.streaming && !message.text && (!message.process || message.process.length === 0) ? (
                     <div className="cx-assistant-streaming">
                       <span className="cx-assistant-typing"><span /><span /><span /></span>
@@ -409,6 +660,32 @@ export function Assistant() {
                   {message.streaming && message.status && message.text ? (
                     <div className="cx-assistant-streaming cx-assistant-streaming--text">
                       <span className="cx-assistant-stream-status">{message.status}</span>
+                    </div>
+                  ) : null}
+                  {message.text && message.role === 'user' && editing?.id !== message.id ? (
+                    <div className="cx-assistant-msg-actions">
+                      <IconButton
+                        icon="pencil"
+                        label="编辑并重发"
+                        size="sm"
+                        disabled={busy}
+                        onClick={() => setEditing({ id: message.id, text: message.text })}
+                      />
+                      <IconButton
+                        icon="trash"
+                        label="删除这一轮"
+                        size="sm"
+                        disabled={busy}
+                        onClick={() => deleteTurn(message)}
+                      />
+                    </div>
+                  ) : null}
+                  {message.text && message.role === 'assistant' && editing?.id !== message.id ? (
+                    <div className="cx-assistant-msg-actions">
+                      <IconButton icon="copy" label="复制" size="sm" onClick={() => void copyMessage(message.text)} />
+                      {messages.slice(0, messages.indexOf(message)).some((item) => item.role === 'user') && !message.streaming ? (
+                        <IconButton icon="refresh" label="重新生成" size="sm" disabled={busy} onClick={() => regenerate(message)} />
+                      ) : null}
                     </div>
                   ) : null}
                 </div>
@@ -443,9 +720,15 @@ export function Assistant() {
                 }
               }}
             />
-            <Button type="submit" variant="primary" icon="send" loading={busy} disabled={!input.trim() || busy}>
-              发送
-            </Button>
+            {busy ? (
+              <Button type="button" variant="danger" icon="x" onClick={stop}>
+                停止
+              </Button>
+            ) : (
+              <Button type="submit" variant="primary" icon="send" disabled={!input.trim()}>
+                发送
+              </Button>
+            )}
           </form>
           <footer className="cx-assistant-foot">
             <span>Enter 发送 · Shift+Enter 换行</span>

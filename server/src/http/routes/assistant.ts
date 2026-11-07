@@ -15,6 +15,7 @@ const chatSchema = z.object({
   pathname: z.string().trim().max(500).optional().default('/'),
   projectId: z.string().trim().max(80).optional(),
   taskId: z.string().trim().max(80).optional(),
+  conversationId: z.string().trim().max(120).regex(/^[A-Za-z0-9_.-]+$/).optional(),
 });
 
 /** 项目工作区由服务端按项目 ID 自动生成，不读取/保存路径配置。 */
@@ -137,6 +138,7 @@ export function registerAssistantRoutes(router: Router): void {
       projectId: input.projectId,
       taskId: input.taskId,
       workspace: projectWorkspaceFor(input.projectId),
+      conversationId: input.conversationId,
       token,
       apiBase:
         process.env.HIVE_API_BASE ||
@@ -219,6 +221,7 @@ export function registerAssistantRoutes(router: Router): void {
         projectId: input.projectId,
         taskId: input.taskId,
         workspace: projectWorkspaceFor(input.projectId),
+        conversationId: input.conversationId,
         token,
         apiBase:
           process.env.HIVE_API_BASE ||

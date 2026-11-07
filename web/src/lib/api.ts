@@ -341,6 +341,7 @@ export const api = {
       pathname: string;
       projectId?: string;
       taskId?: string;
+      conversationId?: string;
     },
     handlers: AssistantStreamHandlers,
     signal?: AbortSignal,
@@ -412,6 +413,7 @@ export const api = {
     pathname: string;
     projectId?: string;
     taskId?: string;
+    conversationId?: string;
   }): Promise<{
     reply: string;
     navigate?: string;

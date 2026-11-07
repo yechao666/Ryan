@@ -1020,3 +1020,91 @@
 .cx-process-result {
   color: var(--text-dim);
 }
+
+/* ------------------------------ 会话管理 ------------------------------ */
+.cx-assistant-panel { position: relative; }
+.cx-assistant-menu-scrim {
+  position: absolute;
+  inset: 0;
+  z-index: 20;
+  border: 0;
+  background: transparent;
+  cursor: default;
+}
+.cx-assistant-conv-menu {
+  position: absolute;
+  z-index: 21;
+  top: 58px;
+  right: 12px;
+  width: min(330px, calc(100% - 24px));
+  padding: 10px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-md);
+  background: #12131c;
+  box-shadow: 0 18px 50px rgba(0, 0, 0, 0.55);
+}
+.cx-assistant-conv-menu__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 2px 2px 8px;
+  font-size: 12px;
+  font-weight: 600;
+}
+.cx-assistant-conv-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-height: 300px;
+  overflow-y: auto;
+}
+.cx-assistant-conv-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  border-radius: 8px;
+  padding: 2px;
+}
+.cx-assistant-conv-row:hover { background: var(--surface-hover); }
+.cx-assistant-conv-row.active { background: rgba(139, 124, 255, 0.12); }
+.cx-assistant-conv-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 6px 8px;
+  border: 0;
+  background: transparent;
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+}
+.cx-assistant-conv-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+  font-weight: 550;
+}
+.cx-assistant-conv-meta { font-size: 10px; color: var(--text-dim); }
+.cx-assistant-conv-row .btn-icon { opacity: 0.6; }
+.cx-assistant-conv-row:hover .btn-icon { opacity: 1; }
+
+/* ------------------------------ 消息操作 ------------------------------ */
+.cx-assistant-bubble { position: relative; }
+.cx-assistant-msg-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 2px;
+  margin-top: 4px;
+  opacity: 0;
+  transition: opacity var(--dur) var(--ease);
+}
+.cx-assistant-msg:hover .cx-assistant-msg-actions,
+.cx-assistant-msg:focus-within .cx-assistant-msg-actions { opacity: 1; }
+.cx-assistant-msg--user .cx-assistant-msg-actions { justify-content: flex-start; }
+.cx-assistant-msg-actions .btn-icon { width: 24px; height: 24px; }
+.cx-assistant-edit { display: flex; flex-direction: column; gap: 7px; min-width: 260px; }
+.cx-assistant-edit .textarea { min-height: 64px; font-size: 12px; }

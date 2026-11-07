@@ -19,6 +19,8 @@ export interface AssistantTurn {
   taskId?: string;
   /** 项目对应的 DSH 工作区；缺省使用助手默认工作区。 */
   workspace?: string;
+  /** 前端会话 ID；不同会话使用不同的 DSH session。 */
+  conversationId?: string;
   token: string;
   apiBase: string;
   /** SSE/流式调用时接收 DSH 原始运行事件。 */
@@ -52,7 +54,7 @@ function workspace(): string {
 }
 
 function sessionKey(input: AssistantTurn): string {
-  return `${input.personId}::${input.workspace ?? ''}`;
+  return `${input.personId}::${input.workspace ?? ''}::${input.conversationId || 'default'}`;
 }
 
 async function deepseekKey(): Promise<string> {
