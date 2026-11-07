@@ -20,6 +20,7 @@ export function buildPrompt(claim) {
   const project = claim?.project ?? {};
   const executor = claim?.executor ?? {};
   const cards = Array.isArray(claim?.promptCards) ? claim.promptCards : [];
+  const memory = claim?.memory && typeof claim.memory === 'object' ? claim.memory : {};
 
   const sections = ['/goal'];
 
@@ -27,6 +28,10 @@ export function buildPrompt(claim) {
   if (project.name) projectLines.push(project.slug ? `${project.name}（${project.slug}）` : project.name);
   if (project.prompt) projectLines.push(project.prompt);
   if (projectLines.length > 0) sections.push(`# 项目背景\n${projectLines.join('\n')}`);
+
+  if (typeof memory.context === 'string' && memory.context.trim()) {
+    sections.push(memory.context.trim());
+  }
 
   if (cards.length > 0) {
     const cardText = cards

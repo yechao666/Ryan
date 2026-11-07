@@ -244,11 +244,6 @@ export function AutomationForm({ open, automation, onClose, onSaved }: Automatio
         onChange={setInstanceId}
       />
 
-      {!detail.project.mnemosConfigured ? (
-        <Callout tone="amber" icon="info">
-          项目尚未配置 Mnemos，自动化创建的任务不会注入项目记忆；可在「设置 → Mnemos 集成」中补充。
-        </Callout>
-      ) : null}
     </Modal>
   );
 }

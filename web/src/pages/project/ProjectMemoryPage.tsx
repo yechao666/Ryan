@@ -12,13 +12,17 @@ import {
   CopyButton,
   EmptyState,
   ErrorState,
+  Field,
   Icon,
   Input,
+  Modal,
   PageHead,
   SearchInput,
   SectionHead,
   Select,
   Skeleton,
+  Textarea,
+  useToast,
 } from '@ui';
 import { useProject } from '../ProjectLayout.tsx';
 
@@ -40,6 +44,12 @@ export function ProjectMemoryPage() {
   const [topK, setTopK] = useState('8');
   const [contextQuery, setContextQuery] = useState('');
   const [contextTick, setContextTick] = useState(0);
+  const toast = useToast();
+  const [addOpen, setAddOpen] = useState(false);
+  const [memoryTitle, setMemoryTitle] = useState('');
+  const [memoryContent, setMemoryContent] = useState('');
+  const [memoryCategory, setMemoryCategory] = useState('note');
+  const [saving, setSaving] = useState(false);
 
   const search = useAsync(
     () => api.memorySearch(projectId, submitted ?? '', memoryAgentId, Number(topK)),
@@ -50,7 +60,7 @@ export function ProjectMemoryPage() {
   const context = useAsync(
     () => api.memoryContext(projectId, memoryAgentId, contextQuery.trim() || undefined),
     [projectId, memoryAgentId, contextTick],
-    detail.project.mnemosConfigured,
+    true,
   );
 
   const runSearch = () => {
@@ -59,20 +69,42 @@ export function ProjectMemoryPage() {
     setSubmitted(next);
   };
 
-  const configured = detail.project.mnemosConfigured;
+  const configured = true;
   const hits = search.data?.hits ?? [];
   const identity = memoryAgentId || `aiwo_${detail.project.slug.replace(/-/g, '_')}`;
+
+  const submitMemory = async () => {
+    if (!memoryContent.trim()) return;
+    setSaving(true);
+    try {
+      await api.addProjectMemory(projectId, {
+        title: memoryTitle.trim() || undefined,
+        content: memoryContent.trim(),
+        category: memoryCategory,
+      });
+      toast.success('记忆已写入项目记忆库');
+      setMemoryTitle('');
+      setMemoryContent('');
+      setMemoryCategory('note');
+      setAddOpen(false);
+      setContextTick((tick) => tick + 1);
+      if (submitted) await search.refresh();
+    } catch (cause) {
+      toast.error(cause instanceof Error ? cause.message : '写入记忆失败');
+    } finally {
+      setSaving(false);
+    }
+  };
 
   return (
     <div className="ws-page">
       <PageHead
         title="项目记忆"
-        desc="搜索项目在 Mnemos 中沉淀的记忆，并预览任务下发时会注入的上下文。"
+        desc="搜索 Aiwo 内部沉淀的项目记忆，并预览任务下发时会注入的上下文。"
         actions={
-          <Link className="ws-link small" to={`${base}/settings`}>
-            <Icon name="settings" size={13} />
-            Mnemos 设置
-          </Link>
+          <Button variant="primary" icon="plus" onClick={() => setAddOpen(true)}>
+            新增记忆
+          </Button>
         }
       />
 
@@ -80,8 +112,8 @@ export function ProjectMemoryPage() {
         <Card>
           <EmptyState
             icon="brain"
-            title="尚未配置 Mnemos 集成"
-            description="为项目配置 Mnemos 项目 ID 与 API Key 后，任务执行时会自动检索并注入项目记忆。"
+            title="项目记忆尚未初始化"
+            description="项目记忆由 Aiwo 内部维护；任务执行时会自动检索并注入记忆。"
             action={
               <Link className="btn btn-sm btn-outline" to={`${base}/settings`}>
                 <Icon name="settings" size={13} />
@@ -97,10 +129,10 @@ export function ProjectMemoryPage() {
               title={
                 <>
                   <Icon name="search" size={14} />
-                  语义搜索
+                  记忆检索
                 </>
               }
-              desc="在项目记忆库中按语义检索，命中结果按相关度排序。"
+              desc="在项目内置记忆库中检索，命中结果按相关度与时间排序。"
               actions={
                 <span className="tiny dim">
                   记忆身份 <span className="mono">{identity}</span>
@@ -147,7 +179,7 @@ export function ProjectMemoryPage() {
                 />
               ) : search.data && !search.data.configured ? (
                 <Callout tone="amber" icon="alert">
-                  {search.data.error ?? 'Mnemos 尚未就绪，无法检索记忆。请检查项目设置中的集成配置。'}
+                  {search.data.error ?? '记忆检索暂时不可用。'}
                 </Callout>
               ) : !hits.length ? (
                 <EmptyState
@@ -277,7 +309,7 @@ export function ProjectMemoryPage() {
                 <ErrorState message={context.error} onRetry={() => void context.refresh()} />
               ) : context.data && !context.data.configured ? (
                 <Callout tone="amber" icon="alert">
-                  {context.data.error ?? 'Mnemos 尚未就绪，无法生成任务简报。'}
+                  {context.data.error ?? '暂时无法生成任务简报。'}
                 </Callout>
               ) : context.data ? (
                 <>
@@ -303,6 +335,48 @@ export function ProjectMemoryPage() {
           </Card>
         </>
       )}
+
+      <Modal
+        open={addOpen}
+        onClose={() => setAddOpen(false)}
+        title="新增项目记忆"
+        description="手动写入一条项目共享记忆；任务完成时也会自动写入执行结论。"
+        footer={
+          <>
+            <Button variant="ghost" onClick={() => setAddOpen(false)}>取消</Button>
+            <Button variant="primary" icon="check" loading={saving} disabled={!memoryContent.trim()} onClick={() => void submitMemory()}>
+              写入记忆
+            </Button>
+          </>
+        }
+      >
+        <div className="vstack gap-10">
+          <div className="grid grid-2">
+            <Field label="标题（可选）">
+              <Input value={memoryTitle} placeholder="例如：支付回调验签约定" onChange={(event) => setMemoryTitle(event.target.value)} />
+            </Field>
+            <Field label="类型">
+              <Select
+                value={memoryCategory}
+                options={[
+                  { value: 'note', label: '笔记' },
+                  { value: 'fact', label: '事实' },
+                  { value: 'decision', label: '决策' },
+                ]}
+                onChange={(event) => setMemoryCategory(event.target.value)}
+              />
+            </Field>
+          </div>
+          <Field label="记忆内容">
+            <Textarea
+              value={memoryContent}
+              rows={6}
+              placeholder="写下项目约定、架构决策、踩坑经验或业务事实…"
+              onChange={(event) => setMemoryContent(event.target.value)}
+            />
+          </Field>
+        </div>
+      </Modal>
     </div>
   );
 }

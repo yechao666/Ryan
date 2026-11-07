@@ -60,8 +60,6 @@ CREATE TABLE IF NOT EXISTS projects (
   repo_url          TEXT,
   workspace_path    TEXT,
   status            TEXT NOT NULL DEFAULT 'active',
-  mnemos_project_id TEXT,
-  mnemos_api_key    TEXT,
   memory_agent_id   TEXT,
   created_at        TEXT NOT NULL,
   updated_at        TEXT NOT NULL
@@ -78,6 +76,23 @@ CREATE TABLE IF NOT EXISTS project_members (
 );
 
 -- 可管理、可被任务引用的提示词卡片
+-- Aiwo 内置项目记忆
+CREATE TABLE IF NOT EXISTS project_memories (
+  id          TEXT PRIMARY KEY,
+  project_id  TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+  category    TEXT NOT NULL DEFAULT 'fact',
+  title       TEXT NOT NULL DEFAULT '',
+  content     TEXT NOT NULL,
+  source      TEXT NOT NULL DEFAULT 'manual',
+  task_id     TEXT,
+  metadata    TEXT NOT NULL DEFAULT '{}',
+  created_by  TEXT REFERENCES persons(id) ON DELETE SET NULL,
+  created_at  TEXT NOT NULL,
+  updated_at  TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_project_memories_project ON project_memories(project_id, created_at DESC);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_project_memories_task ON project_memories(project_id, task_id) WHERE task_id IS NOT NULL;
+
 CREATE TABLE IF NOT EXISTS prompt_cards (
   id          TEXT PRIMARY KEY,
   name        TEXT NOT NULL,

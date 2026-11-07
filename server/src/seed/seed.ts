@@ -39,7 +39,7 @@ function insertPerson(db: DatabaseSync, p: (typeof PEOPLE)[number], passwordHash
   ).run(p.id, p.email, p.name, p.title, p.color, p.admin, passwordHash, iso(60 * 24 * 30));
 }
 
-export function seedIfEmpty(db: DatabaseSync, _env: { mnemosBaseUrl: string }): void {
+export function seedIfEmpty(db: DatabaseSync): void {
   const row = db.prepare('SELECT COUNT(*) AS c FROM persons').get() as unknown as { c: number };
   if (Number(row.c) === 0) seedDatabase(db);
 }

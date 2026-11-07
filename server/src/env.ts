@@ -16,7 +16,6 @@ export interface Env {
   webDist: string;
   demoMode: boolean;
   sessionTtlHours: number;
-  mnemosBaseUrl: string;
   webhookMaxBytes: number;
 }
 
@@ -36,7 +35,6 @@ export function loadEnv(overrides: Partial<Env> = {}): Env {
     webDist: process.env.AIWO_WEB_DIST ?? join(APP_ROOT, 'web', 'dist'),
     demoMode: process.env.AIWO_DEMO !== '0',
     sessionTtlHours: num(process.env.AIWO_SESSION_TTL_HOURS, 72),
-    mnemosBaseUrl: process.env.MNEMOS_BASE_URL ?? 'http://127.0.0.1:4380',
     webhookMaxBytes: num(process.env.AIWO_WEBHOOK_MAX_BYTES, 1_048_576),
     ...overrides,
   };

@@ -35,7 +35,7 @@ import {
   truncateSummary,
   type TaskRow,
 } from './tasks.ts';
-import { add as mnemosAdd, memoryAgentIdOf, memoryConfigFor, taskMemoryText } from '../../memory/mnemos.ts';
+import { addMemory, buildMemoryContext, memoryAgentIdOf, taskMemoryText } from '../../memory/store.ts';
 import { buildInstance, getInstanceRow } from './identity-helpers.ts';
 
 const LEASE_MS = 3 * 60_000;
@@ -65,18 +65,19 @@ function requireInstanceTask(db: Db, taskId: string, instanceId: string): TaskRo
   return task;
 }
 
-async function writeBackTaskMemory(rc: RequestContext, task: TaskRow, input: CompleteTaskInput): Promise<void> {
+function writeBackTaskMemory(rc: RequestContext, task: TaskRow, input: CompleteTaskInput): void {
   const project = getProjectRow(rc.app.db, task.project_id);
   if (!project) return;
-  const config = memoryConfigFor(rc.app.env, project);
-  if (!config) return;
-  const memoryAgentId = memoryAgentIdOf(rc.app.db, project.id);
-  if (!memoryAgentId) return;
   const text = taskMemoryText({ title: task.title, summary: input.summary, decisions: input.decisions, lessons: input.lessons });
   try {
-    await mnemosAdd(config, {
-      text,
-      agentId: memoryAgentId,
+    addMemory(rc.app.db, {
+      projectId: project.id,
+      content: text,
+      title: task.title,
+      category: 'task_result',
+      source: 'task',
+      taskId: task.id,
+      createdBy: task.created_by,
       metadata: { aiwoTaskId: task.id, projectId: project.id },
     });
   } catch (error) {
@@ -279,9 +280,9 @@ export function registerRuntimeRoutes(router: Router): void {
     const project = getProjectRow(db, task.project_id);
     if (!project) throw errors.internal('任务项目读取失败');
     const person = task.created_by ? rowOf<{ id: string; name: string }>(db, 'SELECT id, name FROM persons WHERE id = ?', [task.created_by]) : undefined;
-    const memory = memoryConfigFor(rc.app.env, project);
     const memoryAgentId = memoryAgentIdOf(db, project.id) ?? '';
     const item = getWorkItem(db, task.id)!;
+    const memoryContext = buildMemoryContext(db, project.id, `${item.title}\n${item.prompt}`, 1200, memoryAgentId);
 
     insertTaskEvent(db, {
       taskId: task.id,
@@ -318,11 +319,10 @@ export function registerRuntimeRoutes(router: Router): void {
       },
       promptCards: cardsContent(db, item.promptCardIds),
       memory: {
-        baseUrl: rc.app.env.mnemosBaseUrl,
-        projectId: memory?.projectId ?? '',
-        apiKey: memory?.apiKey ?? '',
         agentId: memoryAgentId,
-        enabled: Boolean(memory),
+        enabled: true,
+        context: memoryContext.prompt,
+        citations: memoryContext.citations,
       },
     };
     rc.json(claimedTask);
@@ -383,7 +383,7 @@ export function registerRuntimeRoutes(router: Router): void {
       summary: truncateSummary(input.summary),
       taskId: task.id,
     });
-    await writeBackTaskMemory(rc, task, input);
+    writeBackTaskMemory(rc, task, input);
     const updated = getWorkItem(db, task.id);
     rc.json(updated);
   });

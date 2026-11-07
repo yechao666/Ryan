@@ -8,6 +8,7 @@ import { recordActivity } from '../../lib/activity.ts';
 import { checkUserInput } from '../../security/check.ts';
 import { generateTaskTitle } from '../../tasks/title.ts';
 import { getDefaultServiceId } from '../../settings/system.ts';
+import { memoryAgentIdOf } from '../../memory/store.ts';
 import type { EventBus } from '../../lib/bus.ts';
 import type { Db } from '../../db/index.ts';
 import { newId, nowIso } from '../../lib/ids.ts';
@@ -55,8 +56,6 @@ export interface TaskRow {
   project_slug?: string | null;
   project_type?: string | null;
   project_status?: string | null;
-  mnemos_project_id?: string | null;
-  mnemos_api_key?: string | null;
   instance_name?: string | null;
   created_by_name?: string | null;
   executor_name?: string | null;
@@ -81,8 +80,6 @@ export const TASK_SELECT = `
          p.slug AS project_slug,
          p.type AS project_type,
          p.status AS project_status,
-         p.mnemos_project_id AS mnemos_project_id,
-         p.mnemos_api_key AS mnemos_api_key,
          i.name AS instance_name,
          cp.name AS created_by_name,
          ep.name AS executor_name
@@ -571,9 +568,9 @@ export function registerTaskRoutes(router: Router): void {
       task: getWorkItem(rc.app.db, task.id),
       events: listTaskEvents(rc.app.db, task.id),
       memory: {
-        projectId: project.mnemos_project_id ?? undefined,
-        memoryAgentId: project.memory_agent_id ?? undefined,
-        configured: Boolean(project.mnemos_project_id && project.mnemos_api_key),
+        projectId: project.id,
+        memoryAgentId: memoryAgentIdOf(rc.app.db, project.id) ?? undefined,
+        configured: true,
       },
     });
   });

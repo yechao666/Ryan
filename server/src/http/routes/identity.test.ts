@@ -304,3 +304,51 @@ test('默认服务：项目未绑定服务时任务使用默认服务', async ()
     body: { serviceId: null },
   }));
 });
+
+test('内置记忆：写入、claim 注入、完成写回', async () => {
+  const project = ok(await call('/api/projects', {
+    token: tokenLin,
+    method: 'POST',
+    body: { name: '内置记忆项目', slug: 'internal-memory-project', visibility: 'team', ownerTeamId: 'tm_platform', type: 'manual' },
+  }));
+  const memory = ok(await call(`/api/projects/${project.id}/memories`, {
+    token: tokenLin,
+    method: 'POST',
+    body: { title: '支付约定', content: '支付回调必须验证签名并保持幂等。', category: 'decision' },
+  }));
+  const search = ok(await call(`/api/projects/${project.id}/memory/search?q=支付回调验签&topK=5`, { token: tokenLin }));
+  assert.ok(search.configured);
+  assert.ok(search.hits.some((hit: Json) => hit.id === memory.id));
+
+  const service = ok(await call('/api/instances', {
+    token: tokenLin,
+    method: 'POST',
+    body: { name: '记忆测试服务', kind: 'remote' },
+  }));
+  ok(await call('/api/runtime/instances/register', {
+    token: service.token,
+    method: 'POST',
+    body: { name: '记忆测试服务', host: '127.0.0.1', version: '0.1.0' },
+  }));
+  const task = ok(await call(`/api/projects/${project.id}/tasks`, {
+    token: tokenLin,
+    method: 'POST',
+    body: { title: '支付回调记忆测试', prompt: '支付回调验签怎么处理？', type: 'ops', instanceId: service.instance.id },
+  }));
+  const claim = ok(await call('/api/runtime/tasks/claim', {
+    token: service.token,
+    method: 'POST',
+    body: {},
+  }));
+  assert.equal(claim.task.id, task.id);
+  assert.ok(claim.memory.enabled);
+  assert.match(claim.memory.context, /支付回调必须验证签名/);
+  ok(await call(`/api/runtime/tasks/${task.id}/complete`, {
+    token: service.token,
+    method: 'POST',
+    body: { status: 'done', summary: '已完成支付验签改造', decisions: ['使用 HMAC 验签'], lessons: ['重复回调保持幂等'] },
+  }));
+  const after = ok(await call(`/api/projects/${project.id}/memories?limit=20`, { token: tokenLin }));
+  assert.ok(after.memories.some((hit: Json) => hit.taskId === task.id));
+  assert.equal(after.agentId, 'aiwo_internal_memory_project');
+});

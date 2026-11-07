@@ -81,9 +81,6 @@ const projectCreateSchema = z.object({
   type: projectTypeSchema.optional(),
   prompt: z.string().max(20_000).optional(),
   repoUrl: z.string().trim().max(500).optional(),
-  mnemosProjectId: z.string().trim().max(120).optional(),
-  mnemosApiKey: z.string().max(500).optional(),
-  memoryAgentId: z.string().trim().max(160).optional(),
 });
 
 const projectUpdateSchema = z.object({
@@ -94,10 +91,6 @@ const projectUpdateSchema = z.object({
   prompt: z.string().max(20_000).optional(),
   repoUrl: z.string().trim().max(500).nullable().optional(),
   ownerTeamId: z.string().trim().min(1).nullable().optional(),
-  mnemosProjectId: z.string().trim().max(120).nullable().optional(),
-  // 空字符串表示清除密钥；字段缺省表示保持不变。
-  mnemosApiKey: z.string().max(500).optional(),
-  memoryAgentId: z.string().trim().max(160).nullable().optional(),
   status: projectStatusSchema.optional(),
 });
 
@@ -415,8 +408,8 @@ export function registerIdentityRoutes(router: Router): void {
     db.prepare(
       `INSERT INTO projects
          (id, slug, name, description, owner_team_id, owner_person_id, visibility, type, prompt, repo_url,
-          status, mnemos_project_id, mnemos_api_key, memory_agent_id, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'active', ?, ?, ?, ?, ?)`,
+          status, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'active', ?, ?)`,
     ).run(
       id,
       slug,
@@ -428,9 +421,6 @@ export function registerIdentityRoutes(router: Router): void {
       type,
       body.prompt ?? '',
       nullableText(body.repoUrl),
-      nullableText(body.mnemosProjectId),
-      nullableText(body.mnemosApiKey),
-      nullableText(body.memoryAgentId),
       now,
       now,
     );
@@ -496,19 +486,6 @@ export function registerIdentityRoutes(router: Router): void {
     if (body.ownerTeamId !== undefined) {
       updates.push('owner_team_id = ?');
       params.push(body.ownerTeamId);
-    }
-    if (body.mnemosProjectId !== undefined) {
-      updates.push('mnemos_project_id = ?');
-      params.push(nullableText(body.mnemosProjectId));
-    }
-    if (body.mnemosApiKey !== undefined) {
-      // 空字符串 = 清除；非空 = 覆盖；字段缺省 = 不变。
-      updates.push('mnemos_api_key = ?');
-      params.push(nullableText(body.mnemosApiKey));
-    }
-    if (body.memoryAgentId !== undefined) {
-      updates.push('memory_agent_id = ?');
-      params.push(nullableText(body.memoryAgentId));
     }
     if (body.status !== undefined) {
       updates.push('status = ?');

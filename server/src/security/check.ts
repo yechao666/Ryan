@@ -6,7 +6,7 @@ import { sha256 } from '../lib/ids.ts';
 interface CheckInput {
   db: Db;
   personId?: string | null;
-  source: 'task' | 'assistant' | 'automation';
+  source: 'task' | 'assistant' | 'automation' | 'memory';
   content: string;
 }
 

@@ -81,9 +81,7 @@ export interface Project {
   /** 项目绑定的 DSH 服务；空表示共享池。 */
   serviceIds?: string[];
   serviceNames?: string[];
-  mnemosProjectId?: string;
-  mnemosConfigured: boolean;
-  /** Mnemos 项目级记忆身份；为空时使用 aiwo_<slug>。 */
+  /** Aiwo 内部项目记忆身份（aiwo_<slug>）。 */
   memoryAgentId?: string;
   createdAt: string;
   updatedAt: string;
@@ -423,11 +421,11 @@ export interface ClaimedTask {
   };
   promptCards: { id: string; name: string; category: PromptCardCategory; content: string }[];
   memory: {
-    baseUrl: string;
-    projectId: string;
-    apiKey: string;
     agentId: string;
     enabled: boolean;
+    /** 项目记忆简报，可直接注入 prompt。 */
+    context: string;
+    citations: string[];
   };
 }
 
@@ -471,8 +469,6 @@ export interface CreateProjectInput {
   type?: ProjectType;
   prompt?: string;
   repoUrl?: string;
-  mnemosProjectId?: string;
-  mnemosApiKey?: string;
   memoryAgentId?: string;
 }
 

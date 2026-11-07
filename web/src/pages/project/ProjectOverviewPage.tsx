@@ -52,7 +52,7 @@ export function ProjectOverviewPage() {
   const memoryContext = useAsync(
     () => api.memoryContext(projectId, memoryAgentId),
     [projectId, memoryAgentId],
-    detail.project.mnemosConfigured,
+    true,
   );
 
   const preview = useMemo(() => {
@@ -309,20 +309,13 @@ export function ProjectOverviewPage() {
               }
             />
             <div className="mt-12">
-              {!detail.project.mnemosConfigured ? (
-                <Callout tone="amber" icon="alert">
-                  项目尚未配置 Mnemos 集成。
-                  <Link className="ws-link" to={`${base}/settings`}>
-                    前往设置
-                  </Link>
-                </Callout>
-              ) : memoryContext.loading && !memoryContext.data ? (
+              {memoryContext.loading && !memoryContext.data ? (
                 <Skeleton h={124} style={{ borderRadius: 10 }} />
               ) : memoryContext.error ? (
                 <ErrorState message={memoryContext.error} onRetry={() => void memoryContext.refresh()} />
               ) : memoryContext.data && !memoryContext.data.configured ? (
                 <Callout tone="amber" icon="alert">
-                  {memoryContext.data.error ?? 'Mnemos 尚未就绪，暂时无法读取项目记忆。'}
+                  {memoryContext.data.error ?? '项目记忆暂时不可用。'}
                 </Callout>
               ) : memoryContext.data ? (
                 <>

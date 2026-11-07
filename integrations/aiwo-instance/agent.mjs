@@ -23,7 +23,7 @@ import { buildDshEnv } from './lib/credentials.mjs';
 
 const MAX_SUMMARY = 20_000;
 
-/** 从最终输出中提取「决策 / 经验」小节，供 Aiwo 写回 Mnemos。 */
+/** 从最终输出中提取「决策 / 经验」小节，供 Aiwo 写回项目记忆。 */
 function extractSection(text, labels) {
   const lines = String(text ?? '').split(/\r?\n/);
   const heading = new RegExp(`^#{1,6}\\s*(?:${labels})\\s*[:：]?\\s*$`);

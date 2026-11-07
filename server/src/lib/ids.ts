@@ -26,13 +26,6 @@ export function randomToken(bytes = 32): string {
   return randomBytes(bytes).toString('base64url');
 }
 
-/** API Key 明文：mnemos_live_<随机>；仅创建时返回一次。 */
-export function newApiKeySecret(): { secret: string; prefix: string; hash: string } {
-  const body = randomBytes(24).toString('base64url');
-  const secret = `mnemos_live_${body}`;
-  return { secret, prefix: secret.slice(0, 18), hash: sha256(secret) };
-}
-
 export function dayKey(iso: string): string {
   return iso.slice(0, 10);
 }

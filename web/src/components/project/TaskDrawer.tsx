@@ -205,7 +205,7 @@ export function TaskDrawer({ taskId, onClose, onChanged, inline = false }: TaskD
   const memory = useAsync(
     () => api.memoryContext(projectId, memoryAgentId, task?.title),
     [memoryOpen, projectId, memoryAgentId, task?.title],
-    memoryOpen && projectDetail.project.mnemosConfigured,
+    memoryOpen,
   );
 
   const notifyChanged = useCallback(() => {
@@ -374,19 +374,15 @@ export function TaskDrawer({ taskId, onClose, onChanged, inline = false }: TaskD
               <div className="ws-drawer-section">
                 <SectionHead
                   title="记忆上下文"
-                  desc={memoryAgentId ? `Mnemos 记忆身份 ${memoryAgentId}` : '将使用项目默认记忆身份'}
+                  desc={memoryAgentId ? `项目记忆身份 ${memoryAgentId}` : '项目内部记忆'}
                 />
-                {!projectDetail.project.mnemosConfigured ? (
-                  <Callout tone="amber" icon="alert">
-                    该项目尚未配置 Mnemos 集成，任务不会注入项目记忆。可在「设置 → Mnemos 集成」中补充项目 ID 与 API Key。
-                  </Callout>
-                ) : memory.loading && !memory.data ? (
+                {memory.loading && !memory.data ? (
                   <Skeleton h={110} style={{ borderRadius: 12 }} />
                 ) : memory.error ? (
                   <ErrorState message={memory.error} onRetry={() => void memory.refresh()} />
                 ) : memory.data && !memory.data.configured ? (
                   <Callout tone="amber" icon="alert">
-                    {memory.data.error ?? 'Mnemos 尚未就绪，暂时无法生成记忆上下文。'}
+                    {memory.data.error ?? '暂时无法生成记忆上下文。'}
                   </Callout>
                 ) : memory.data ? (
                   (() => {

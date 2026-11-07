@@ -196,9 +196,7 @@ export function buildProjectSummary(db: Db, row: ProjectRow): ProjectSummary {
     status: row.status as ProjectSummary['status'],
     serviceIds: services.map((service) => service.id),
     serviceNames: services.map((service) => service.name),
-    mnemosProjectId: row.mnemos_project_id ?? undefined,
-    mnemosConfigured: Boolean(row.mnemos_project_id && row.mnemos_api_key),
-    memoryAgentId: row.memory_agent_id ?? undefined,
+    memoryAgentId: `aiwo_${row.slug.replace(/-/g, '_')}`,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
     counts: {

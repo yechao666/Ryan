@@ -13,6 +13,7 @@ import type {
   InboundDelivery,
   LiveEvent,
   MemoryContextResult,
+  MemoryHit,
   MemorySearchResult,
   Paginated,
   Person,
@@ -222,7 +223,7 @@ export const api = {
   },
   updateProject(
     id: string,
-    input: Partial<CreateProjectInput> & { status?: string; mnemosApiKey?: string },
+    input: Partial<CreateProjectInput> & { status?: string },
   ): Promise<ProjectSummary> {
     return request(`/api/projects/${id}`, { method: 'PATCH', body: JSON.stringify(input) });
   },
@@ -456,6 +457,18 @@ export const api = {
   memoryContext(projectId: string, agentId?: string, q?: string): Promise<MemoryContextResult> {
     return request(`/api/projects/${projectId}/memory/context${qs({ agentId, q })}`);
   },
+  projectMemories(projectId: string, limit = 50): Promise<{ memories: MemoryHit[]; agentId: string }> {
+    return request(`/api/projects/${projectId}/memories${qs({ limit })}`);
+  },
+
+  addProjectMemory(projectId: string, input: { content: string; title?: string; category?: string }): Promise<MemoryHit> {
+    return request(`/api/projects/${projectId}/memories`, { method: 'POST', body: JSON.stringify(input) });
+  },
+
+  deleteProjectMemory(projectId: string, memoryId: string): Promise<{ ok: boolean }> {
+    return request(`/api/projects/${projectId}/memories/${memoryId}`, { method: 'DELETE' });
+  },
+
 
   // ---- SSE ----
   subscribeEvents(onEvent: (event: LiveEvent) => void, projectId?: string): () => void {

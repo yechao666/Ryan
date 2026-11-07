@@ -35,8 +35,6 @@ interface ProjectFormState {
   type: ProjectType;
   prompt: string;
   repoUrl: string;
-  mnemosProjectId: string;
-  mnemosApiKey: string;
 }
 
 const EMPTY_FORM: ProjectFormState = {
@@ -47,8 +45,6 @@ const EMPTY_FORM: ProjectFormState = {
   type: 'manual',
   prompt: '',
   repoUrl: '',
-  mnemosProjectId: '',
-  mnemosApiKey: '',
 };
 
 /** 项目列表页：搜索 + 可见性筛选 + 新建项目。 */
@@ -111,8 +107,6 @@ export function ProjectsPage() {
         type: form.type,
         prompt: form.prompt.trim() || undefined,
         repoUrl: form.type === 'manual' ? undefined : form.repoUrl.trim() || undefined,
-        mnemosProjectId: form.mnemosProjectId.trim() || undefined,
-        mnemosApiKey: form.mnemosApiKey.trim() || undefined,
       });
       toast.success(`项目「${created.name}」已创建`);
       setForm(EMPTY_FORM);
@@ -324,39 +318,6 @@ export function ProjectsPage() {
                 />
               </Field>
             )}
-          </div>
-
-          <div className="divider" />
-
-          <div className="stack" style={{ gap: 12 }}>
-            <div>
-              <div className="card-title">
-                <Icon name="brain" size={15} />
-                项目记忆（可选）
-              </div>
-              <div className="card-sub">接入 Mnemos 后，项目记忆可在任务中搜索与写回。</div>
-            </div>
-
-            <div className="grid grid-2">
-              <Field label="Mnemos 项目 ID" htmlFor="project-mnemos-id">
-                <Input
-                  id="project-mnemos-id"
-                  value={form.mnemosProjectId}
-                  placeholder="prj_orion_python"
-                  onChange={(event) => update('mnemosProjectId', event.target.value)}
-                />
-              </Field>
-              <Field label="Mnemos API Key" htmlFor="project-mnemos-key" hint="只保存在服务端，不会回显。">
-                <Input
-                  id="project-mnemos-key"
-                  type="password"
-                  value={form.mnemosApiKey}
-                  placeholder="粘贴 API Key"
-                  autoComplete="new-password"
-                  onChange={(event) => update('mnemosApiKey', event.target.value)}
-                />
-              </Field>
-            </div>
           </div>
 
           {submitError ? (

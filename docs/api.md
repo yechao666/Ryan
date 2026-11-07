@@ -16,7 +16,7 @@ Base URL: `http://127.0.0.1:4500`。控制台使用会话 Bearer token；服务�
 | GET/PATCH/DELETE | `/api/projects/:id` | 项目详情 / 更新 / 删除 |
 | POST/DELETE | `/api/projects/:id/members` | 项目成员 |
 
-项目字段：`name,slug,description,ownerTeamId,visibility,type,prompt,repoUrl,mnemosProjectId,mnemosApiKey,memoryAgentId`。项目不配置工作目录；DSH 插件按项目 ID 在服务本机自动生成。
+项目字段：`name,slug,description,ownerTeamId,visibility,type,prompt,repoUrl`。项目不配置工作目录；DSH 插件按项目 ID 在服务本机自动生成。项目记忆由 Aiwo 内置维护。
 
 ## 提示词卡片（Aiwo 没有智员，用卡片复用工作流/风格/标准）
 
@@ -91,12 +91,17 @@ Aiwo 任务执行者固定为「创建人@Aiwo」；任务不支持对话，只�
 
 创建：`{name,triggerType:'cron'|'webhook'|'manual',triggerConfig,promptTemplate,promptCardIds,instanceId,enabled}`。
 
-## 记忆（Mnemos）
+## 记忆（Aiwo 内置）
 
 | Method | Path | 说明 |
 | --- | --- | --- |
-| GET | `/api/projects/:id/memory/search?q=&topK=` | 项目记忆搜索 |
-| GET | `/api/projects/:id/memory/context?q=` | 项目记忆上下文 |
+| GET | `/api/projects/:id/memory/search?q=&topK=` | 项目记忆检索 |
+| GET | `/api/projects/:id/memory/context?q=` | 项目记忆上下文简报 |
+| GET | `/api/projects/:id/memories?limit=` | 列出项目记忆 |
+| POST | `/api/projects/:id/memories` | `{content,title?,category?}` 手动写入 |
+| DELETE | `/api/projects/:id/memories/:memoryId` | 删除项目记忆 |
+
+记忆按项目隔离，任务完成会自动写回。不需要外部 Mnemos 服务或 API Key。
 
 ## 系统设置 / 安全检查
 

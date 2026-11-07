@@ -17,7 +17,7 @@ const bus = new EventBus();
 const app = { db, env, bus, startedAt: new Date().toISOString() };
 
 if (env.demoMode && tableCount(db, 'persons') === 0) {
-  seedIfEmpty(db, env);
+  seedIfEmpty(db);
 }
 
 const router = new Router();

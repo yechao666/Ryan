@@ -13,7 +13,7 @@
   → session/update 事件
   → /api/runtime/tasks/:id/events（批量）
   → /api/runtime/tasks/:id/complete
-  → Mnemos 写回
+  → Aiwo 内置项目记忆写回
 ```
 
 - 服务是独立资源，不依赖智员。
@@ -23,7 +23,7 @@
 - ACP 不可用时自动回退 headless；两种模式都产生同样的 runtime_events。
 - 任务结束即终止，不支持对话。
 - 服务每 5s 查询任务状态；控制台取消后代理自动中止 ACP/headless 会话。
-- 完成时从最终输出的「决策 / 经验」小节提取，随结果写入 Mnemos。
+- 完成时从最终输出的「决策 / 经验」小节提取，随结果写入 Aiwo 内置项目记忆。
 
 ### 2. 助手：DSH headless + 开放 API
 
@@ -75,8 +75,8 @@ POST /api/runtime/tasks/:id/complete
 
 ## 记忆
 
-- 项目级 Mnemos 配置：project.mnemosProjectId / API Key / memoryAgentId
-- claim 返回 `memory` + `promptCards`
-- 服务代理拉取 `/v1/context`，注入 prompt
-- 完成后 Aiwo 服务端调用 Mnemos `/v1/memories` 写回
-- 记忆身份由项目决定，不再按智员绑定
+- 项目级记忆表 `project_memories`，按 `project_id` 隔离
+- claim 时由 Aiwo 生成 memory context，随 `memory.context` 注入 prompt
+- 完成后 Aiwo 直接写入 `project_memories`，不依赖外部服务
+- 记忆身份由项目决定：`aiwo_<slug>`
+- 检索采用本地词项/中文二元组 + 时间衰减评分；上下文有 token 预算

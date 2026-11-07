@@ -49,7 +49,7 @@ interface BasicForm {
   ownerTeamId: string;
 }
 
-/** 项目设置：基本信息、Mnemos 集成、成员与危险操作。 */
+/** 项目设置：基本信息、成员与危险操作。 */
 export function ProjectSettingsPage() {
   const { detail, reload } = useProject();
   const projectId = detail.project.id;
@@ -67,12 +67,6 @@ export function ProjectSettingsPage() {
     ownerTeamId: detail.project.ownerTeamId ?? '',
   });
   const [savingBasic, setSavingBasic] = useState(false);
-
-  const [mnemosProjectId, setMnemosProjectId] = useState(detail.project.mnemosProjectId ?? '');
-  const [mnemosApiKey, setMnemosApiKey] = useState('');
-  const [savingMnemos, setSavingMnemos] = useState(false);
-  const [testing, setTesting] = useState(false);
-  const [testResult, setTestResult] = useState<{ tone: Tone; text: string } | null>(null);
 
   const [addOpen, setAddOpen] = useState(false);
   const [newPersonId, setNewPersonId] = useState('');
@@ -94,7 +88,6 @@ export function ProjectSettingsPage() {
       repoUrl: detail.project.repoUrl ?? '',
       ownerTeamId: detail.project.ownerTeamId ?? '',
     });
-    setMnemosProjectId(detail.project.mnemosProjectId ?? '');
   }, [detail.project]);
 
   useEffect(() => {
@@ -146,49 +139,6 @@ export function ProjectSettingsPage() {
       toast.error(cause instanceof Error ? cause.message : '保存项目信息失败，请重试');
     } finally {
       setSavingBasic(false);
-    }
-  };
-
-  const handleSaveMnemos = async () => {
-    setSavingMnemos(true);
-    try {
-      await api.updateProject(projectId, {
-        mnemosProjectId: mnemosProjectId.trim(),
-        mnemosApiKey: mnemosApiKey.trim() || undefined,
-      });
-      setMnemosApiKey('');
-      toast.success('Mnemos 集成配置已保存');
-      await reload();
-    } catch (cause) {
-      toast.error(cause instanceof Error ? cause.message : '保存 Mnemos 配置失败');
-    } finally {
-      setSavingMnemos(false);
-    }
-  };
-
-  const handleTest = async () => {
-    setTesting(true);
-    setTestResult(null);
-    try {
-      const result = await api.memorySearch(projectId, '测试记忆连接', undefined, 3);
-      if (result.configured) {
-        setTestResult({
-          tone: 'green',
-          text: `记忆检索正常：命中 ${result.hits.length} 条，耗时 ${fmtMs(result.tookMs)}。`,
-        });
-      } else {
-        setTestResult({
-          tone: 'amber',
-          text: result.error ?? 'Mnemos 尚未就绪，请检查项目 ID 与 API Key。',
-        });
-      }
-    } catch (cause) {
-      setTestResult({
-        tone: 'red',
-        text: cause instanceof Error ? cause.message : '测试搜索失败，请检查集成配置。',
-      });
-    } finally {
-      setTesting(false);
     }
   };
 
@@ -364,64 +314,6 @@ export function ProjectSettingsPage() {
               保存基本信息
             </Button>
           </div>
-        </Card>
-
-        <Card className="card-pad">
-          <SectionHead
-            title={
-              <>
-                <Icon name="brain" size={14} />
-                Mnemos 集成
-              </>
-            }
-            desc="任务执行时，Aiwo 会按项目 ID 与 API Key 读取 / 写入 Mnemos 记忆。"
-            actions={
-              <Badge tone={detail.project.mnemosConfigured ? 'green' : 'slate'} dot>
-                {detail.project.mnemosConfigured ? '已配置' : '未配置'}
-              </Badge>
-            }
-          />
-          <div className="ws-form-grid mt-12">
-            <Field label="Mnemos 项目 ID" hint="Mnemos 中用于隔离项目记忆的标识。">
-              <Input
-                value={mnemosProjectId}
-                placeholder="例如：mb_xxxx 或项目 slug"
-                onChange={(event) => setMnemosProjectId(event.target.value)}
-              />
-            </Field>
-            <Field label="API Key" hint="密码框留空表示不修改；写入后只返回是否已配置。">
-              <Input
-                type="password"
-                value={mnemosApiKey}
-                placeholder={detail.project.mnemosConfigured ? '已配置，留空不修改' : '填写 Mnemos API Key'}
-                autoComplete="new-password"
-                onChange={(event) => setMnemosApiKey(event.target.value)}
-              />
-            </Field>
-          </div>
-          <div className="ws-card-actions">
-            <Button
-              variant="primary"
-              icon="check"
-              loading={savingMnemos}
-              onClick={() => void handleSaveMnemos()}
-            >
-              保存集成配置
-            </Button>
-            <Button
-              variant="outline"
-              icon="search"
-              loading={testing}
-              onClick={() => void handleTest()}
-            >
-              测试搜索
-            </Button>
-          </div>
-          {testResult ? (
-            <Callout tone={testResult.tone} icon={testResult.tone === 'green' ? 'checkCircle' : 'alert'}>
-              {testResult.text}
-            </Callout>
-          ) : null}
         </Card>
 
         <Card>

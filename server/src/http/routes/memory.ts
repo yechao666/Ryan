@@ -1,18 +1,20 @@
 /**
- * 项目记忆 API（会话鉴权）：语义搜索 + 上下文简报。
- * 未配置 Mnemos 时返回 configured:false 而不是 500；记忆服务异常通过 error 字段透出。
+ * Aiwo 内置项目记忆 API：检索、上下文简报、手动新增与删除。
+ * 记忆按项目隔离；不再依赖外部 Mnemos 服务或 API Key。
  */
 import { z } from 'zod';
 import type { Router } from '../router.ts';
-import { requireProject } from '../auth.ts';
+import { requirePerson, requireProject } from '../auth.ts';
+import { errors } from '../respond.ts';
 import {
-  context as mnemosContext,
-  memoryConfigFor,
-  resolveMemoryAgent,
-  search as mnemosSearch,
-  tookMsOf,
-  toMemoryHits,
-} from '../../memory/mnemos.ts';
+  addMemory,
+  buildMemoryContext,
+  deleteMemory,
+  listMemories,
+  memoryAgentIdOf,
+  searchMemories,
+} from '../../memory/store.ts';
+import { checkUserInput } from '../../security/check.ts';
 import type {
   MemoryContextResult,
   MemorySearchResult,
@@ -29,121 +31,67 @@ const contextQuerySchema = z.object({
   q: z.string().max(1_000).optional(),
 });
 
-function errorMessage(error: unknown): string {
-  if (error instanceof Error) return error.message;
-  return String(error);
-}
+const listQuerySchema = z.object({
+  limit: z.coerce.number().int().min(1).max(200).default(50),
+});
+
+const addSchema = z.object({
+  content: z.string().trim().min(1).max(20_000),
+  title: z.string().trim().max(200).optional(),
+  category: z.enum(['fact', 'decision', 'note', 'task_result']).optional(),
+});
 
 export function registerMemoryRoutes(router: Router): void {
-  // GET /api/projects/:id/memory/search?q=&topK=
-  router.get('/api/projects/:id/memory/search', async (rc) => {
+  router.get('/api/projects/:id/memory/search', (rc) => {
     const project = requireProject(rc, rc.params.id, 'view');
     const params = rc.query(searchQuerySchema);
-    const config = memoryConfigFor(rc.app.env, project);
-    if (!config) {
-      const result: MemorySearchResult = { hits: [], tookMs: 0, configured: false };
-      rc.json(result);
-      return;
-    }
-
-    const resolution = resolveMemoryAgent(rc.app.db, project.id);
-    if (!resolution.memoryAgentId) {
-      const result: MemorySearchResult = {
-        hits: [],
-        tookMs: 0,
-        configured: true,
-        error: resolution.error ?? '无法确定记忆身份',
-      };
-      rc.json(result);
-      return;
-    }
-
-    const startedAt = Date.now();
-    try {
-      const raw = await mnemosSearch(config, {
-        query: params.q,
-        agentId: resolution.memoryAgentId,
-        topK: params.topK,
-      });
-      const result: MemorySearchResult = {
-        hits: toMemoryHits(raw),
-        tookMs: tookMsOf(raw, startedAt),
-        configured: true,
-      };
-      rc.json(result);
-    } catch (error) {
-      const result: MemorySearchResult = {
-        hits: [],
-        tookMs: Math.round(Date.now() - startedAt),
-        configured: true,
-        error: errorMessage(error),
-      };
-      rc.json(result);
-    }
+    const result: MemorySearchResult = searchMemories(rc.app.db, project.id, params.q, params.topK);
+    rc.json(result);
   });
 
-  // GET /api/projects/:id/memory/context?q=
-  router.get('/api/projects/:id/memory/context', async (rc) => {
+  router.get('/api/projects/:id/memory/context', (rc) => {
     const project = requireProject(rc, rc.params.id, 'view');
     const params = rc.query(contextQuerySchema);
-    const config = memoryConfigFor(rc.app.env, project);
-    if (!config) {
-      const result: MemoryContextResult = {
-        prompt: '',
-        tokenEstimate: 0,
-        citations: [],
-        configured: false,
-      };
-      rc.json(result);
-      return;
-    }
+    const result: MemoryContextResult = buildMemoryContext(rc.app.db, project.id, params.q ?? '', CONTEXT_BUDGET_TOKENS);
+    rc.json(result);
+  });
 
-    const resolution = resolveMemoryAgent(rc.app.db, project.id);
-    if (!resolution.memoryAgentId) {
-      const result: MemoryContextResult = {
-        prompt: '',
-        tokenEstimate: 0,
-        citations: [],
-        configured: true,
-        error: resolution.error ?? '无法确定记忆身份',
-      };
-      rc.json(result);
-      return;
-    }
+  router.get('/api/projects/:id/memories', (rc) => {
+    const project = requireProject(rc, rc.params.id, 'view');
+    const params = rc.query(listQuerySchema);
+    const agentId = memoryAgentIdOf(rc.app.db, project.id) ?? '';
+    rc.json({ memories: listMemories(rc.app.db, project.id, params.limit), agentId });
+  });
 
-    try {
-      const raw = await mnemosContext(config, {
-        agentId: resolution.memoryAgentId,
-        query: params.q ?? '',
-        budgetTokens: CONTEXT_BUDGET_TOKENS,
-      });
-      const prompt = typeof raw.prompt === 'string' ? raw.prompt : '';
-      const tokenEstimate =
-        typeof raw.token_estimate === 'number'
-          ? raw.token_estimate
-          : typeof raw.tokenEstimate === 'number'
-            ? raw.tokenEstimate
-            : 0;
-      const citations = Array.isArray(raw.citations)
-        ? raw.citations.filter((item): item is string => typeof item === 'string')
-        : [];
-      const result: MemoryContextResult = {
-        prompt,
-        tokenEstimate,
-        citations,
-        configured: true,
-      };
-      rc.json(result);
-    } catch (error) {
-      // Agent 未在 Mnemos 注册时服务端返回 404：按 configured:true + error 返回，不 500。
-      const result: MemoryContextResult = {
-        prompt: '',
-        tokenEstimate: 0,
-        citations: [],
-        configured: true,
-        error: errorMessage(error),
-      };
-      rc.json(result);
+  router.post('/api/projects/:id/memories', async (rc) => {
+    const person = requirePerson(rc);
+    const project = requireProject(rc, rc.params.id, 'contribute');
+    const input = await rc.body(addSchema);
+    const security = await checkUserInput({
+      db: rc.app.db,
+      personId: person.id,
+      source: 'memory',
+      content: input.content,
+    });
+    if (!security.allowed) {
+      throw errors.badRequest(security.blockedMessage ?? '输入未通过安全检查', { reason: security.reason });
     }
+    const memory = addMemory(rc.app.db, {
+      projectId: project.id,
+      content: input.content,
+      title: input.title,
+      category: input.category ?? 'note',
+      source: 'manual',
+      createdBy: person.id,
+    });
+    rc.json(memory, 201);
+  });
+
+  router.delete('/api/projects/:id/memories/:memoryId', (rc) => {
+    const project = requireProject(rc, rc.params.id, 'manage');
+    if (!deleteMemory(rc.app.db, project.id, rc.params.memoryId)) {
+      throw errors.notFound('记忆不存在');
+    }
+    rc.json({ ok: true });
   });
 }
