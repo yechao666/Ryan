@@ -102,6 +102,9 @@ export function InstancesPage() {
   const [revoking, setRevoking] = useState(false);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
+  const [kindFilter, setKindFilter] = useState('all');
+  const [defaultFilter, setDefaultFilter] = useState('all');
+  const [taskFilter, setTaskFilter] = useState('all');
   const [editTarget, setEditTarget] = useState<DshInstance | null>(null);
   const [editForm, setEditForm] = useState<InstanceFormState>(EMPTY_FORM);
   const [editError, setEditError] = useState<string | null>(null);
@@ -111,22 +114,27 @@ export function InstancesPage() {
   const [pageSize, setPageSize] = useState(20);
 
   const list = useMemo(() => instances.data ?? [], [instances.data]);
+  const defaultServiceId = settings.data?.defaultServiceId ?? '';
   const filteredList = useMemo(() => {
     const needle = search.trim().toLowerCase();
     return list.filter((item) => {
       if (statusFilter !== 'all' && item.status !== statusFilter) return false;
+      if (kindFilter !== 'all' && item.kind !== kindFilter) return false;
+      if (defaultFilter === 'default' && defaultServiceId !== item.id) return false;
+      if (defaultFilter === 'other' && defaultServiceId === item.id) return false;
+      if (taskFilter === 'busy' && !item.currentTask) return false;
+      if (taskFilter === 'idle' && item.currentTask) return false;
       if (!needle) return true;
       return `${item.name} ${item.id} ${item.host} ${item.baseUrl ?? ''}`.toLowerCase().includes(needle);
     });
-  }, [list, search, statusFilter]);
+  }, [list, search, statusFilter, kindFilter, defaultFilter, taskFilter, defaultServiceId]);
   const totalPages = Math.max(1, Math.ceil(filteredList.length / pageSize));
   const currentPage = Math.min(page, totalPages);
   const pagedList = useMemo(
     () => filteredList.slice((currentPage - 1) * pageSize, currentPage * pageSize),
     [filteredList, currentPage, pageSize],
   );
-  useEffect(() => { setPage(1); }, [search, statusFilter, pageSize]);
-  const defaultServiceId = settings.data?.defaultServiceId ?? '';
+  useEffect(() => { setPage(1); }, [search, statusFilter, kindFilter, defaultFilter, taskFilter, pageSize]);
   const online = list.filter((item) => item.status === 'online').length;
   const unconfigured = list.filter((item) => item.status === 'unconfigured').length;
   const offline = list.filter((item) => item.status === 'offline').length;
@@ -501,6 +509,36 @@ export function InstancesPage() {
             ]}
             onChange={(event) => setStatusFilter(event.target.value)}
           />
+          <Select
+            className="ws-filter-select"
+            value={kindFilter}
+            options={[
+              { value: 'all', label: '全部类型' },
+              { value: 'local', label: '本机 DSH' },
+              { value: 'remote', label: '远端 DSH' },
+            ]}
+            onChange={(event) => setKindFilter(event.target.value)}
+          />
+          <Select
+            className="ws-filter-select"
+            value={defaultFilter}
+            options={[
+              { value: 'all', label: '默认/普通' },
+              { value: 'default', label: '仅默认服务' },
+              { value: 'other', label: '非默认服务' },
+            ]}
+            onChange={(event) => setDefaultFilter(event.target.value)}
+          />
+          <Select
+            className="ws-filter-select"
+            value={taskFilter}
+            options={[
+              { value: 'all', label: '全部任务状态' },
+              { value: 'busy', label: '执行中' },
+              { value: 'idle', label: '空闲' },
+            ]}
+            onChange={(event) => setTaskFilter(event.target.value)}
+          />
           <SearchInput
             value={search}
             onChange={setSearch}
@@ -509,8 +547,20 @@ export function InstancesPage() {
           />
           <span className="tiny dim">共 {filteredList.length} 个服务</span>
         </div>
-        {search || statusFilter !== 'all' ? (
-          <Button size="sm" variant="ghost" onClick={() => { setSearch(''); setStatusFilter('all'); }}>清除筛选</Button>
+        {search || statusFilter !== 'all' || kindFilter !== 'all' || defaultFilter !== 'all' || taskFilter !== 'all' ? (
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={() => {
+              setSearch('');
+              setStatusFilter('all');
+              setKindFilter('all');
+              setDefaultFilter('all');
+              setTaskFilter('all');
+            }}
+          >
+            清除筛选
+          </Button>
         ) : null}
       </div>
 
