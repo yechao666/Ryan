@@ -7,7 +7,8 @@
  *   ACP 不可用时自动回退 `dsh --profile headless --json -`
  * - 单任务串行；SIGINT/SIGTERM 优雅停止
  */
-import { mkdirSync } from 'node:fs';
+import { existsSync, mkdirSync, statSync } from 'node:fs';
+import { isAbsolute } from 'node:path';
 import { spawn } from 'node:child_process';
 import { parseConfig, usage, PLUGIN_VERSION } from './lib/config.mjs';
 import { createLogger, sleep } from './lib/log.mjs';
@@ -246,12 +247,27 @@ class Agent {
     }
   }
 
+  /** 项目 repoUrl 若是本机绝对目录，则作为本任务 ACP 会话的工作区；否则用实例默认工作区。 */
+  workspaceFor(claim) {
+    const repo = claim.project?.repoUrl;
+    if (typeof repo === 'string' && isAbsolute(repo) && existsSync(repo)) {
+      try {
+        if (statSync(repo).isDirectory()) return repo;
+      } catch {
+        /* fall through */
+      }
+    }
+    return this.config.workspace;
+  }
+
   async execute(claim) {
     const task = claim.task;
     const projectLabel = claim.project.name || task.projectName || task.projectId || '';
     this.logger.info(`领到任务 ${task.id}「${String(task.title ?? '').slice(0, 80)}」${projectLabel ? `（${projectLabel}）` : ''}`);
 
     const prompt = buildPrompt(claim);
+    const workspace = this.workspaceFor(claim);
+    this.logger.info(`任务工作区：${workspace}`);
     this.logger.debug(`提示词 ${prompt.length} 字符，执行模式 ${this.mode}`);
 
     const pump = new EventPump({
@@ -269,6 +285,7 @@ class Agent {
       cancelledByServer: false,
       progressBusy: false,
       mode: this.mode,
+      workspace,
     };
     this.active = active;
 
@@ -351,6 +368,7 @@ class Agent {
       const runner = this.ensureRunner();
       const result = await runner.runTask({
         prompt,
+        cwd: active.workspace,
         signal: active.controller.signal,
         onEvent: (type, payload) => active.pump.push(type, payload),
       });
@@ -371,7 +389,7 @@ class Agent {
 
   runHeadlessTask(prompt, active) {
     return runHeadless({
-      config: { ...this.config, profile: this.config.profile },
+      config: { ...this.config, profile: this.config.profile, workspace: active.workspace },
       prompt,
       signal: active.controller.signal,
       logger: this.logger,

@@ -279,11 +279,12 @@ export class AcpRunner {
    * 执行一个任务 prompt，读取 session/update 直到 stop。
    * @returns {Promise<{sessionId: string, text: string, stopReason: string|null}>}
    */
-  async runTask({ prompt, onEvent, signal }) {
+  async runTask({ prompt, cwd, onEvent, signal }) {
     await this.ensureConnected();
-    const session = await raceAbort(this.connection.agent.buildSession(this.config.workspace).start(), signal);
+    const sessionCwd = cwd || this.config.workspace;
+    const session = await raceAbort(this.connection.agent.buildSession(sessionCwd).start(), signal);
     const sessionId = session.sessionId;
-    onEvent('session', { sessionId, cwd: this.config.workspace, profile: this.config.profile });
+    onEvent('session', { sessionId, cwd: sessionCwd, profile: this.config.profile });
 
     let text = '';
     let stopReason = null;

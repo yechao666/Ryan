@@ -328,7 +328,7 @@ export function ProjectSettingsPage() {
                 onChange={(event) => setForm((prev) => ({ ...prev, ownerTeamId: event.target.value }))}
               />
             </Field>
-            <Field label="仓库地址" hint="GitHub / GitLab 仓库 HTTPS 地址，用于仓库事件关联。">
+            <Field label="仓库地址 / 工作区" hint="远端仓库填 HTTPS；本机项目可填实例上的绝对目录，作为该项目的 ACP 会话工作区。">
               <Input
                 value={form.repoUrl}
                 placeholder="https://github.com/org/repo"
