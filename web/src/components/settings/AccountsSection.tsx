@@ -2,12 +2,14 @@ import { useEffect, useMemo, useState } from 'react';
 import type { Person } from '@shared';
 import { api } from '@lib/api.ts';
 import { useAsync } from '@lib/hooks.ts';
+import { useAuth } from '@lib/auth.tsx';
 import { fmtDateTime, fmtRelative } from '@lib/format.ts';
 import {
   Avatar,
   Badge,
   Button,
   Callout,
+  ConfirmDialog,
   Card,
   EmptyState,
   Field,
@@ -53,6 +55,7 @@ const SSO_OPTIONS = [
 
 export function AccountsSection() {
   const toast = useToast();
+  const { person } = useAuth();
   const accounts = useAsync(() => api.adminAccounts(), []);
   const [keyword, setKeyword] = useState('');
   const [role, setRole] = useState('all');
@@ -70,6 +73,8 @@ export function AccountsSection() {
   const [edit, setEdit] = useState<AccountRow | null>(null);
   const [editForm, setEditForm] = useState({ name: '', title: '' });
   const [updating, setUpdating] = useState(false);
+  const [removeTarget, setRemoveTarget] = useState<AccountRow | null>(null);
+  const [removing, setRemoving] = useState(false);
 
   useEffect(() => { setPage(1); }, [keyword, role, password, sso, pageSize]);
 
@@ -147,6 +152,19 @@ export function AccountsSection() {
     } catch (cause) { toast.error(cause instanceof Error ? cause.message : '更新失败'); } finally { setUpdating(false); }
   };
 
+  const removeAccount = async () => {
+    if (!removeTarget) return;
+    setRemoving(true);
+    try {
+      await api.deleteAccount(removeTarget.id);
+      toast.success('账号已删除');
+      setRemoveTarget(null);
+      await accounts.refresh();
+    } catch (cause) {
+      toast.error(cause instanceof Error ? cause.message : '删除账号失败');
+    } finally { setRemoving(false); }
+  };
+
   const columns: Column<AccountRow>[] = [
     {
       key: 'person',
@@ -202,13 +220,16 @@ export function AccountsSection() {
     {
       key: 'actions',
       header: '操作',
-      width: 250,
+      width: 310,
       align: 'right',
       render: (account) => (
         <div className="hstack gap-4" style={{ justifyContent: 'flex-end' }} onClick={(event) => event.stopPropagation()}>
           <Button size="sm" variant="ghost" icon="pencil" onClick={() => openEdit(account)}>编辑</Button>
           <Button size="sm" variant="ghost" icon="key" onClick={() => { setReset(account); setNewPassword(''); }}>重置密码</Button>
           <Button size="sm" variant="ghost" icon="shield" onClick={() => void toggleAdmin(account)}>{account.isAdmin ? '取消管理员' : '设为管理员'}</Button>
+          {account.id !== person?.id ? (
+            <Button size="sm" variant="ghost" icon="trash" onClick={() => setRemoveTarget(account)}>删除</Button>
+          ) : null}
         </div>
       ),
     },
@@ -299,6 +320,16 @@ export function AccountsSection() {
           <Field label="职位/角色"><Input value={editForm.title} onChange={(event) => setEditForm({ ...editForm, title: event.target.value })} /></Field>
         </div>
       </Modal>
+
+      <ConfirmDialog
+        open={Boolean(removeTarget)}
+        onClose={() => setRemoveTarget(null)}
+        onConfirm={() => void removeAccount()}
+        title={`删除账号「${removeTarget?.name ?? ''}」？`}
+        description="删除后该人员的会话和统一认证绑定会移除；仍拥有项目或为最后一个管理员时不能删除。"
+        confirmLabel="删除账号"
+        loading={removing}
+      />
     </>
   );
 }

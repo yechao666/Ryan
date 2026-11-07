@@ -135,6 +135,7 @@ Aiwo 任务执行者固定为「创建人@Aiwo」；任务不支持对话，只�
 | GET | `/api/settings/accounts` | 管理员查看人员账号 |
 | POST | `/api/settings/accounts` | 管理员创建本地账号 |
 | PATCH | `/api/settings/accounts/:id` | 管理员维护资料/管理员权限/重置密码 |
+| DELETE | `/api/settings/accounts/:id` | 管理员删除账号（不能自删、删最后一个管理员或项目所有者） |
 
 统一认证使用 OIDC authorization code + PKCE；redirect URI 为：
 

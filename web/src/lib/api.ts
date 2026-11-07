@@ -208,6 +208,10 @@ export const api = {
     return request(`/api/settings/accounts/${id}`, { method: 'PATCH', body: JSON.stringify(input) });
   },
 
+  deleteAccount(id: string): Promise<{ ok: boolean }> {
+    return request(`/api/settings/accounts/${id}`, { method: 'DELETE' });
+  },
+
   authProviderAdmin(): Promise<AuthProvider[]> {
     return request('/api/settings/auth-providers');
   },

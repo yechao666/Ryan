@@ -369,6 +369,21 @@ export function registerAccountRoutes(router: Router): void {
     rc.json(personFromRow(row), 201);
   });
 
+  router.delete('/api/settings/accounts/:id', (rc) => {
+    const actor = requireAdmin(rc);
+    const target = rowOf<{ id: string; is_admin: number; name: string }>(rc.app.db, 'SELECT id, is_admin, name FROM persons WHERE id = ?', [rc.params.id]);
+    if (!target) throw errors.notFound('账号不存在');
+    if (target.id === actor.id) throw errors.badRequest('不能删除自己的账号');
+    if (Number(target.is_admin) === 1) {
+      const admins = rowOf<{ c: number }>(rc.app.db, 'SELECT COUNT(*) AS c FROM persons WHERE is_admin = 1')?.c ?? 0;
+      if (admins <= 1) throw errors.badRequest('至少保留一个管理员账号');
+    }
+    const owned = rowOf<{ c: number }>(rc.app.db, 'SELECT COUNT(*) AS c FROM projects WHERE owner_person_id = ?', [target.id])?.c ?? 0;
+    if (Number(owned) > 0) throw errors.badRequest(`该账号名下还有 ${owned} 个项目，请先转移项目所有权`);
+    rc.app.db.prepare('DELETE FROM persons WHERE id = ?').run(target.id);
+    rc.json({ ok: true });
+  });
+
   router.patch('/api/settings/accounts/:id', async (rc) => {
     const actor = requireAdmin(rc);
     const target = rowOf<{ id: string; is_admin: number }>(rc.app.db, 'SELECT id, is_admin FROM persons WHERE id = ?', [rc.params.id]);

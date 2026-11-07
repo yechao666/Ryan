@@ -130,7 +130,7 @@ node integrations/aiwo-instance/agent.mjs \
 - 支持本地密码；OIDC 自动创建的账号可以后补本地密码。
 - 支持配置多个 OIDC 统一认证源，登录页自动展示已启用认证源。
 - 账号页支持资料、密码、统一认证绑定/解绑。
-- 管理员可在独立「账号管理」页维护本地账号；统一认证源在系统设置中维护。
+- 管理员可在独立「账号管理」页创建、编辑、删除本地账号；统一认证源在系统设置中维护。
 - 当前统一认证协议为 OIDC；多个 IdP（Keycloak、Azure AD、Google、Authing 等）都通过 issuer discovery 接入。
 
 ## 项目记忆
@@ -150,7 +150,7 @@ node integrations/aiwo-instance/agent.mjs \
 - 支持本地密码；OIDC 自动创建的账号可以后补本地密码。
 - 支持配置多个 OIDC 统一认证源，登录页自动展示已启用认证源。
 - 账号页支持资料、密码、统一认证绑定/解绑。
-- 管理员可在独立「账号管理」页维护本地账号；统一认证源在系统设置中维护。
+- 管理员可在独立「账号管理」页创建、编辑、删除本地账号；统一认证源在系统设置中维护。
 - 当前统一认证协议为 OIDC；多个 IdP（Keycloak、Azure AD、Google、Authing 等）都通过 issuer discovery 接入。
 
 ## 项目记忆保存什么

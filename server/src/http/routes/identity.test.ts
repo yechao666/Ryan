@@ -241,6 +241,9 @@ test('助手 manifest：包含稳定 API 清单，不泄露凭证', async () => 
   assert.ok(Array.isArray(manifest.endpoints));
   assert.ok(manifest.endpoints.some((item: Json) => item.method === 'POST' && item.path === '/api/projects/:id/tasks'));
   assert.ok(manifest.endpoints.some((item: Json) => item.path === '/api/assistant/manifest'));
+  assert.ok(manifest.endpoints.some((item: Json) => item.method === 'DELETE' && item.path === '/api/settings/accounts/:id'));
+  assert.ok(manifest.endpoints.some((item: Json) => item.path === '/api/settings/accounts'));
+  assert.ok(manifest.endpoints.some((item: Json) => item.path === '/api/account'));
   assert.equal(manifest.navigation.directive, 'HIVE_NAVIGATE: <站内绝对路径>');
   assert.ok(manifest.navigation.routes.some((item: Json) => item.path === '/projects/:projectId/tasks/:taskId'));
   assert.ok(manifest.navigation.taskLookup.length >= 2);
@@ -536,6 +539,21 @@ test('账号体系：管理员创建账号、本地登录、改密与统一认�
     token: tokenLin,
     method: 'DELETE',
   }));
+
+  const selfDelete = await call('/api/settings/accounts/per_linwei', {
+    token: tokenLin,
+    method: 'DELETE',
+  });
+  assert.equal(selfDelete.status, 400);
+  ok(await call(`/api/settings/accounts/${created.id}`, {
+    token: tokenLin,
+    method: 'DELETE',
+  }));
+  const afterDelete = await call('/api/auth/login', {
+    method: 'POST',
+    body: { email: 'new.person@aiwo.dev', password: 'changed-password' },
+  });
+  assert.equal(afterDelete.status, 401);
 });
 
 test('统一认证：OIDC 登录自动创建人员并建立会话', async () => {
