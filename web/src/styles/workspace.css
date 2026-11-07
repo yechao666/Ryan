@@ -2083,3 +2083,6 @@
   .ws-memory-status-strip { align-items: flex-start; }
   .ws-memory-dream-inline { width: 100%; }
 }
+
+.ws-page-size { width: 132px; }
+.ws-table-foot { gap: 12px; }

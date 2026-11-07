@@ -34,7 +34,13 @@ import {
 } from '@ui';
 import { useProject } from '../ProjectLayout.tsx';
 
-const PAGE_SIZE = 20;
+const DEFAULT_PAGE_SIZE = 20;
+const PAGE_SIZE_OPTIONS = [
+  { value: '10', label: '每页 10 行' },
+  { value: '20', label: '每页 20 行' },
+  { value: '50', label: '每页 50 行' },
+  { value: '100', label: '每页 100 行' },
+];
 
 const CATEGORY_META: Record<string, { label: string; tone: Tone }> = {
   fact: { label: '事实', tone: 'cyan' },
@@ -102,6 +108,10 @@ export function ProjectMemoryPage() {
   const [source, setSource] = useState('all');
   const [statusFilter, setStatusFilter] = useState('durable');
   const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(() => {
+    const saved = Number(localStorage.getItem('aiwo.memory.pageSize'));
+    return PAGE_SIZE_OPTIONS.some((item) => Number(item.value) === saved) ? saved : DEFAULT_PAGE_SIZE;
+  });
   const [detailTarget, setDetailTarget] = useState<MemoryHit | null>(null);
 
   const [addOpen, setAddOpen] = useState(false);
@@ -161,12 +171,16 @@ export function ProjectMemoryPage() {
   useEffect(() => {
     setPage(1);
     setSelectedKeys(new Set());
-  }, [keyword, category, source, statusFilter]);
-  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  }, [keyword, category, source, statusFilter, pageSize]);
+
+  useEffect(() => {
+    localStorage.setItem('aiwo.memory.pageSize', String(pageSize));
+  }, [pageSize]);
+  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
   const currentPage = Math.min(page, totalPages);
   const paged = useMemo(
-    () => filtered.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE),
-    [filtered, currentPage],
+    () => filtered.slice((currentPage - 1) * pageSize, currentPage * pageSize),
+    [filtered, currentPage, pageSize],
   );
 
   const summary = useMemo(() => {
@@ -571,7 +585,15 @@ export function ProjectMemoryPage() {
           />
           {!memories.loading && filtered.length > 0 ? (
             <div className="ws-table-foot">
-              <Pagination page={currentPage} totalPages={totalPages} total={filtered.length} pageSize={PAGE_SIZE} onChange={setPage} />
+              <div className="hstack gap-6">
+                <Select
+                  className="ws-page-size"
+                  value={String(pageSize)}
+                  options={PAGE_SIZE_OPTIONS}
+                  onChange={(event) => setPageSize(Number(event.target.value))}
+                />
+              </div>
+              <Pagination page={currentPage} totalPages={totalPages} total={filtered.length} pageSize={pageSize} onChange={setPage} />
             </div>
           ) : null}
         </Card>
