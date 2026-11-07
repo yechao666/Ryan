@@ -1,31 +1,46 @@
-# Aiwo DSH 助手
+# Aiwo 助手集成
 
-全局助手运行在真实的 DSH headless 实例中，不再依赖本地意图解析：
+## 安全边界
 
-- 前端 `POST /api/assistant/chat`，附带当前人员 token、当前页面/项目上下文。
-- Aiwo 后端启动 `dsh --profile headless --json -`，复用同一人员的 DSH session。
-- 子进程通过 `HIVE_AUTH_FILE` 读取一次性 token 文件；token 不写入提示词。
-- 助手通过 `GET /api/assistant/manifest` 获取稳定 API 清单，通过 `integrations/assistant/aiwo-api.mjs` 调用开放 API；不需要读取 Aiwo 源码。
-- 写操作直接执行；最终回复可带 `HIVE_NAVIGATE: /path`，前端自动跳转并刷新当前页面。
-- 本地意图解析仅作为 DSH 不可用时的降级。
+助手通过受限 DSH profile 启动，默认工具被禁用：
 
-## 环境
+- `bash` / `pwsh` / `jobs`
+- `read` / `write` / `edit` / 文件搜索
+- `skill`
+- `web_fetch` / `web_search`
+- `subagent` / `workflow`
+- `plugin_manager`
+- `todo` / `goal`
 
-| 变量 | 默认 | 说明 |
-| --- | --- | --- |
-| `HIVE_DSH_BIN` | `dsh` | DSH CLI 路径 |
-| `HIVE_DSH_HOME` / `DSH_HOME` | `~/.dsh` | DSH home |
-| `HIVE_DSH_PROFILE` | `headless` | headless profile |
-| `HIVE_DSH_WORKSPACE` | Aiwo 仓库 | 助手工作目录 |
-| `AIWO_API_BASE` | `http://host:port` | 助手调用 API 的地址 |
-| `DEEPSEEK_API_KEY` | 读 `$DSH_HOME/.credentials.yaml` | 模型密钥 |
+唯一可用工具是 `aiwo_api`：
 
-## 调用示例
-
-```bash
-node integrations/assistant/aiwo-api.mjs GET /api/projects
-node integrations/assistant/aiwo-api.mjs POST /api/projects/prj_xxx/tasks \
-  '{"agentId":"agt_xxx","title":"...","prompt":"...","type":"feature"}'
+```text
+aiwo_api({ method: "GET"|"POST"|"PATCH"|"DELETE", path: "/api/...", body?: object })
 ```
 
-助手提示词要求先读取 `docs/api.md`，不要修改源码/数据库；权限沿用当前人员。
+它只能访问当前 Aiwo 服务的同源 `/api/` 路径；认证 token 从 `HIVE_AUTH_FILE` 读取，模型不能传入或看到明文 token。
+
+## API 契约
+
+助手先调用：
+
+```text
+aiwo_api({ method: "GET", path: "/api/assistant/manifest" })
+```
+
+`/api/assistant/manifest` 是唯一 API 定义来源。助手不需要、也不应该读取 Aiwo 源码或数据库。
+
+## 文件
+
+- `aiwo-api-tool.mjs`：DSH 工具插件，注册唯一 `aiwo_api` 工具。
+- `restricted.cordis.yml`：助手 profile patch，禁用默认工具并插入 `aiwo_api`。
+
+## 运行
+
+服务端 `assistant/runner.ts` 用以下 profile 参数启动：
+
+```text
+dsh --profile headless --patch integrations/assistant/restricted.cordis.yml --json
+```
+
+工作目录默认是 `~/.aiwo/assistant`，不是 Aiwo 源码目录；如需指定，使用 `AIWO_ASSISTANT_WORKSPACE`。

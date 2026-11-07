@@ -31,13 +31,14 @@
   → POST /api/assistant/chat（人员 token）
   → Aiwo 启动 dsh --profile headless
   → prompt 携带 docs/api.md + 当前页面/taskId
-  → 助手通过 bash 调 aiwo-api.mjs
+  → 受限 aiwo_api HTTP 工具（无 bash/文件工具）
   → 操作项目/任务/卡片/服务/自动化
   → reply + HIVE_NAVIGATE
 ```
 
 - 助手不进入任务队列，不占服务租约。
 - 助手 API 契约来自 `GET /api/assistant/manifest`；默认 cwd 是独立的 `~/.aiwo/assistant`，不把 Aiwo 源码仓库作为工作区。
+- 助手使用受限 profile：`bash/pwsh/jobs/fs/fs-search/skill/web/subagent/workflow` 等默认工具全部禁用，仅注册 `aiwo_api` HTTP 工具。
 - 助手按项目 ID 的自动工作区设置 headless cwd；同一人员在同一项目复用会话，切项目时按 workspace 区分会话。
 - 同一人员复用 DSH session，可跨轮对话。
 - token 写入 0600 临时文件，不进入提示词。

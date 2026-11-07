@@ -1,13 +1,12 @@
 import { spawn } from 'node:child_process';
-import { copyFile, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { homedir, tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = resolve(here, '../../..');
-const API_HELPER = join(REPO_ROOT, 'integrations/assistant/aiwo-api.mjs');
-const ASSISTANT_TOOL_DIR = process.env.AIWO_ASSISTANT_TOOL_DIR || join(homedir(), '.aiwo', 'assistant-tools');
+const RESTRICTED_PATCH = join(REPO_ROOT, 'integrations/assistant/restricted.cordis.yml');
 
 const sessions = new Map<string, string>();
 
@@ -52,14 +51,6 @@ function workspace(): string {
   return process.env.HIVE_DSH_WORKSPACE || join(homedir(), '.aiwo', 'assistant');
 }
 
-/** 把通用 API helper 安装到助手工具目录，避免提示词暴露/依赖源码路径。 */
-async function ensureAssistantTool(): Promise<string> {
-  await mkdir(ASSISTANT_TOOL_DIR, { recursive: true });
-  const target = join(ASSISTANT_TOOL_DIR, 'aiwo-api.mjs');
-  await copyFile(API_HELPER, target);
-  return target;
-}
-
 function sessionKey(input: AssistantTurn): string {
   return `${input.personId}::${input.workspace ?? ''}`;
 }
@@ -76,7 +67,7 @@ async function deepseekKey(): Promise<string> {
   return '';
 }
 
-function buildPrompt(input: AssistantTurn, helperPath: string): string {
+function buildPrompt(input: AssistantTurn): string {
   return [
     '你是 Aiwo 平台内置的 DSH 系统助手，运行在一个真实的 DSH headless 服务中。',
     'Aiwo 没有智员概念：任务执行者固定为「人员@Aiwo」。你的职责是直接帮助当前人员操作系统，而不是只给出操作步骤。',
@@ -87,21 +78,17 @@ function buildPrompt(input: AssistantTurn, helperPath: string): string {
     `当前任务：${input.taskId ?? '未打开具体任务'}${input.taskId ? '（用户说“这个任务”时使用这个 ID）' : ''}`,
     '任务详情页路径格式：/projects/:projectId/tasks/:taskId（不要使用 ?task= 查询参数）。',
     '',
-    'API 契约只来自稳定 manifest，不通过阅读 Aiwo 源码推断接口。',
-    '当前工作区不是 Aiwo 仓库；禁止使用 ls/grep/find/cat 扫描 Aiwo 源码目录，也不要读取数据库文件。',
-    '先通过 helper 请求 GET /api/assistant/manifest 获取完整接口清单；manifest 是唯一的 API 定义来源。',
+    '你只有一个工具：aiwo_api。它只能通过 HTTP 访问当前 Aiwo 服务的 /api 路径。',
+    '你没有 shell、文件读写、文件搜索、web_fetch、skill、subagent 等工具；不要尝试执行命令或读取文件。',
+    'API 契约只来自稳定 manifest，不通过阅读源码推断接口。',
+    '第一步调用 aiwo_api GET /api/assistant/manifest 获取完整接口清单；manifest 是唯一的 API 定义来源。',
     '',
-    '推荐调用方式（token 已在 env 中，不要打印 token）：',
-    `  node ${helperPath} GET /api/assistant/manifest`,
-    `  node ${helperPath} GET /api/projects`,
-    `  node ${helperPath} GET "/api/tasks?projectId=prj_xxx&limit=20"`,
-    `  node ${helperPath} POST "/api/projects/prj_xxx/tasks" '{"title":"...","prompt":"...","promptCardIds":["pcard_xxx"],"instanceId":"ins_xxx","type":"feature"}'`,
-    '',
-    '常用接口：GET /api/projects、GET /api/teams、GET /api/persons、GET /api/instances、GET /api/tasks、GET /api/prompt-cards；',
+    '工具调用形式：aiwo_api({ method: "GET"|"POST"|"PATCH"|"DELETE", path: "/api/...", body?: object })。',
+    '常用路径：/api/projects、/api/teams、/api/persons、/api/instances、/api/tasks、/api/prompt-cards；',
     'POST /api/projects/:id/tasks、POST /api/prompt-cards、POST /api/instances、POST /api/automations/:id/run。',
     '',
     '执行规则：',
-    '- 用户明确要求创建/修改/查询时，直接调用 API 完成；先做必要的查询确认 ID 和权限。',
+    '- 用户明确要求创建/修改/查询时，直接调用 aiwo_api 完成；先做必要的查询确认 ID 和权限。',
     '- 不要修改仓库源码、数据库文件或系统配置，只通过开放 API 操作。',
     '- 写操作完成后用中文简洁说明做了什么（名称、ID、时间等）；没有执行写操作就不要声称已执行。',
     '- 如果操作影响某个页面，最后单独输出一行：HIVE_NAVIGATE: /projects/...（只能是站内以 / 开头的路径）。',
@@ -126,13 +113,12 @@ async function runAssistantTurnOnce(input: AssistantTurn): Promise<AssistantResu
   if (!apiKey) {
     throw new Error('Aiwo 助手缺少 DEEPSEEK_API_KEY：请在服务器环境中配置，或写入 ~/.dsh/.credentials.yaml');
   }
-  const helperPath = await ensureAssistantTool();
-  const prompt = buildPrompt(input, helperPath);
+  const prompt = buildPrompt(input);
   const cwd = input.workspace || workspace();
   await mkdir(cwd, { recursive: true });
   const key = sessionKey(input);
   const previous = sessions.get(key);
-  const args = ['--profile', profile(), '--json'];
+  const args = ['--profile', profile(), '--patch', RESTRICTED_PATCH, '--json'];
   if (previous) args.push('--session-id', previous);
   args.push('-');
 
