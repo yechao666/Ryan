@@ -211,7 +211,7 @@ export function ProjectsPage() {
         open={createOpen}
         onClose={closeCreate}
         title="新建项目"
-        description="创建后可在项目工作区绑定服务、创建任务与配置记忆。"
+        description="创建后即可创建任务、配置记忆；项目工作区由 DSH 服务按项目 ID 自动生成。"
         size="lg"
         footer={
           <>

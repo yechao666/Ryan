@@ -60,8 +60,8 @@ export function seedDatabase(db: DatabaseSync): void {
 
   db.prepare(
     `INSERT INTO projects (id, slug, name, description, owner_team_id, owner_person_id, visibility, type, prompt, repo_url,
-                        workspace_path, status, created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'active', ?, ?)`,
+                        status, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'active', ?, ?)`,
   ).run(
     'prj_calc',
     'calculator-demo',
@@ -72,7 +72,6 @@ export function seedDatabase(db: DatabaseSync): void {
     'team',
     'local',
     '这是一个本地 Git 演示项目。开发在 feature/* 分支进行，合并前运行 python3 -m unittest -v；禁止直接修改 main；本地仓库没有 remote，不执行 push。',
-    '/Volumes/wd2025/devel/aiworker/aiwo/.run/local-git-demo',
     '/Volumes/wd2025/devel/aiworker/aiwo/.run/local-git-demo',
     iso(60 * 24 * 7),
     iso(12),

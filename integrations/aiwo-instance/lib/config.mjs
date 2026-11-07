@@ -52,6 +52,7 @@ function readCli(argv) {
     'base',
     'token',
     'workspace',
+    'workspace-root',
     'dsh-bin',
     'profile',
     'headless-profile',
@@ -105,15 +106,17 @@ function readCli(argv) {
 }
 
 export function usage() {
-  return `Aiwo DSH 实例代理 v${PLUGIN_VERSION}
+  return `Aiwo DSH 服务代理 v${PLUGIN_VERSION}
 
 用法：
-  node agent.mjs --base <Aiwo URL> --token <实例 token> [options]
+  node agent.mjs --base <Aiwo URL> --token <服务 token> [options]
 
 必填：
   --base <url>              Aiwo 服务地址（默认 http://127.0.0.1:4500）
-  --token <token>           Aiwo 实例 token（aiwo_ins_...；管理端创建）
-  --workspace <dir>         任务工作区（默认当前目录）
+  --token <token>           Aiwo 服务 token（aiwo_ins_...；管理端创建）
+  --workspace <dir>         无项目时的回退工作区（默认当前目录）
+  --workspace-root <dir>    按项目 ID 自动生成工作区的根目录
+                            （默认 ~/.aiwo/workspaces，目录为 projects/<projectId>）
 
 DSH：
   --dsh-bin <path>          dsh 可执行文件（默认 dsh）
@@ -125,11 +128,11 @@ DSH：
   --permission <allow|reject>  ACP 权限请求处理（默认 allow）
   --no-credentials          不从未设置的环境变量读取 ~/.dsh 凭据（headless 用）
 
-实例 / 任务：
-  --name <name>             实例名（默认主机名）
+服务 / 任务：
+  --name <name>             服务名（默认主机名）
   --host <host>             主机名（默认主机名）
-  --kind <local|remote>     实例类型（默认沿用服务端配置）
-  --port <port>             实例端口（可选）
+  --kind <local|remote>     服务类型（默认沿用服务端配置）
+  --port <port>             服务端口（可选）
   --heartbeat <ms>          心跳间隔（默认 20000，最小 200）
   --poll <ms>               claim 轮询（默认 5000，最小 100）
   --lease-renew <ms>        任务运行中续租间隔（默认 90000，0 关闭）
@@ -141,6 +144,7 @@ DSH：
 
 常用环境变量：
   AIWO_BASE_URL / AIWO_INSTANCE_TOKEN（或 AIWO_TOKEN） / AIWO_WORKSPACE
+  AIWO_WORKSPACE_ROOT（默认 ~/.aiwo/workspaces）
   AIWO_DSH_BIN / AIWO_DSH_PROFILE / AIWO_HEADLESS_PROFILE / DSH_HOME
   AIWO_INSTANCE_NAME / AIWO_INSTANCE_HOST / AIWO_HEARTBEAT_MS / AIWO_POLL_MS
   AIWO_LEASE_RENEW_MS / AIWO_TASK_TIMEOUT_MS / AIWO_ACP_PERMISSION
@@ -148,7 +152,7 @@ DSH：
 
 示例：
   node agent.mjs --base http://127.0.0.1:4500 --token aiwo_ins_xxx \\
-    --workspace /srv/aiwo-workspace --name aiwo-remote-01
+    --workspace-root /srv/aiwo-workspaces --name aiwo-remote-01
 `;
 }
 
@@ -162,11 +166,14 @@ export function parseConfig(argv, env = process.env) {
   if (cli.version) return { action: 'version' };
 
   const token = cli.token ?? env.AIWO_INSTANCE_TOKEN ?? env.AIWO_TOKEN ?? '';
-  if (!token) throw new ConfigError('缺少实例 token：请传 --token 或设置 AIWO_INSTANCE_TOKEN');
+  if (!token) throw new ConfigError('缺少服务 token：请传 --token 或设置 AIWO_INSTANCE_TOKEN');
   if (cli._.length > 0) throw new ConfigError(`不支持的位置参数：${cli._.join(' ')}`);
 
   const base = normalizeBase(cli.base ?? env.AIWO_BASE_URL ?? DEFAULT_BASE);
   const workspace = path.resolve(cli.workspace ?? env.AIWO_WORKSPACE ?? process.cwd());
+  const workspaceRoot = path.resolve(
+    cli['workspace-root'] ?? env.AIWO_WORKSPACE_ROOT ?? path.join(os.homedir(), '.aiwo', 'workspaces'),
+  );
 
   const heartbeatMs = cli.heartbeat !== undefined
     ? parseIntStrict(cli.heartbeat, '--heartbeat')
@@ -230,6 +237,7 @@ export function parseConfig(argv, env = process.env) {
     base,
     token,
     workspace,
+    workspaceRoot,
     dshBin: cli['dsh-bin'] ?? env.AIWO_DSH_BIN ?? 'dsh',
     profile: cli.profile ?? env.AIWO_DSH_PROFILE ?? 'acp',
     headlessProfile: cli['headless-profile'] ?? env.AIWO_HEADLESS_PROFILE ?? 'headless',

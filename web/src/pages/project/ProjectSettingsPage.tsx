@@ -46,7 +46,6 @@ interface BasicForm {
   type: ProjectType;
   prompt: string;
   repoUrl: string;
-  workspacePath: string;
   ownerTeamId: string;
 }
 
@@ -65,7 +64,6 @@ export function ProjectSettingsPage() {
     type: detail.project.type,
     prompt: detail.project.prompt ?? '',
     repoUrl: detail.project.repoUrl ?? '',
-    workspacePath: detail.project.workspacePath ?? '',
     ownerTeamId: detail.project.ownerTeamId ?? '',
   });
   const [savingBasic, setSavingBasic] = useState(false);
@@ -94,7 +92,6 @@ export function ProjectSettingsPage() {
       type: detail.project.type,
       prompt: detail.project.prompt ?? '',
       repoUrl: detail.project.repoUrl ?? '',
-      workspacePath: detail.project.workspacePath ?? '',
       ownerTeamId: detail.project.ownerTeamId ?? '',
     });
     setMnemosProjectId(detail.project.mnemosProjectId ?? '');
@@ -141,7 +138,6 @@ export function ProjectSettingsPage() {
         type: form.type,
         prompt: form.prompt,
         repoUrl: form.repoUrl.trim() || undefined,
-        workspacePath: form.workspacePath.trim() || undefined,
         ownerTeamId: form.ownerTeamId || undefined,
       });
       toast.success('项目信息已保存');
@@ -270,7 +266,7 @@ export function ProjectSettingsPage() {
 
   return (
     <div className="ws-page">
-      <PageHead title="项目设置" desc="维护项目基本信息、记忆集成与成员权限。" />
+      <PageHead title="项目设置" desc="维护项目基本信息、记忆集成与成员权限。工作区由 DSH 服务按项目 ID 自动生成，不需要配置。" />
 
       <div className="ws-settings-stack">
         <Card className="card-pad">
@@ -337,16 +333,6 @@ export function ProjectSettingsPage() {
                 value={form.repoUrl}
                 placeholder="https://github.com/org/repo"
                 onChange={(event) => setForm((prev) => ({ ...prev, repoUrl: event.target.value }))}
-              />
-            </Field>
-            <Field
-              label="项目工作区"
-              hint="DSH 服务上的绝对目录；同一项目的任务与对话共用此目录，可共享工作区数据。"
-            >
-              <Input
-                value={form.workspacePath}
-                placeholder="/srv/workspaces/aiwo-calc"
-                onChange={(event) => setForm((prev) => ({ ...prev, workspacePath: event.target.value }))}
               />
             </Field>
             <div className="ws-form-field-full">

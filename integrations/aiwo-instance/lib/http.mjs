@@ -1,6 +1,6 @@
 /**
  * Aiwo 运行时 HTTP 客户端。
- * 实例 token 只放在 Authorization 头里，绝不出现在日志/错误信息中。
+ * 服务 token 只放在 Authorization 头里，绝不出现在日志/错误信息中。
  */
 export class ApiError extends Error {
   constructor(status, code, message, requestId, body) {
@@ -79,7 +79,7 @@ export class AiwoApi {
     return payload;
   }
 
-  /** 注册/更新实例资源信息（实例 token 鉴权）。 */
+  /** 注册/更新服务资源信息（服务 token 鉴权）。 */
   register(payload) {
     return this.request('POST', '/api/runtime/instances/register', { body: payload });
   }
@@ -93,7 +93,7 @@ export class AiwoApi {
     return this.request('POST', '/api/runtime/tasks/claim', { body: {}, timeoutMs: 20_000 });
   }
 
-  /** 实例侧轮询任务状态，用于感知控制台取消。 */
+  /** 服务侧轮询任务状态，用于感知控制台取消。 */
   taskStatus(taskId) {
     return this.request('GET', `/api/runtime/tasks/${encodeURIComponent(taskId)}/status`, {
       timeoutMs: 10_000,

@@ -28,7 +28,6 @@ export function normalizeClaim(raw) {
       slug: typeof project.slug === 'string' ? project.slug : '',
       prompt: typeof project.prompt === 'string' ? project.prompt : '',
       repoUrl: typeof project.repoUrl === 'string' ? project.repoUrl : undefined,
-      workspacePath: typeof project.workspacePath === 'string' ? project.workspacePath : undefined,
       type: typeof project.type === 'string' ? project.type : undefined,
       memoryAgentId: typeof project.memoryAgentId === 'string' ? project.memoryAgentId : undefined,
     },

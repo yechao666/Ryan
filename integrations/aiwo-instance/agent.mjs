@@ -1,14 +1,14 @@
 #!/usr/bin/env node
 /**
- * Aiwo DSH 实例代理。
+ * Aiwo DSH 服务代理。
  *
  * - outbound 连接 Aiwo 运行时：注册 → 心跳 → 轮询 claim → 执行 → 上报事件 → complete
  * - 执行优先用常驻 `dsh --profile acp` 子进程（ACP v1 over stdio），
  *   ACP 不可用时自动回退 `dsh --profile headless --json -`
  * - 单任务串行；SIGINT/SIGTERM 优雅停止
  */
-import { existsSync, mkdirSync, statSync } from 'node:fs';
-import { isAbsolute } from 'node:path';
+import { mkdirSync } from 'node:fs';
+import { join } from 'node:path';
 import { spawn } from 'node:child_process';
 import { parseConfig, usage, PLUGIN_VERSION } from './lib/config.mjs';
 import { createLogger, sleep } from './lib/log.mjs';
@@ -112,12 +112,12 @@ class Agent {
         const result = await this.api.register(payload);
         this.instance = result?.instance ?? null;
         this.logger.info(
-          `实例已注册：${this.instance?.name ?? this.config.name}（${this.instance?.id ?? '未知 id'}）`,
+          `服务已注册：${this.instance?.name ?? this.config.name}（${this.instance?.id ?? '未知 id'}）`,
         );
         return;
       } catch (error) {
         if (error instanceof ApiError && error.status === 401) {
-          this.logger.error('注册失败：实例 token 无效或已吊销（需要 aiwo_ins_...）');
+          this.logger.error('注册失败：服务 token 无效或已吊销（需要 aiwo_ins_...）');
           throw error;
         }
         this.logger.warn(`注册失败（第 ${attempt}/5 次）：${error instanceof Error ? error.message : String(error)}`);
@@ -190,14 +190,14 @@ class Agent {
     this.sleepCancel?.();
     if (this.active) {
       this.active.abortReason = reason;
-      this.active.controller.abort(new TaskAbortError(`实例收到 ${reason}`));
+      this.active.controller.abort(new TaskAbortError(`服务收到 ${reason}`));
     }
   }
 
   async run() {
     mkdirSync(this.config.workspace, { recursive: true });
     this.logger.info(
-      `Aiwo 实例代理 v${PLUGIN_VERSION} 启动：base=${this.config.base} workspace=${this.config.workspace} mode=${this.mode} poll=${this.config.pollMs}ms heartbeat=${this.config.heartbeatMs}ms`,
+      `Aiwo 服务代理 v${PLUGIN_VERSION} 启动：base=${this.config.base} workspace=${this.config.workspace} mode=${this.mode} poll=${this.config.pollMs}ms heartbeat=${this.config.heartbeatMs}ms`,
     );
 
     const dshVersion = await this.probeDshVersion();
@@ -214,7 +214,7 @@ class Agent {
           raw = await this.api.claim();
         } catch (error) {
           if (error instanceof ApiError && error.status === 401) {
-            this.logger.error('实例 token 无效，停止代理');
+            this.logger.error('服务 token 无效，停止代理');
             throw error;
           }
           this.logger.warn(`claim 失败：${error instanceof Error ? error.message : String(error)}`);
@@ -243,18 +243,19 @@ class Agent {
     }
   }
 
-  /** 项目 repoUrl 若是本机绝对目录，则作为本任务 ACP 会话的工作区；否则用实例默认工作区。 */
+  /** 项目工作区由本机按项目 ID 自动生成；同一项目在同一服务上固定同一目录。 */
   workspaceFor(claim) {
-    const candidates = [claim.project?.workspacePath, claim.project?.repoUrl];
-    for (const candidate of candidates) {
-      if (typeof candidate !== 'string' || !isAbsolute(candidate) || !existsSync(candidate)) continue;
-      try {
-        if (statSync(candidate).isDirectory()) return candidate;
-      } catch {
-        /* try next */
-      }
+    const projectId = claim.project?.id || claim.task?.projectId;
+    if (!projectId) return this.config.workspace;
+    const safe = String(projectId).replace(/[^A-Za-z0-9._-]/g, '_');
+    const dir = join(this.config.workspaceRoot, 'projects', safe);
+    try {
+      mkdirSync(dir, { recursive: true });
+      return dir;
+    } catch (error) {
+      this.logger.warn(`无法创建项目工作区 ${dir}：${error instanceof Error ? error.message : String(error)}，回退默认工作区`);
+      return this.config.workspace;
     }
-    return this.config.workspace;
   }
 
   async execute(claim) {
@@ -330,7 +331,7 @@ class Agent {
       if (error instanceof TaskTimeoutError) message = '任务执行超时';
       else if (aborted) {
         message = active.abortReason
-          ? `实例停止（${active.abortReason}），任务中断`
+          ? `服务停止（${active.abortReason}），任务中断`
           : '任务被中断';
       }
       if (active.cancelledByServer) {
@@ -451,7 +452,7 @@ class Agent {
     this.stopHeartbeat();
     this.sleepCancel?.();
     if (this.active) {
-      this.active.controller.abort(new TaskAbortError('实例关闭'));
+      this.active.controller.abort(new TaskAbortError('服务关闭'));
     }
     this.runner?.close();
     this.runner = null;

@@ -81,7 +81,6 @@ const projectCreateSchema = z.object({
   type: projectTypeSchema.optional(),
   prompt: z.string().max(20_000).optional(),
   repoUrl: z.string().trim().max(500).optional(),
-  workspacePath: z.string().trim().max(500).optional(),
   mnemosProjectId: z.string().trim().max(120).optional(),
   mnemosApiKey: z.string().max(500).optional(),
   memoryAgentId: z.string().trim().max(160).optional(),
@@ -94,7 +93,6 @@ const projectUpdateSchema = z.object({
   type: projectTypeSchema.optional(),
   prompt: z.string().max(20_000).optional(),
   repoUrl: z.string().trim().max(500).nullable().optional(),
-  workspacePath: z.string().trim().max(500).nullable().optional(),
   ownerTeamId: z.string().trim().min(1).nullable().optional(),
   mnemosProjectId: z.string().trim().max(120).nullable().optional(),
   // 空字符串表示清除密钥；字段缺省表示保持不变。
@@ -417,8 +415,8 @@ export function registerIdentityRoutes(router: Router): void {
     db.prepare(
       `INSERT INTO projects
          (id, slug, name, description, owner_team_id, owner_person_id, visibility, type, prompt, repo_url,
-          workspace_path, status, mnemos_project_id, mnemos_api_key, memory_agent_id, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'active', ?, ?, ?, ?, ?)`,
+          status, mnemos_project_id, mnemos_api_key, memory_agent_id, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'active', ?, ?, ?, ?, ?)`,
     ).run(
       id,
       slug,
@@ -430,7 +428,6 @@ export function registerIdentityRoutes(router: Router): void {
       type,
       body.prompt ?? '',
       nullableText(body.repoUrl),
-      nullableText(body.workspacePath),
       nullableText(body.mnemosProjectId),
       nullableText(body.mnemosApiKey),
       nullableText(body.memoryAgentId),
@@ -499,10 +496,6 @@ export function registerIdentityRoutes(router: Router): void {
     if (body.ownerTeamId !== undefined) {
       updates.push('owner_team_id = ?');
       params.push(body.ownerTeamId);
-    }
-    if (body.workspacePath !== undefined) {
-      updates.push('workspace_path = ?');
-      params.push(nullableText(body.workspacePath));
     }
     if (body.mnemosProjectId !== undefined) {
       updates.push('mnemos_project_id = ?');

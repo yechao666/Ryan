@@ -39,7 +39,6 @@ function makeClaim(overrides = {}) {
       prompt: '项目提示词：只改必要文件，测试必须实际运行。',
       type: 'local',
       repoUrl: '/tmp/aiwo-demo-repo',
-      workspacePath: '/tmp/aiwo-demo-workspace',
       memoryAgentId: 'agent_demo',
       ...overrides.project,
     },
@@ -231,7 +230,6 @@ await testCase('claim 解析：保留字段 / 缺字段报错 / 去 /goal', () =
   const claim = normalizeClaim(makeClaim());
   assert.equal(claim.task.id, 'tsk_smoke');
   assert.equal(claim.project.prompt.includes('项目提示词'), true);
-  assert.equal(claim.project.workspacePath, '/tmp/aiwo-demo-workspace');
   assert.equal(claim.promptCards.length, 1);
   assert.equal(claim.executor.label, '张三@Aiwo');
   assert.equal(stripGoalPrefix('/goal 做点什么'), '做点什么');
