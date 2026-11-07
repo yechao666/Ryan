@@ -203,8 +203,8 @@ export function TaskDrawer({ taskId, onClose, onChanged, inline = false }: TaskD
 
   const memoryAgentId = detail?.memory.memoryAgentId;
   const memory = useAsync(
-    () => api.memoryContext(projectId, memoryAgentId, task?.title),
-    [memoryOpen, projectId, memoryAgentId, task?.title],
+    () => api.memoryBrief(projectId),
+    [memoryOpen, projectId],
     memoryOpen,
   );
 
@@ -373,20 +373,16 @@ export function TaskDrawer({ taskId, onClose, onChanged, inline = false }: TaskD
             {memoryOpen ? (
               <div className="ws-drawer-section">
                 <SectionHead
-                  title="记忆上下文"
-                  desc={memoryAgentId ? `项目记忆身份 ${memoryAgentId}` : '项目内部记忆'}
+                  title="记忆简报"
+                  desc={memoryAgentId ? `项目记忆身份 ${memoryAgentId} · 最近记忆/洞见摘要` : '最近记忆/洞见摘要'}
                 />
                 {memory.loading && !memory.data ? (
                   <Skeleton h={110} style={{ borderRadius: 12 }} />
                 ) : memory.error ? (
                   <ErrorState message={memory.error} onRetry={() => void memory.refresh()} />
-                ) : memory.data && !memory.data.configured ? (
-                  <Callout tone="amber" icon="alert">
-                    {memory.data.error ?? '暂时无法生成记忆上下文。'}
-                  </Callout>
                 ) : memory.data ? (
                   (() => {
-                    const prompt = memory.data.prompt || '（当前任务没有可用的记忆上下文）';
+                    const prompt = memory.data.text || '（当前任务没有可用的记忆简报）';
                     const lines = prompt.split('\n');
                     const collapsible = lines.length > 12;
                     const code =
@@ -395,11 +391,10 @@ export function TaskDrawer({ taskId, onClose, onChanged, inline = false }: TaskD
                         : prompt;
                     return (
                       <>
-                        <CodeBlock title="task context" code={code} />
+                        <CodeBlock title="memory brief" code={code} />
                         <div className="ws-mem-foot">
                           <span className="tiny dim">
-                            约 {fmtInt(memory.data.tokenEstimate)} tokens ·{' '}
-                            {(memory.data.citations ?? []).length} 条引用
+                            {memory.data.count} 条最近记忆 · 上限 {memory.data.maxChars} 字
                           </span>
                           <div className="hstack gap-4">
                             {collapsible ? (
@@ -412,7 +407,7 @@ export function TaskDrawer({ taskId, onClose, onChanged, inline = false }: TaskD
                                 {memoryExpanded ? '收起' : '展开全部'}
                               </Button>
                             ) : null}
-                            <CopyButton value={memory.data.prompt} label="复制上下文" />
+                            <CopyButton value={memory.data.text} label="复制简报" />
                           </div>
                         </div>
                       </>

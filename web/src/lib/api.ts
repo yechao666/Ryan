@@ -13,6 +13,7 @@ import type {
   InboundDelivery,
   LiveEvent,
   MemoryContextResult,
+  MemoryBrief,
   MemoryDreamStatus,
   MemoryHit,
   MemorySearchResult,
@@ -458,6 +459,14 @@ export const api = {
   memoryContext(projectId: string, agentId?: string, q?: string): Promise<MemoryContextResult> {
     return request(`/api/projects/${projectId}/memory/context${qs({ agentId, q })}`);
   },
+  memoryBrief(projectId: string): Promise<MemoryBrief> {
+    return request(`/api/projects/${projectId}/memory/brief`);
+  },
+
+  updateMemoryBrief(projectId: string, maxChars: number): Promise<{ maxChars: number; brief: MemoryBrief }> {
+    return request(`/api/projects/${projectId}/memory/brief`, { method: 'PATCH', body: JSON.stringify({ maxChars }) });
+  },
+
   memoryDream(projectId: string): Promise<MemoryDreamStatus> {
     return request(`/api/projects/${projectId}/memory/dream`);
   },

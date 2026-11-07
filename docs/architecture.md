@@ -79,7 +79,7 @@ POST /api/runtime/tasks/:id/complete
 
 
 - 项目级记忆表 `project_memories`，按 `project_id` 隔离
-- claim 只声明记忆工具可用，不自动注入记忆正文；DSH 需要时调用工具检索
+- claim 注入最近的 durable 记忆/洞见简报（默认最多 500 字，可配置）；DSH 需要更多背景时调用工具检索
 - 任务 DSH 通过 `--patch` 注册 `aiwo_memory_search/context/add`，工具只能访问当前任务所属项目
 - 完成后 Aiwo 直接写入 `project_memories`，不依赖外部服务
 - 记忆身份由项目决定：`aiwo_<slug>`

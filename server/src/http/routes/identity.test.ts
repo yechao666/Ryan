@@ -319,6 +319,16 @@ test('内置记忆：写入、claim 注入、完成写回', async () => {
   const search = ok(await call(`/api/projects/${project.id}/memory/search?q=支付回调验签&topK=5`, { token: tokenLin }));
   assert.ok(search.configured);
   assert.ok(search.hits.some((hit: Json) => hit.id === memory.id));
+  const brief = ok(await call(`/api/projects/${project.id}/memory/brief`, { token: tokenLin }));
+  assert.match(brief.text, /支付回调必须验证签名/);
+  assert.ok(brief.text.length <= 500);
+  const briefConfig = ok(await call(`/api/projects/${project.id}/memory/brief`, {
+    token: tokenLin,
+    method: 'PATCH',
+    body: { maxChars: 300 },
+  }));
+  assert.equal(briefConfig.maxChars, 300);
+  assert.ok(briefConfig.brief.text.length <= 300);
 
   const service = ok(await call('/api/instances', {
     token: tokenLin,
@@ -343,6 +353,9 @@ test('内置记忆：写入、claim 注入、完成写回', async () => {
   assert.equal(claim.task.id, task.id);
   assert.ok(claim.memory.enabled);
   assert.equal(claim.memory.tools, true);
+  assert.match(claim.memory.brief, /支付回调必须验证签名/);
+  assert.ok(claim.memory.brief.length <= 300);
+  assert.equal(claim.memory.maxChars, 300);
   assert.equal(claim.memory.context, undefined);
   const current = ok(await call('/api/runtime/tasks/current', { token: service.token }));
   assert.equal(current.taskId, task.id);
@@ -364,6 +377,12 @@ test('内置记忆：写入、claim 注入、完成写回', async () => {
   assert.equal(toolAdd.category, 'note');
   assert.equal(toolAdd.taskId, task.id);
   assert.equal(toolAdd.status, 'candidate');
+  const blocked = await call(`/api/runtime/tasks/${task.id}/memory/add`, {
+    token: service.token,
+    method: 'POST',
+    body: { content: '任务完成：执行成功，退出码 0。', category: 'note' },
+  });
+  assert.equal(blocked.status, 400);
   ok(await call(`/api/runtime/tasks/${task.id}/complete`, {
     token: service.token,
     method: 'POST',

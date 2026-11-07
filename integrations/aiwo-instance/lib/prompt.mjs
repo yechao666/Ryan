@@ -30,8 +30,15 @@ export function buildPrompt(claim) {
   if (projectLines.length > 0) sections.push(`# 项目背景\n${projectLines.join('\n')}`);
 
   if (memory.enabled) {
+    const brief = typeof memory.brief === 'string' ? memory.brief.trim() : '';
+    if (brief) {
+      sections.push(`# 项目记忆简报
+${brief}
+
+（简报只包含最近的记忆/洞见，最多 ${Number(memory.maxChars) || 500} 字；需要更多背景时使用 aiwo_memory_search / aiwo_memory_context 工具。）`);
+    }
     sections.push(`# 项目记忆
-项目记忆不会自动注入；需要项目背景、约定或历史决策时，使用 aiwo_memory_search / aiwo_memory_context 工具按需检索。不要假设记忆中一定有答案。
+项目记忆详细信息不会全部注入，需要项目背景、约定或历史决策时，使用 aiwo_memory_search / aiwo_memory_context 工具按需检索。不要假设记忆中一定有答案。
 
 写入准则：只写跨任务可复用、长期有效的知识，例如决策及原因、项目约定、领域事实、架构/接口关系、踩坑经验、可复用流程。不要写普通任务摘要、完成状态、逐文件改动、命令输出、临时调试信息、未验证猜测或密钥/隐私。任务结果请留在任务历史。
 如果任务确实产生了长期有效的决策或经验，请在最终输出末尾使用「## 决策」和「## 经验」小节；这些只会作为候选记忆，由做梦流程再提升。`);

@@ -49,18 +49,18 @@ export function ProjectOverviewPage() {
   const waitingCount = taskList.filter((task) => task.status === 'waiting_input').length;
 
   const memoryAgentId = detail.project.memoryAgentId;
-  const memoryContext = useAsync(
-    () => api.memoryContext(projectId, memoryAgentId),
-    [projectId, memoryAgentId],
+  const memoryBrief = useAsync(
+    () => api.memoryBrief(projectId),
+    [projectId],
     true,
   );
 
   const preview = useMemo(() => {
-    const prompt = memoryContext.data?.prompt ?? '';
+    const prompt = memoryBrief.data?.text ?? '';
     if (!prompt.trim()) return '';
     const lines = prompt.split('\n');
     return lines.slice(0, 6).join('\n') + (lines.length > 6 ? '\n…' : '');
-  }, [memoryContext.data]);
+  }, [memoryBrief.data]);
 
   const base = `/projects/${encodeURIComponent(projectId)}`;
   const openTask = (taskId: string) => navigate(`${base}/tasks/${encodeURIComponent(taskId)}`);
@@ -309,15 +309,11 @@ export function ProjectOverviewPage() {
               }
             />
             <div className="mt-12">
-              {memoryContext.loading && !memoryContext.data ? (
+              {memoryBrief.loading && !memoryBrief.data ? (
                 <Skeleton h={124} style={{ borderRadius: 10 }} />
-              ) : memoryContext.error ? (
-                <ErrorState message={memoryContext.error} onRetry={() => void memoryContext.refresh()} />
-              ) : memoryContext.data && !memoryContext.data.configured ? (
-                <Callout tone="amber" icon="alert">
-                  {memoryContext.data.error ?? '项目记忆暂时不可用。'}
-                </Callout>
-              ) : memoryContext.data ? (
+              ) : memoryBrief.error ? (
+                <ErrorState message={memoryBrief.error} onRetry={() => void memoryBrief.refresh()} />
+              ) : memoryBrief.data ? (
                 <>
                   <div className="tiny dim" style={{ marginBottom: 8 }}>
                     记忆身份{' '}
@@ -325,9 +321,9 @@ export function ProjectOverviewPage() {
                   </div>
                   <pre className="ws-mem-preview">{preview || '（当前没有可用的记忆上下文）'}</pre>
                   <div className="ws-mem-foot">
-                    <span className="tiny dim">约 {fmtInt(memoryContext.data.tokenEstimate)} tokens</span>
+                    <span className="tiny dim">{memoryBrief.data.count} 条最近记忆 · 上限 {memoryBrief.data.maxChars} 字</span>
                     <div className="hstack gap-4">
-                      <CopyButton value={memoryContext.data.prompt} label="复制" />
+                      <CopyButton value={memoryBrief.data.text} label="复制" />
                       <Link className="ws-link small" to={`${base}/memory`}>
                         查看完整
                         <Icon name="arrowRight" size={12} />

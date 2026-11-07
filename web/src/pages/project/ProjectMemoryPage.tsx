@@ -118,13 +118,13 @@ export function ProjectMemoryPage() {
   const [savingDream, setSavingDream] = useState(false);
   const [dreaming, setDreaming] = useState(false);
 
-  const [contextQuery, setContextQuery] = useState('');
-  const [contextTick, setContextTick] = useState(0);
-  const context = useAsync(
-    () => api.memoryContext(projectId, detail.project.memoryAgentId, contextQuery.trim() || undefined),
-    [projectId, detail.project.memoryAgentId, contextTick],
-    true,
-  );
+  const brief = useAsync(() => api.memoryBrief(projectId), [projectId], true);
+  const [briefMax, setBriefMax] = useState('500');
+  const [savingBrief, setSavingBrief] = useState(false);
+
+  useEffect(() => {
+    if (brief.data) setBriefMax(String(brief.data.maxChars));
+  }, [brief.data]);
 
   useEffect(() => {
     const settings = dream.data?.settings;
@@ -200,7 +200,7 @@ export function ProjectMemoryPage() {
       setMemoryCategory('note');
       setAddOpen(false);
       await memories.refresh();
-      setContextTick((tick) => tick + 1);
+      await brief.refresh();
     } catch (cause) {
       toast.error(cause instanceof Error ? cause.message : '写入记忆失败');
     } finally {
@@ -217,7 +217,7 @@ export function ProjectMemoryPage() {
       if (detailTarget?.id === deleteTarget.id) setDetailTarget(null);
       setDeleteTarget(null);
       await memories.refresh();
-      setContextTick((tick) => tick + 1);
+      await brief.refresh();
     } catch (cause) {
       toast.error(cause instanceof Error ? cause.message : '删除记忆失败');
     } finally {
@@ -253,7 +253,7 @@ export function ProjectMemoryPage() {
       if (run.status === 'skipped') toast.info('没有需要整理的新记忆');
       else toast.success(`做梦完成：${run.inputCount} 条新记忆 → ${run.insightCount} 条洞见`);
       await Promise.all([memories.refresh(), dream.refresh()]);
-      setContextTick((tick) => tick + 1);
+      await brief.refresh();
     } catch (cause) {
       toast.error(cause instanceof Error ? cause.message : '做梦失败');
     } finally {
@@ -344,7 +344,7 @@ export function ProjectMemoryPage() {
     <div className="ws-page">
       <PageHead
         title="项目记忆"
-        desc="Aiwo 内置项目记忆；任务需要时通过记忆工具检索，不自动占用上下文。"
+        desc="Aiwo 内置项目记忆；任务领取时注入最近的记忆简报（默认 500 字），更多背景由 DSH 按需检索。"
         actions={
           <div className="hstack gap-6">
             <Button variant="ghost" icon="refresh" loading={memories.loading} onClick={() => void memories.refresh()}>
@@ -507,99 +507,66 @@ export function ProjectMemoryPage() {
 
       <Card className="card-pad">
         <SectionHead
-          title={<><Icon name="sparkles" size={14} />任务上下文简报</>}
-          desc="模拟 DSH 按需检索时生成的「项目记忆」段落，并估算 token 消耗。"
+          title={<><Icon name="sparkles" size={14} />记忆简报</>}
+          desc="只取最近的持久记忆/洞见，按字数上限生成；任务领取时会作为记忆上下文注入 DSH。"
           actions={
-            <Button size="sm" variant="ghost" icon="refresh" onClick={() => setContextTick((tick) => tick + 1)}>
-              重新生成
+            <Button size="sm" variant="ghost" icon="refresh" onClick={() => void brief.refresh()}>
+              刷新
             </Button>
           }
         />
-        <div className="toolbar mt-12">
-          <div className="toolbar-left ws-context-form">
+        <div className="mt-12" style={{ display: 'flex', alignItems: 'flex-end', gap: 12, flexWrap: 'wrap' }}>
+          <Field label="最大字数">
             <Input
-              value={contextQuery}
-              placeholder="可选：填写任务主题，让简报更聚焦（例如：修复支付回调）"
-              onChange={(event) => setContextQuery(event.target.value)}
-              onKeyDown={(event) => {
-                if (event.key === 'Enter') {
-                  event.preventDefault();
-                  setContextTick((tick) => tick + 1);
-                }
-              }}
+              style={{ width: 100 }}
+              value={briefMax}
+              inputMode="numeric"
+              onChange={(event) => setBriefMax(event.target.value.replace(/[^0-9]/g, ''))}
             />
-            <Button variant="primary" icon="sparkles" loading={context.loading} onClick={() => setContextTick((tick) => tick + 1)}>
-              生成简报
-            </Button>
-          </div>
+          </Field>
+          <Button
+            size="sm"
+            variant="outline"
+            icon="check"
+            loading={savingBrief}
+            onClick={async () => {
+              const value = Number(briefMax);
+              if (!Number.isFinite(value) || value < 100 || value > 5000) {
+                toast.error('简报字数需在 100–5000 之间');
+                return;
+              }
+              setSavingBrief(true);
+              try {
+                await api.updateMemoryBrief(projectId, value);
+                toast.success('记忆简报字数已保存');
+                await brief.refresh();
+              } catch (cause) {
+                toast.error(cause instanceof Error ? cause.message : '保存简报设置失败');
+              } finally {
+                setSavingBrief(false);
+              }
+            }}
+          >
+            保存
+          </Button>
+          <span className="tiny dim">默认 500 字 · 仅最近记忆/洞见</span>
         </div>
-        <div className="mt-16">
-          {context.loading && !context.data ? (
-            <Skeleton h={160} style={{ borderRadius: 12 }} />
-          ) : context.error ? (
-            <ErrorState message={context.error} onRetry={() => void context.refresh()} />
-          ) : context.data ? (
+        <div className="mt-12">
+          {brief.loading && !brief.data ? (
+            <Skeleton h={140} style={{ borderRadius: 12 }} />
+          ) : brief.error ? (
+            <ErrorState message={brief.error} onRetry={() => void brief.refresh()} />
+          ) : (
             <>
-              <CodeBlock title="memory context" code={context.data.prompt || '（当前没有可用的记忆上下文）'} />
+              <CodeBlock title="memory brief" code={brief.data?.text || '（当前还没有可用的持久记忆）'} />
               <div className="ws-mem-foot">
-                <span className="tiny dim">约 {fmtInt(context.data.tokenEstimate)} tokens · {(context.data.citations ?? []).length} 条引用</span>
-                <CopyButton value={context.data.prompt} label="复制简报" />
+                <span className="tiny dim">{brief.data?.count ?? 0} 条最近记忆 · 上限 {brief.data?.maxChars ?? 500} 字</span>
+                <CopyButton value={brief.data?.text ?? ''} label="复制简报" />
               </div>
-              {context.data.citations?.length ? (
-                <div className="ws-citation-row">
-                  {context.data.citations.slice(0, 8).map((citation) => <code className="ws-placeholder" key={citation}>{citation}</code>)}
-                </div>
-              ) : null}
             </>
-          ) : null}
+          )}
         </div>
       </Card>
-
-      <Modal
-        open={Boolean(detailTarget)}
-        onClose={() => setDetailTarget(null)}
-        title={detailTarget?.title || '记忆详情'}
-        description={detailTarget ? `#${detailTarget.id} · ${fmtDateTime(detailTarget.createdAt)}` : undefined}
-        size="lg"
-        footer={
-          <>
-            {detailTarget?.taskId ? (
-              <Link className="btn btn-sm btn-outline" to={`${base}/tasks/${encodeURIComponent(detailTarget.taskId)}`}>
-                <Icon name="list" size={12} />查看来源任务
-              </Link>
-            ) : null}
-            <Button variant="ghost" onClick={() => setDetailTarget(null)}>关闭</Button>
-            <Button variant="danger" icon="trash" onClick={() => detailTarget && setDeleteTarget(detailTarget)}>删除</Button>
-          </>
-        }
-      >
-        {detailTarget ? (
-          <div className="vstack gap-10">
-            <div className="hstack gap-6 wrap">
-              <Badge tone={categoryMeta(detailTarget.category).tone}>{categoryMeta(detailTarget.category).label}</Badge>
-              <Badge tone="slate">{sourceLabel(detailTarget.source)}</Badge>
-              <Badge tone={statusMeta(detailTarget.status).tone}>{statusMeta(detailTarget.status).label}</Badge>
-              <span className="tiny dim">更新于 {fmtRelative(detailTarget.updatedAt ?? detailTarget.createdAt)}</span>
-            </div>
-            <div className="ws-mem-preview" style={{ maxHeight: 420 }}>{detailTarget.content}</div>
-            <div className="hstack gap-6">
-              <CopyButton value={detailTarget.content} label="复制内容" />
-              <Button
-                size="sm"
-                variant="ghost"
-                icon="sparkles"
-                onClick={() => {
-                  setContextQuery(detailTarget.content.slice(0, 80));
-                  setContextTick((tick) => tick + 1);
-                  setDetailTarget(null);
-                }}
-              >
-                用于简报
-              </Button>
-            </div>
-          </div>
-        ) : null}
-      </Modal>
 
       <Modal
         open={addOpen}

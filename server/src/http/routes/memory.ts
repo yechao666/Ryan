@@ -8,8 +8,11 @@ import { requirePerson, requireProject } from '../auth.ts';
 import { errors } from '../respond.ts';
 import {
   addMemory,
+  buildMemoryBrief,
   buildMemoryContext,
   deleteMemory,
+  getMemoryBriefMaxChars,
+  setMemoryBriefMaxChars,
   listMemories,
   memoryAgentIdOf,
   searchMemories,
@@ -36,6 +39,10 @@ const listQuerySchema = z.object({
   limit: z.coerce.number().int().min(1).max(200).default(50),
 });
 
+const briefSettingsSchema = z.object({
+  maxChars: z.number().int().min(100).max(5000),
+});
+
 const dreamSettingsSchema = z.object({
   enabled: z.boolean().optional(),
   intervalMinutes: z.number().int().min(1).max(60 * 24 * 30).optional(),
@@ -60,6 +67,18 @@ export function registerMemoryRoutes(router: Router): void {
     const params = rc.query(contextQuerySchema);
     const result: MemoryContextResult = buildMemoryContext(rc.app.db, project.id, params.q ?? '', CONTEXT_BUDGET_TOKENS);
     rc.json(result);
+  });
+
+  router.get('/api/projects/:id/memory/brief', (rc) => {
+    const project = requireProject(rc, rc.params.id, 'view');
+    rc.json(buildMemoryBrief(rc.app.db, project.id, getMemoryBriefMaxChars(rc.app.db, project.id)));
+  });
+
+  router.patch('/api/projects/:id/memory/brief', async (rc) => {
+    const project = requireProject(rc, rc.params.id, 'manage');
+    const input = await rc.body(briefSettingsSchema);
+    const maxChars = setMemoryBriefMaxChars(rc.app.db, project.id, input.maxChars);
+    rc.json({ maxChars, brief: buildMemoryBrief(rc.app.db, project.id, maxChars) });
   });
 
   router.get('/api/projects/:id/memory/dream', (rc) => {

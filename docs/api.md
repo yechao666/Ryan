@@ -102,6 +102,9 @@ Aiwo 任务执行者固定为「创建人@Aiwo」；任务不支持对话，只�
 | --- | --- | --- |
 | GET | `/api/projects/:id/memory/search?q=&topK=` | 项目记忆检索 |
 | GET | `/api/projects/:id/memory/context?q=` | 项目记忆上下文简报 |
+| GET | `/api/projects/:id/memory/brief` | 最近记忆/洞见的记忆简报 |
+| PATCH | `/api/projects/:id/memory/brief` | `{maxChars}` 设置简报最大字数（100–5000，默认 500） |
+
 | GET | `/api/projects/:id/memories?limit=` | 列出项目记忆 |
 | POST | `/api/projects/:id/memories` | `{content,title?,category?}` 手动写入持久记忆 |
 | DELETE | `/api/projects/:id/memories/:memoryId` | 删除项目记忆 |

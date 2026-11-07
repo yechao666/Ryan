@@ -35,7 +35,8 @@ import {
   truncateSummary,
   type TaskRow,
 } from './tasks.ts';
-import { addMemory, buildMemoryContext, memoryAgentIdOf, searchMemories, taskMemoryText } from '../../memory/store.ts';
+import { addMemory, buildMemoryBrief, buildMemoryContext, getMemoryBriefMaxChars, memoryAgentIdOf, searchMemories, taskMemoryText } from '../../memory/store.ts';
+import { memoryWriteIssue } from '../../memory/policy.ts';
 import { buildInstance, getInstanceRow } from './identity-helpers.ts';
 
 const LEASE_MS = 3 * 60_000;
@@ -303,6 +304,7 @@ export function registerRuntimeRoutes(router: Router): void {
     const person = task.created_by ? rowOf<{ id: string; name: string }>(db, 'SELECT id, name FROM persons WHERE id = ?', [task.created_by]) : undefined;
     const memoryAgentId = memoryAgentIdOf(db, project.id) ?? '';
     const item = getWorkItem(db, task.id)!;
+    const memoryBrief = buildMemoryBrief(db, project.id, getMemoryBriefMaxChars(db, project.id));
 
     insertTaskEvent(db, {
       taskId: task.id,
@@ -342,6 +344,8 @@ export function registerRuntimeRoutes(router: Router): void {
         agentId: memoryAgentId,
         enabled: true,
         tools: true,
+        brief: memoryBrief.text,
+        maxChars: memoryBrief.maxChars,
       },
     };
     rc.json(claimedTask);
@@ -382,6 +386,8 @@ export function registerRuntimeRoutes(router: Router): void {
     const instance = authenticateInstance(rc);
     const task = requireInstanceTask(rc.app.db, rc.params.id, instance.id);
     const input = await rc.body(memoryAddSchema);
+    const issue = memoryWriteIssue(input.content, input.category);
+    if (issue) throw errors.badRequest(issue);
     const memory = addMemory(rc.app.db, {
       projectId: task.project_id,
       content: input.content,

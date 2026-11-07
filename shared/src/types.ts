@@ -354,6 +354,13 @@ export interface MemoryDreamStatus {
   runs: MemoryDreamRun[];
 }
 
+export interface MemoryBrief {
+  text: string;
+  maxChars: number;
+  count: number;
+  recent: MemoryHit[];
+}
+
 export interface InboundDelivery {
   id: string;
   projectId: string;
@@ -455,8 +462,11 @@ export interface ClaimedTask {
   memory: {
     agentId: string;
     enabled: boolean;
-    /** 记忆工具可用；记忆内容按需检索，不自动注入上下文。 */
+    /** 记忆工具可用；详细信息按需检索。 */
     tools: boolean;
+    /** 仅最近记忆/洞见生成的简报，受 maxChars 限制。 */
+    brief: string;
+    maxChars: number;
   };
 }
 

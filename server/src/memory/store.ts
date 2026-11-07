@@ -5,7 +5,7 @@
  * - context() 生成可直接注入 DSH 的项目记忆简报。
  */
 import type { Db } from '../db/index.ts';
-import type { MemoryContextResult, MemoryHit, MemorySearchResult } from '../../../shared/src/types.ts';
+import type { MemoryBrief, MemoryContextResult, MemoryHit, MemorySearchResult } from '../../../shared/src/types.ts';
 import { newId, nowIso } from '../lib/ids.ts';
 import type { ProjectRow } from '../lib/access.ts';
 
@@ -236,6 +236,48 @@ export function addMemory(db: Db, input: AddMemoryInput): MemoryHit {
 export function deleteMemory(db: Db, projectId: string, memoryId: string): boolean {
   const result = db.prepare('DELETE FROM project_memories WHERE id = ? AND project_id = ?').run(memoryId, projectId);
   return Number(result.changes) > 0;
+}
+
+export function getMemoryBriefMaxChars(db: Db, projectId: string): number {
+  const row = rowOf<{ memory_brief_max_chars: number }>(db, 'SELECT memory_brief_max_chars FROM projects WHERE id = ?', [projectId]);
+  const value = Number(row?.memory_brief_max_chars);
+  return Number.isFinite(value) ? Math.max(100, Math.min(5000, value)) : 500;
+}
+
+export function setMemoryBriefMaxChars(db: Db, projectId: string, maxChars: number): number {
+  const value = Math.max(100, Math.min(5000, Math.floor(maxChars)));
+  db.prepare('UPDATE projects SET memory_brief_max_chars = ?, updated_at = ? WHERE id = ?').run(value, nowIso(), projectId);
+  return value;
+}
+
+/** 仅取最近的持久记忆/洞见，生成有字数上限、可直接注入会话的简报。 */
+export function buildMemoryBrief(db: Db, projectId: string, maxChars = 500): MemoryBrief {
+  const limit = Math.max(100, Math.min(5000, maxChars));
+  const agentId = memoryAgentIdOf(db, projectId) ?? '';
+  const rows = rowsOf<ProjectMemoryRow>(
+    db,
+    `SELECT * FROM project_memories WHERE project_id = ? AND status = 'durable'
+      ORDER BY updated_at DESC, created_at DESC LIMIT 30`,
+    [projectId],
+  );
+  const header = '# 项目记忆简报（仅最近记忆/洞见）\n';
+  let text = header;
+  let count = 0;
+  const recent: MemoryHit[] = [];
+  for (const row of rows) {
+    const content = row.content.replace(/\s+/g, ' ').trim();
+    if (!content) continue;
+    const title = row.title ? `${row.title}：` : '';
+    const line = `- [${row.category}] ${title}${content}`;
+    const remaining = limit - text.length;
+    if (remaining <= 0) break;
+    const clipped = line.length <= remaining ? line : `${line.slice(0, Math.max(0, remaining - 1))}…`;
+    text += `${clipped}\n`;
+    count += 1;
+    recent.push(mapHit(row, 0, {}, agentId));
+    if (text.length >= limit) break;
+  }
+  return { text: count ? text.trimEnd() : '', maxChars: limit, count, recent };
 }
 
 /** 任务完成后只沉淀显式决策/经验，不把普通任务结果写入项目记忆。 */

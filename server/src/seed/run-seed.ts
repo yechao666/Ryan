@@ -30,7 +30,7 @@ const tables = [
 db.exec('PRAGMA foreign_keys = OFF;');
 for (const table of tables) db.exec(`DELETE FROM ${table};`);
 db.exec('PRAGMA foreign_keys = ON;');
-db.prepare("INSERT OR REPLACE INTO meta (key, value) VALUES ('schema_version', '7')").run();
+db.prepare("INSERT OR REPLACE INTO meta (key, value) VALUES ('schema_version', '8')").run();
 seedDatabase(db);
 console.log(`[aiwo] seeded ${env.dbPath}`);
 console.log(`[aiwo] demo login: lin.wei@aiwo.dev / aiwo-demo`);

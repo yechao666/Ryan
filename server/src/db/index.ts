@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url';
 
 const here = dirname(fileURLToPath(import.meta.url));
 export type Db = DatabaseSync;
-export const SCHEMA_VERSION = 7;
+export const SCHEMA_VERSION = 8;
 
 export function openDatabase(dbPath: string): Db {
   if (dbPath !== ':memory:') mkdirSync(dirname(dbPath), { recursive: true });
@@ -43,6 +43,9 @@ export function migrate(db: Db): void {
   }
   if (!projectColumns.some((column) => column.name === 'memory_dream_last_at')) {
     db.exec('ALTER TABLE projects ADD COLUMN memory_dream_last_at TEXT');
+  }
+  if (!projectColumns.some((column) => column.name === 'memory_brief_max_chars')) {
+    db.exec('ALTER TABLE projects ADD COLUMN memory_brief_max_chars INTEGER NOT NULL DEFAULT 500');
   }
   const memoryColumns = db.prepare('PRAGMA table_info(project_memories)').all() as unknown as { name: string }[];
   if (!memoryColumns.some((column) => column.name === 'dreamed_at')) {

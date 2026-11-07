@@ -143,14 +143,35 @@ function insightLines(rows: NewMemoryRow[]): string {
   }).join('\n');
 }
 
-function fallbackInsight(rows: NewMemoryRow[]): { title: string; content: string } {
-  const groups = new Map<string, number>();
-  for (const row of rows) groups.set(row.category, (groups.get(row.category) ?? 0) + 1);
-  const distribution = [...groups.entries()].map(([key, count]) => `${key} ${count}`).join(' / ');
-  return {
+function fallbackInsights(rows: NewMemoryRow[]): { title: string; content: string }[] {
+  const meaningful = rows.filter((row) => ['decision', 'lesson', 'fact', 'note'].includes(row.category) && row.content.trim().length >= 10);
+  if (meaningful.length === 0) return [];
+  return [{
     title: `记忆整理 · ${new Date().toLocaleDateString('zh-CN')}`,
-    content: `本批整理 ${rows.length} 条新记忆（${distribution}）。\n${insightLines(rows)}`,
-  };
+    content: insightLines(meaningful).slice(0, 4_000),
+  }];
+}
+
+function normalized(text: string): string {
+  return text.toLowerCase().replace(/\s+/g, '').replace(/[，。！？；：、,.!?;:]/g, '');
+}
+
+function duplicateOf(db: Db, projectId: string, content: string): boolean {
+  const target = normalized(content);
+  if (!target) return true;
+  const rows = rowsOf<{ content: string }>(
+    db,
+    "SELECT content FROM project_memories WHERE project_id = ? AND status = 'durable' ORDER BY updated_at DESC LIMIT 200",
+    [projectId],
+  );
+  return rows.some((row) => {
+    const existing = normalized(row.content);
+    if (!existing) return false;
+    if (existing === target) return true;
+    const shorter = existing.length < target.length ? existing : target;
+    const longer = existing.length < target.length ? target : existing;
+    return shorter.length >= 20 && longer.includes(shorter) && shorter.length / longer.length >= 0.8;
+  });
 }
 
 async function deepseekKey(): Promise<string> {
@@ -170,12 +191,12 @@ async function synthesize(
   projectId: string,
   rows: NewMemoryRow[],
 ): Promise<{ summary: string; insights: { title: string; content: string }[] }> {
-  const fallback = fallbackInsight(rows);
+  const fallback = fallbackInsights(rows);
   if (process.env.AIWO_DREAM_AI === '0') {
-    return { summary: `已整理 ${rows.length} 条新记忆`, insights: [fallback] };
+    return { summary: `已整理 ${rows.length} 条新记忆`, insights: fallback };
   }
   const key = await deepseekKey();
-  if (!key) return { summary: `已整理 ${rows.length} 条新记忆`, insights: [fallback] };
+  if (!key) return { summary: `已整理 ${rows.length} 条新记忆`, insights: fallback };
   const dir = await mkdtemp(join(tmpdir(), 'aiwo-dream-'));
   const child = spawn(process.env.HIVE_DSH_BIN || 'dsh', ['--profile', 'headless', '--json', '-'], {
     cwd: dir,
@@ -213,7 +234,7 @@ async function synthesize(
       '不要调用工具，不要编造未出现的事实。合并重复、指出决策与经验。',
       '只输出 JSON，格式：',
       '{"summary":"一句话总结","insights":[{"title":"短标题","content":"洞见正文"}]}',
-      '最多 5 条 insights。',
+      '最多 5 条 insights。没有跨任务可复用的有效洞见时，返回空数组 []，不要为了凑数生成泛泛总结。',
       '',
       `项目：${projectId}`,
       '新记忆：',
@@ -237,13 +258,12 @@ async function synthesize(
           .filter((item) => item.content)
           .slice(0, 5)
       : [];
-    if (insights.length === 0) insights.push(fallback);
     return {
       summary: typeof parsed.summary === 'string' && parsed.summary.trim() ? parsed.summary.trim() : `已整理 ${rows.length} 条新记忆`,
       insights,
     };
   } catch {
-    return { summary: `已整理 ${rows.length} 条新记忆`, insights: [fallback] };
+    return { summary: `已整理 ${rows.length} 条新记忆`, insights: fallback };
   } finally {
     clearTimeout(timeout);
     if (child.exitCode === null) child.kill('SIGTERM');
@@ -283,6 +303,9 @@ export async function runDream(
     const now = nowIso();
     let insightCount = 0;
     for (const insight of insights) {
+      const content = insight.content.trim();
+      if (content.length < 20 || /^(?:没有|暂无|本批没有|无有效)/.test(content)) continue;
+      if (duplicateOf(db, projectId, content)) continue;
       const memory = addMemory(db, {
         projectId,
         title: insight.title,
@@ -298,7 +321,7 @@ export async function runDream(
     db.prepare(`UPDATE project_memories SET dreamed_at = ?, status = 'archived' WHERE id IN (${marks})`).run(now, ...rows.map((row) => row.id));
     db.prepare('UPDATE projects SET memory_dream_last_at = ?, updated_at = ? WHERE id = ?').run(now, now, projectId);
     db.prepare("UPDATE memory_dream_runs SET status = 'completed', input_count = ?, insight_count = ?, summary = ?, finished_at = ? WHERE id = ?")
-      .run(rows.length, insightCount, summary, now, runId);
+      .run(rows.length, insightCount, insightCount > 0 ? summary : '本批没有形成有效洞见', now, runId);
     return mapRun(rowOf<DreamRunRow>(db, 'SELECT * FROM memory_dream_runs WHERE id = ?', [runId])!);
   } catch (error) {
     const finishedAt = nowIso();
