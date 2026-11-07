@@ -16,6 +16,7 @@ export interface ProjectMemoryRow {
   title: string;
   content: string;
   source: string;
+  status: string;
   task_id: string | null;
   metadata: string;
   created_by: string | null;
@@ -29,6 +30,7 @@ export interface AddMemoryInput {
   title?: string;
   category?: string;
   source?: string;
+  status?: 'durable' | 'candidate' | 'archived';
   taskId?: string | null;
   createdBy?: string | null;
   metadata?: Record<string, unknown>;
@@ -69,6 +71,7 @@ function mapHit(row: ProjectMemoryRow, score: number, signals: Record<string, nu
     score: Number(score.toFixed(4)),
     category: row.category,
     source: row.source,
+    status: row.status as MemoryHit['status'],
     visibility: 'project',
     agentId,
     createdAt: row.created_at,
@@ -130,7 +133,7 @@ export function searchMemories(
   const startedAt = Date.now();
   const rows = rowsOf<ProjectMemoryRow>(
     db,
-    `SELECT * FROM project_memories WHERE project_id = ? ORDER BY created_at DESC LIMIT ${MAX_SCAN}`,
+    `SELECT * FROM project_memories WHERE project_id = ? AND status = 'durable' ORDER BY created_at DESC LIMIT ${MAX_SCAN}`,
     [projectId],
   );
   const terms = queryTerms(query);
@@ -209,8 +212,8 @@ export function addMemory(db: Db, input: AddMemoryInput): MemoryHit {
   const id = newId('mem');
   db.prepare(
     `INSERT INTO project_memories
-       (id, project_id, category, title, content, source, task_id, metadata, created_by, created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       (id, project_id, category, title, content, source, status, task_id, metadata, created_by, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
   ).run(
     id,
     input.projectId,
@@ -218,6 +221,7 @@ export function addMemory(db: Db, input: AddMemoryInput): MemoryHit {
     input.title ?? '',
     input.content,
     input.source ?? 'manual',
+    input.status ?? 'durable',
     input.taskId ?? null,
     JSON.stringify(input.metadata ?? {}),
     input.createdBy ?? null,
@@ -234,13 +238,15 @@ export function deleteMemory(db: Db, projectId: string, memoryId: string): boole
   return Number(result.changes) > 0;
 }
 
+/** 任务完成后只沉淀显式决策/经验，不把普通任务结果写入项目记忆。 */
 export function taskMemoryText(input: {
-  title: string;
-  summary: string;
   decisions?: string[];
   lessons?: string[];
 }): string {
   const decisions = input.decisions ?? [];
   const lessons = input.lessons ?? [];
-  return `任务：${input.title}\n结论：${input.summary}${decisions.length ? `\n决策：${decisions.join('；')}` : ''}${lessons.length ? `\n经验：${lessons.join('；')}` : ''}`;
+  return [
+    decisions.length ? `决策：${decisions.join('；')}` : '',
+    lessons.length ? `经验：${lessons.join('；')}` : '',
+  ].filter(Boolean).join('\n');
 }

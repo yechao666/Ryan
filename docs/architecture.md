@@ -75,6 +75,9 @@ POST /api/runtime/tasks/:id/complete
 
 ## 记忆
 
+项目记忆只保存跨任务可复用的知识（决策、约定、领域事实、架构、踩坑、runbook），不保存普通任务结果/日志。任务完成只产生决策/经验候选；做梦将其提升为 durable insight。
+
+
 - 项目级记忆表 `project_memories`，按 `project_id` 隔离
 - claim 只声明记忆工具可用，不自动注入记忆正文；DSH 需要时调用工具检索
 - 任务 DSH 通过 `--patch` 注册 `aiwo_memory_search/context/add`，工具只能访问当前任务所属项目

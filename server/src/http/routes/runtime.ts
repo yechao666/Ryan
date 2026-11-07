@@ -66,22 +66,28 @@ function requireInstanceTask(db: Db, taskId: string, instanceId: string): TaskRo
 }
 
 function writeBackTaskMemory(rc: RequestContext, task: TaskRow, input: CompleteTaskInput): void {
+  if (input.status !== 'done') return;
+  const decisions = (input.decisions ?? []).filter(Boolean);
+  const lessons = (input.lessons ?? []).filter(Boolean);
+  // 普通任务结果留在任务历史；只有显式决策/经验作为候选记忆进入做梦流程。
+  if (decisions.length === 0 && lessons.length === 0) return;
   const project = getProjectRow(rc.app.db, task.project_id);
   if (!project) return;
-  const text = taskMemoryText({ title: task.title, summary: input.summary, decisions: input.decisions, lessons: input.lessons });
+  const text = taskMemoryText({ decisions, lessons });
   try {
     addMemory(rc.app.db, {
       projectId: project.id,
       content: text,
-      title: task.title,
-      category: 'task_result',
+      title: `任务沉淀：${task.title}`,
+      category: lessons.length > 0 ? 'lesson' : 'decision',
       source: 'task',
+      status: 'candidate',
       taskId: task.id,
       createdBy: task.created_by,
-      metadata: { aiwoTaskId: task.id, projectId: project.id },
+      metadata: { aiwoTaskId: task.id, projectId: project.id, kind: 'task_candidate' },
     });
   } catch (error) {
-    console.warn(`[aiwo] 任务 ${task.id} 记忆写回失败：${error instanceof Error ? error.message : String(error)}`);
+    console.warn(`[aiwo] 任务 ${task.id} 候选记忆写回失败：${error instanceof Error ? error.message : String(error)}`);
   }
 }
 

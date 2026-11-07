@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url';
 
 const here = dirname(fileURLToPath(import.meta.url));
 export type Db = DatabaseSync;
-export const SCHEMA_VERSION = 6;
+export const SCHEMA_VERSION = 7;
 
 export function openDatabase(dbPath: string): Db {
   if (dbPath !== ':memory:') mkdirSync(dirname(dbPath), { recursive: true });
@@ -47,6 +47,11 @@ export function migrate(db: Db): void {
   const memoryColumns = db.prepare('PRAGMA table_info(project_memories)').all() as unknown as { name: string }[];
   if (!memoryColumns.some((column) => column.name === 'dreamed_at')) {
     db.exec('ALTER TABLE project_memories ADD COLUMN dreamed_at TEXT');
+  }
+  if (!memoryColumns.some((column) => column.name === 'status')) {
+    db.exec("ALTER TABLE project_memories ADD COLUMN status TEXT NOT NULL DEFAULT 'durable'");
+    // 旧的任务结果记录属于任务历史，不是持久项目知识：一次性归档。
+    db.exec("UPDATE project_memories SET status = 'archived' WHERE source = 'task'");
   }
   db.prepare("INSERT OR REPLACE INTO meta (key, value) VALUES ('schema_version', ?)").run(String(SCHEMA_VERSION));
 }

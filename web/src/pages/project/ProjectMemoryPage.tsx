@@ -40,6 +40,7 @@ const CATEGORY_META: Record<string, { label: string; tone: Tone }> = {
   decision: { label: '决策', tone: 'violet' },
   note: { label: '笔记', tone: 'slate' },
   task_result: { label: '任务结果', tone: 'green' },
+  lesson: { label: '经验', tone: 'cyan' },
   insight: { label: '洞见', tone: 'amber' },
 };
 
@@ -47,6 +48,7 @@ const CATEGORY_OPTIONS = [
   { value: 'all', label: '全部类型' },
   { value: 'decision', label: '决策' },
   { value: 'task_result', label: '任务结果' },
+  { value: 'lesson', label: '经验' },
   { value: 'insight', label: '洞见' },
   { value: 'fact', label: '事实' },
   { value: 'note', label: '笔记' },
@@ -60,12 +62,25 @@ const SOURCE_OPTIONS = [
   { value: 'dream', label: '做梦整理' },
 ];
 
+const STATUS_OPTIONS = [
+  { value: 'durable', label: '持久记忆' },
+  { value: 'candidate', label: '待整理' },
+  { value: 'archived', label: '已归档' },
+  { value: 'all', label: '全部状态' },
+];
+
 function categoryMeta(category: string) {
   return CATEGORY_META[category] ?? { label: category || '未分类', tone: 'slate' as Tone };
 }
 
+function statusMeta(status?: string) {
+  if (status === 'candidate') return { label: '待整理', tone: 'amber' as Tone };
+  if (status === 'archived') return { label: '已归档', tone: 'slate' as Tone };
+  return { label: '持久', tone: 'green' as Tone };
+}
+
 function sourceLabel(source?: string): string {
-  if (source === 'task') return '任务写回';
+  if (source === 'task') return '任务沉淀';
   if (source === 'agent') return 'DSH 工具';
   if (source === 'dream') return '做梦整理';
   if (source === 'manual') return '手动';
@@ -84,6 +99,7 @@ export function ProjectMemoryPage() {
   const [keyword, setKeyword] = useState('');
   const [category, setCategory] = useState('all');
   const [source, setSource] = useState('all');
+  const [statusFilter, setStatusFilter] = useState('durable');
   const [page, setPage] = useState(1);
   const [detailTarget, setDetailTarget] = useState<MemoryHit | null>(null);
 
@@ -130,14 +146,15 @@ export function ProjectMemoryPage() {
   const filtered = useMemo(() => {
     const q = keyword.trim().toLowerCase();
     return all.filter((hit) => {
+      if (statusFilter !== 'all' && (hit.status ?? 'durable') !== statusFilter) return false;
       if (category !== 'all' && hit.category !== category) return false;
       if (source !== 'all' && hit.source !== source) return false;
       if (!q) return true;
       return `${hit.title ?? ''}\n${hit.content}`.toLowerCase().includes(q);
     });
-  }, [all, keyword, category, source]);
+  }, [all, keyword, category, source, statusFilter]);
 
-  useEffect(() => { setPage(1); }, [keyword, category, source]);
+  useEffect(() => { setPage(1); }, [keyword, category, source, statusFilter]);
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const currentPage = Math.min(page, totalPages);
   const paged = useMemo(
@@ -146,24 +163,26 @@ export function ProjectMemoryPage() {
   );
 
   const summary = useMemo(() => {
-    const count = (name: string) => all.filter((hit) => hit.category === name).length;
+    const durable = all.filter((hit) => (hit.status ?? 'durable') === 'durable');
+    const count = (name: string) => durable.filter((hit) => hit.category === name).length;
     return {
-      total: all.length,
+      total: durable.length,
       decisions: count('decision'),
       taskResults: count('task_result'),
       notes: count('note') + count('fact'),
       insights: count('insight'),
-      latest: all[0]?.createdAt,
+      latest: durable[0]?.createdAt,
     };
   }, [all]);
 
   const identity = memories.data?.agentId || detail.project.memoryAgentId || `aiwo_${detail.project.slug.replace(/-/g, '_')}`;
-  const hasFilters = Boolean(keyword.trim()) || category !== 'all' || source !== 'all';
+  const hasFilters = Boolean(keyword.trim()) || category !== 'all' || source !== 'all' || statusFilter !== 'durable';
 
   const clearFilters = () => {
     setKeyword('');
     setCategory('all');
     setSource('all');
+    setStatusFilter('durable');
   };
 
   const submitMemory = async () => {
@@ -269,6 +288,15 @@ export function ProjectMemoryPage() {
       render: (row) => <Badge size="sm" tone="slate">{sourceLabel(row.source)}</Badge>,
     },
     {
+      key: 'status',
+      header: '状态',
+      width: 86,
+      render: (row) => {
+        const meta = statusMeta(row.status);
+        return <Badge size="sm" tone={meta.tone}>{meta.label}</Badge>;
+      },
+    },
+    {
       key: 'task',
       header: '关联任务',
       width: 130,
@@ -341,9 +369,9 @@ export function ProjectMemoryPage() {
           <div className="card-sub">架构、方案与约定</div>
         </Card>
         <Card className="card-pad">
-          <div className="pm-label">任务结果</div>
-          <div className="pm-value">{fmtInt(summary.taskResults)}</div>
-          <div className="card-sub">任务完成自动写回</div>
+          <div className="pm-label">洞见</div>
+          <div className="pm-value">{fmtInt(summary.insights)}</div>
+          <div className="card-sub">做梦提升的高层知识</div>
         </Card>
         <Card className="card-pad">
           <div className="pm-label">最近更新</div>
@@ -418,6 +446,12 @@ export function ProjectMemoryPage() {
             options={SOURCE_OPTIONS}
             onChange={(event) => setSource(event.target.value)}
           />
+          <Select
+            className="ws-filter-select"
+            value={statusFilter}
+            options={STATUS_OPTIONS}
+            onChange={(event) => setStatusFilter(event.target.value)}
+          />
           <SearchInput
             value={keyword}
             onChange={setKeyword}
@@ -457,7 +491,7 @@ export function ProjectMemoryPage() {
                 <EmptyState
                   icon="brain"
                   title="还没有项目记忆"
-                  description="任务完成后会自动写入执行结论，也可以手动新增。"
+                  description="普通任务结果留在任务历史；只有决策/经验候选会进入做梦流程，也可以手动新增。"
                   action={<Button size="sm" variant="primary" icon="plus" onClick={() => setAddOpen(true)}>新增记忆</Button>}
                 />
               )
@@ -544,6 +578,7 @@ export function ProjectMemoryPage() {
             <div className="hstack gap-6 wrap">
               <Badge tone={categoryMeta(detailTarget.category).tone}>{categoryMeta(detailTarget.category).label}</Badge>
               <Badge tone="slate">{sourceLabel(detailTarget.source)}</Badge>
+              <Badge tone={statusMeta(detailTarget.status).tone}>{statusMeta(detailTarget.status).label}</Badge>
               <span className="tiny dim">更新于 {fmtRelative(detailTarget.updatedAt ?? detailTarget.createdAt)}</span>
             </div>
             <div className="ws-mem-preview" style={{ maxHeight: 420 }}>{detailTarget.content}</div>
@@ -570,7 +605,7 @@ export function ProjectMemoryPage() {
         open={addOpen}
         onClose={() => setAddOpen(false)}
         title="新增项目记忆"
-        description="手动写入一条项目共享记忆；任务完成时也会自动写入执行结论。"
+        description="手动写入一条持久项目知识；普通任务结果不会自动进入这里。"
         footer={
           <>
             <Button variant="ghost" onClick={() => setAddOpen(false)}>取消</Button>

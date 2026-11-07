@@ -302,6 +302,7 @@ export interface MemoryHit {
   score: number;
   category: string;
   source?: string;
+  status?: 'durable' | 'candidate' | 'archived';
   visibility: string;
   agentId?: string;
   taskId?: string;

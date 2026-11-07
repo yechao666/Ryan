@@ -109,7 +109,7 @@ export function updateDreamSettings(
 export function pendingMemoryCount(db: Db, projectId: string): number {
   const row = rowOf<{ c: number }>(
     db,
-    'SELECT COUNT(*) AS c FROM project_memories WHERE project_id = ? AND dreamed_at IS NULL',
+    'SELECT COUNT(*) AS c FROM project_memories WHERE project_id = ? AND status = \'candidate\' AND dreamed_at IS NULL',
     [projectId],
   );
   return Number(row?.c ?? 0);
@@ -268,7 +268,7 @@ export async function runDream(
     const rows = rowsOf<NewMemoryRow>(
       db,
       `SELECT id, title, content, category, created_at FROM project_memories
-        WHERE project_id = ? AND dreamed_at IS NULL ORDER BY created_at ASC LIMIT ?`,
+        WHERE project_id = ? AND status = 'candidate' AND dreamed_at IS NULL ORDER BY created_at ASC LIMIT ?`,
       [projectId, MAX_BATCH],
     );
     if (rows.length === 0) {
@@ -295,7 +295,7 @@ export async function runDream(
       insightCount += 1;
     }
     const marks = rows.map(() => '?').join(', ');
-    db.prepare(`UPDATE project_memories SET dreamed_at = ? WHERE id IN (${marks})`).run(now, ...rows.map((row) => row.id));
+    db.prepare(`UPDATE project_memories SET dreamed_at = ?, status = 'archived' WHERE id IN (${marks})`).run(now, ...rows.map((row) => row.id));
     db.prepare('UPDATE projects SET memory_dream_last_at = ?, updated_at = ? WHERE id = ?').run(now, now, projectId);
     db.prepare("UPDATE memory_dream_runs SET status = 'completed', input_count = ?, insight_count = ?, summary = ?, finished_at = ? WHERE id = ?")
       .run(rows.length, insightCount, summary, now, runId);
@@ -315,7 +315,9 @@ export async function runDream(
 export function dueDreamProjects(db: Db, now = new Date()): string[] {
   const rows = rowsOf<ProjectDreamRow>(
     db,
-    'SELECT id, slug, memory_dream_enabled, memory_dream_interval_minutes, memory_dream_last_at FROM projects WHERE memory_dream_enabled = 1',
+    `SELECT p.id, p.slug, p.memory_dream_enabled, p.memory_dream_interval_minutes, p.memory_dream_last_at
+       FROM projects p WHERE p.memory_dream_enabled = 1
+       AND EXISTS (SELECT 1 FROM project_memories m WHERE m.project_id = p.id AND m.status = 'candidate' AND m.dreamed_at IS NULL)`,
   );
   return rows
     .filter((row) => {

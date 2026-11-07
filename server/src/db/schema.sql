@@ -84,6 +84,7 @@ CREATE TABLE IF NOT EXISTS project_memories (
   title       TEXT NOT NULL DEFAULT '',
   content     TEXT NOT NULL,
   source      TEXT NOT NULL DEFAULT 'manual',
+  status      TEXT NOT NULL DEFAULT 'durable',
   task_id     TEXT,
   metadata    TEXT NOT NULL DEFAULT '{}',
   created_by  TEXT REFERENCES persons(id) ON DELETE SET NULL,

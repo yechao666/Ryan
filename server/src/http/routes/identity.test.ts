@@ -373,22 +373,38 @@ test('内置记忆：写入、claim 注入、完成写回', async () => {
   assert.equal(after.agentId, 'aiwo_internal_memory_project');
 });
 
-test('记忆做梦：增量整理新记忆并生成洞见', async () => {
+test('记忆做梦：只整理任务候选决策/经验并生成洞见', async () => {
   process.env.AIWO_DREAM_AI = '0';
   const project = ok(await call('/api/projects', {
     token: tokenLin,
     method: 'POST',
     body: { name: '做梦项目', slug: 'dream-project', visibility: 'team', ownerTeamId: 'tm_platform', type: 'manual' },
   }));
-  const first = ok(await call(`/api/projects/${project.id}/memories`, {
+  const service = ok(await call('/api/instances', {
     token: tokenLin,
     method: 'POST',
-    body: { content: '接口统一使用 snake_case。', category: 'decision' },
+    body: { name: '做梦测试服务', kind: 'remote' },
   }));
-  ok(await call(`/api/projects/${project.id}/memories`, {
+  ok(await call('/api/runtime/instances/register', {
+    token: service.token,
+    method: 'POST',
+    body: { name: '做梦测试服务', host: '127.0.0.1', version: '0.1.0' },
+  }));
+  const task = ok(await call(`/api/projects/${project.id}/tasks`, {
     token: tokenLin,
     method: 'POST',
-    body: { content: '部署前必须运行迁移。', category: 'fact' },
+    body: { title: '做梦任务', prompt: '只输出结论', type: 'ops', instanceId: service.instance.id },
+  }));
+  ok(await call('/api/runtime/tasks/claim', { token: service.token, method: 'POST', body: {} }));
+  ok(await call(`/api/runtime/tasks/${task.id}/complete`, {
+    token: service.token,
+    method: 'POST',
+    body: {
+      status: 'done',
+      summary: '普通任务结果不应进入项目记忆',
+      decisions: ['接口统一使用 snake_case'],
+      lessons: ['部署前必须先运行迁移'],
+    },
   }));
   const configured = ok(await call(`/api/projects/${project.id}/memory/dream`, {
     token: tokenLin,
@@ -397,7 +413,7 @@ test('记忆做梦：增量整理新记忆并生成洞见', async () => {
   }));
   assert.equal(configured.intervalMinutes, 60);
   const status = ok(await call(`/api/projects/${project.id}/memory/dream`, { token: tokenLin }));
-  assert.equal(status.pendingCount, 2);
+  assert.equal(status.pendingCount, 1);
   assert.equal(status.settings.intervalMinutes, 60);
   const run = ok(await call(`/api/projects/${project.id}/memory/dream/run`, {
     token: tokenLin,
@@ -405,12 +421,12 @@ test('记忆做梦：增量整理新记忆并生成洞见', async () => {
     body: {},
   }));
   assert.equal(run.run.status, 'completed');
-  assert.equal(run.run.inputCount, 2);
+  assert.equal(run.run.inputCount, 1);
   assert.ok(run.run.insightCount >= 1);
   assert.equal(run.status.pendingCount, 0);
   const after = ok(await call(`/api/projects/${project.id}/memories?limit=20`, { token: tokenLin }));
   assert.ok(after.memories.some((hit: Json) => hit.category === 'insight'));
-  assert.ok(after.memories.every((hit: Json) => hit.source !== 'dream' || hit.id !== first.id));
+  assert.ok(after.memories.some((hit: Json) => hit.source === 'task' && hit.status === 'archived'));
   const empty = ok(await call(`/api/projects/${project.id}/memory/dream/run`, {
     token: tokenLin,
     method: 'POST',
