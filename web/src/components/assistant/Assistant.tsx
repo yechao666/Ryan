@@ -702,7 +702,7 @@ export function Assistant() {
           </div>
 
           <form
-            className="cx-assistant-input"
+            className="cx-assistant-composer"
             onSubmit={(event) => {
               event.preventDefault();
               void send();
@@ -720,20 +720,37 @@ export function Assistant() {
                 }
               }}
             />
-            {busy ? (
-              <Button type="button" variant="danger" icon="x" onClick={stop}>
-                停止
-              </Button>
-            ) : (
-              <Button type="submit" variant="primary" icon="send" disabled={!input.trim()}>
-                发送
-              </Button>
-            )}
+            <div className="cx-assistant-composer-bar">
+              <div className="cx-assistant-composer-meta">
+                <span className="cx-assistant-composer-tag">
+                  <Icon name="server" size={11} />
+                  DSH 服务
+                </span>
+                <span className="cx-assistant-composer-hint">Enter 发送 · Shift+Enter 换行</span>
+              </div>
+              {busy ? (
+                <button
+                  type="button"
+                  className="cx-assistant-send is-stop"
+                  aria-label="停止生成"
+                  title="停止生成"
+                  onClick={stop}
+                >
+                  <Icon name="x" size={15} />
+                </button>
+              ) : (
+                <button
+                  type="submit"
+                  className="cx-assistant-send"
+                  aria-label="发送"
+                  title="发送"
+                  disabled={!input.trim()}
+                >
+                  <Icon name="send" size={16} />
+                </button>
+              )}
+            </div>
           </form>
-          <footer className="cx-assistant-foot">
-            <span>Enter 发送 · Shift+Enter 换行</span>
-            <span className="dim">DSH 服务 · Aiwo API</span>
-          </footer>
         </section>
       ) : (
         <button type="button" className="cx-assistant-fab" title="打开 Aiwo 助手" onClick={() => setOpen(true)}>

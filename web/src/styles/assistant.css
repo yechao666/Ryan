@@ -529,25 +529,84 @@
 
 /* ------------------------------ 输入区 ------------------------------ */
 
-.cx-assistant-input {
-  display: flex;
-  align-items: flex-end;
-  gap: 8px;
-  padding: 10px 14px 0;
+.cx-assistant-composer {
+  margin: 8px 14px 0;
+  padding: 8px 10px 8px;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  background: rgba(9, 11, 18, 0.92);
+  transition: border-color var(--dur) var(--ease), box-shadow var(--dur) var(--ease);
 }
-
-.cx-assistant-input .textarea {
-  flex: 1;
-  min-height: 44px;
-  max-height: 100px;
-  padding: 8px 10px;
+.cx-assistant-composer:focus-within {
+  border-color: rgba(139, 124, 255, 0.58);
+  box-shadow: 0 0 0 3px rgba(139, 124, 255, 0.12);
+}
+.cx-assistant-composer .textarea {
+  width: 100%;
+  min-height: 58px;
+  max-height: 160px;
+  padding: 4px 3px 7px;
+  border: 0 !important;
+  border-radius: 0;
+  background: transparent !important;
+  box-shadow: none !important;
+  outline: 0 !important;
   resize: none;
-  font-size: 12.5px;
-  line-height: 1.55;
+  font-size: 13px;
+  line-height: 1.6;
 }
-
-.cx-assistant-input .btn {
-  height: 36px;
+.cx-assistant-composer .textarea::placeholder { color: var(--text-dim); }
+.cx-assistant-composer-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding-top: 7px;
+  border-top: 1px solid var(--border-faint);
+}
+.cx-assistant-composer-meta {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  min-width: 0;
+}
+.cx-assistant-composer-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 7px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  color: var(--text-muted);
+  font-size: 10px;
+  white-space: nowrap;
+}
+.cx-assistant-composer-hint {
+  font-size: 10px;
+  color: var(--text-dim);
+  white-space: nowrap;
+}
+.cx-assistant-send {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  flex: 0 0 34px;
+  border: 0;
+  border-radius: 50%;
+  background: var(--gradient-primary);
+  color: #090710;
+  box-shadow: 0 5px 16px -6px rgba(139, 124, 255, 0.7);
+  cursor: pointer;
+  transition: transform var(--dur) var(--ease), opacity var(--dur) var(--ease), background var(--dur) var(--ease);
+}
+.cx-assistant-send:hover:not(:disabled) { transform: translateY(-1px); }
+.cx-assistant-send:disabled { opacity: 0.45; cursor: default; box-shadow: none; }
+.cx-assistant-send.is-stop {
+  background: rgba(239, 68, 68, 0.16);
+  color: #fca5a5;
+  border: 1px solid rgba(239, 68, 68, 0.35);
+  box-shadow: none;
 }
 
 .cx-assistant-foot {
