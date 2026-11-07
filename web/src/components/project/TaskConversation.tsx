@@ -148,7 +148,7 @@ function ThinkingBlock({ text, live }: { text: string; live: boolean }) {
         <span className="ws-thinking-snippet">{summary}</span>
         <span className="ws-thinking-toggle">{open ? '收起' : '展开'}</span>
       </button>
-      {open ? <div className="ws-thinking-body">{text}</div> : null}
+      {open ? <div className="ws-thinking-body"><Markdown text={text} /></div> : null}
     </div>
   );
 }
