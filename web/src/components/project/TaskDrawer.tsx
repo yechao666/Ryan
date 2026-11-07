@@ -330,24 +330,41 @@ export function TaskDrawer({ taskId, onClose, onChanged, inline = false }: TaskD
                   title="引用提示词"
                   desc={`${task.promptCards?.length || task.promptCardIds?.length || 0} 张卡片会随任务一起注入`}
                 />
-                <div className="chip-row">
+                <div className="ws-prompt-ref-grid">
                   {task.promptCards?.length > 0
                     ? task.promptCards.map((card) => {
                         const category = promptCardCategoryMeta(card.category);
                         return (
-                          <span className="chip" key={card.id} title={card.name}>
-                            <Icon name="book" size={11} />
-                            {card.name}
-                            <Badge tone={category.tone} size="sm">
-                              {category.label}
-                            </Badge>
-                          </span>
+                          <div className="ws-prompt-ref-card" key={card.id}>
+                            <span className="ws-prompt-ref-icon">
+                              <Icon name="book" size={14} />
+                            </span>
+                            <div className="ws-prompt-ref-main">
+                              <div className="ws-prompt-ref-name" title={card.name}>
+                                {card.name}
+                              </div>
+                              <div className="ws-prompt-ref-meta">
+                                <Badge tone={category.tone} size="sm">
+                                  {category.label}
+                                </Badge>
+                                <span>随任务注入</span>
+                              </div>
+                            </div>
+                          </div>
                         );
                       })
                     : (task.promptCardIds ?? []).map((id) => (
-                        <span className="chip mono" key={id}>
-                          {id.slice(0, 12)}
-                        </span>
+                        <div className="ws-prompt-ref-card" key={id}>
+                          <span className="ws-prompt-ref-icon">
+                            <Icon name="book" size={14} />
+                          </span>
+                          <div className="ws-prompt-ref-main">
+                            <div className="ws-prompt-ref-name mono" title={id}>
+                              {id.slice(0, 16)}
+                            </div>
+                            <div className="ws-prompt-ref-meta">随任务注入</div>
+                          </div>
+                        </div>
                       ))}
                 </div>
               </div>
