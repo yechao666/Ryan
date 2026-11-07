@@ -38,6 +38,7 @@ export interface Person {
   title: string;
   avatarColor: string;
   isAdmin: boolean;
+  hasPassword?: boolean;
   createdAt: string;
   lastSeenAt?: string;
 }
@@ -383,6 +384,37 @@ export interface DemoAccount {
   title: string;
   role: string;
   password: string;
+}
+
+export interface AuthProvider {
+  id: string;
+  slug: string;
+  name: string;
+  type: 'oidc';
+  issuer: string;
+  enabled: boolean;
+  autoCreate: boolean;
+  clientId: string;
+  clientSecretConfigured: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface PersonIdentity {
+  id: string;
+  providerId: string;
+  providerName: string;
+  providerSlug: string;
+  subject: string;
+  email?: string;
+  createdAt: string;
+}
+
+export interface AccountProfile {
+  person: Person;
+  hasPassword: boolean;
+  identities: PersonIdentity[];
+  availableProviders: Pick<AuthProvider, 'id' | 'slug' | 'name' | 'type'>[];
 }
 
 export interface Paginated<T> {

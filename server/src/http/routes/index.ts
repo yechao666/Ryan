@@ -12,6 +12,7 @@ import { registerAssistantRoutes } from './assistant.ts';
 import { registerPromptCardRoutes } from './prompt-cards.ts';
 import { registerSettingsRoutes } from './settings.ts';
 import { registerInstanceRoutes } from './instances.ts';
+import { registerAccountRoutes } from './account.ts';
 
 export function registerRoutes(router: Router, _app: AppContext): void {
   registerAuthRoutes(router);
@@ -26,4 +27,5 @@ export function registerRoutes(router: Router, _app: AppContext): void {
   registerPromptCardRoutes(router);
   registerSettingsRoutes(router);
   registerInstanceRoutes(router);
+  registerAccountRoutes(router);
 }

@@ -34,6 +34,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   useEffect(() => {
+    const hash = new URLSearchParams(window.location.hash.replace(/^#/, ''));
+    const ssoToken = hash.get('token');
+    if (ssoToken) {
+      setToken(ssoToken);
+      window.history.replaceState(null, '', `${window.location.pathname}${window.location.search}`);
+    }
     void refresh();
   }, [refresh]);
 

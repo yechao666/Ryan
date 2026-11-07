@@ -23,11 +23,12 @@ export function LoginPage() {
   const navigate = useNavigate();
   const toast = useToast();
   const meta = useAsync(() => api.meta(), []);
+  const providers = useAsync(() => api.authProviders(), []);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(() => new URLSearchParams(window.location.search).get('sso_error'));
 
   if (person) return <Navigate to="/" replace />;
 
@@ -167,6 +168,28 @@ export function LoginPage() {
                 {submitting ? '正在登录…' : '登录 Aiwo'}
               </Button>
             </form>
+
+            {providers.data?.length ? (
+              <div className="stack" style={{ gap: 10, marginTop: 16 }}>
+                <div className="hstack gap-8">
+                  <span className="divider" style={{ flex: 1 }} />
+                  <span className="tiny dim">或使用统一认证</span>
+                  <span className="divider" style={{ flex: 1 }} />
+                </div>
+                {providers.data.map((provider) => (
+                  <a
+                    key={provider.id}
+                    className="btn btn-outline btn-lg btn-block"
+                    href={`/api/auth/sso/${encodeURIComponent(provider.slug)}/start`}
+                  >
+                    <Icon name="shield" size={15} />
+                    使用 {provider.name} 登录
+                  </a>
+                ))}
+              </div>
+            ) : providers.error ? (
+              <div className="tiny dim" style={{ marginTop: 12 }}>统一认证配置加载失败。</div>
+            ) : null}
 
             <div className="login-demo">
               <div className="row-between">

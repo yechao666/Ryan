@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url';
 
 const here = dirname(fileURLToPath(import.meta.url));
 export type Db = DatabaseSync;
-export const SCHEMA_VERSION = 9;
+export const SCHEMA_VERSION = 10;
 
 export function openDatabase(dbPath: string): Db {
   if (dbPath !== ':memory:') mkdirSync(dirname(dbPath), { recursive: true });
@@ -29,6 +29,10 @@ export function migrate(db: Db): void {
   const taskColumns = db.prepare('PRAGMA table_info(work_items)').all() as unknown as { name: string }[];
   if (!taskColumns.some((column) => column.name === 'allowed_service_ids')) {
     db.exec("ALTER TABLE work_items ADD COLUMN allowed_service_ids TEXT NOT NULL DEFAULT '[]'");
+  }
+  const personColumns = db.prepare('PRAGMA table_info(persons)').all() as unknown as { name: string }[];
+  if (!personColumns.some((column) => column.name === 'password_set')) {
+    db.exec('ALTER TABLE persons ADD COLUMN password_set INTEGER NOT NULL DEFAULT 1');
   }
   const cardColumns = db.prepare('PRAGMA table_info(prompt_cards)').all() as unknown as { name: string }[];
   if (!cardColumns.some((column) => column.name === 'person_id')) {

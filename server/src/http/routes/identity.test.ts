@@ -483,3 +483,125 @@ test('记忆批量删除', async () => {
   const after = ok(await call(`/api/projects/${project.id}/memories?limit=20`, { token: tokenLin }));
   assert.equal(after.memories.length, 0);
 });
+
+test('账号体系：管理员创建账号、本地登录、改密与统一认证配置', async () => {
+  const provider = ok(await call('/api/settings/auth-providers', {
+    token: tokenLin,
+    method: 'POST',
+    body: {
+      name: '测试 SSO',
+      slug: 'test-sso',
+      issuer: 'https://idp.example.invalid',
+      clientId: 'client-id',
+      clientSecret: 'client-secret',
+    },
+  }));
+  assert.equal(provider.slug, 'test-sso');
+  const publicProviders = ok(await call('/api/auth/providers'));
+  assert.ok(publicProviders.some((item: Json) => item.slug === 'test-sso'));
+
+  const created = ok(await call('/api/settings/accounts', {
+    token: tokenLin,
+    method: 'POST',
+    body: { name: '新同事', email: 'new.person@aiwo.dev', password: 'new-password', title: '工程师' },
+  }));
+  assert.equal(created.email, 'new.person@aiwo.dev');
+  const newLogin = ok(await call('/api/auth/login', {
+    method: 'POST',
+    body: { email: 'new.person@aiwo.dev', password: 'new-password' },
+  }));
+  const newToken = newLogin.token as string;
+  const account = ok(await call('/api/account', { token: newToken }));
+  assert.equal(account.person.name, '新同事');
+  assert.equal(account.hasPassword, true);
+  assert.ok(account.availableProviders.some((item: Json) => item.slug === 'test-sso'));
+
+  ok(await call('/api/account', {
+    token: newToken,
+    method: 'PATCH',
+    body: { name: '新同事 B', title: '高级工程师' },
+  }));
+  ok(await call('/api/account/password', {
+    token: newToken,
+    method: 'POST',
+    body: { currentPassword: 'new-password', newPassword: 'changed-password' },
+  }));
+  const relogin = ok(await call('/api/auth/login', {
+    method: 'POST',
+    body: { email: 'new.person@aiwo.dev', password: 'changed-password' },
+  }));
+  assert.equal(relogin.person.name, '新同事 B');
+
+  ok(await call(`/api/settings/auth-providers/${provider.id}`, {
+    token: tokenLin,
+    method: 'DELETE',
+  }));
+});
+
+test('统一认证：OIDC 登录自动创建人员并建立会话', async () => {
+  const idp = createServer((req, res) => {
+    const url = new URL(req.url ?? '/', 'http://127.0.0.1');
+    res.setHeader('content-type', 'application/json');
+    if (url.pathname === '/.well-known/openid-configuration') {
+      const base = `http://127.0.0.1:${(idp.address() as { port: number }).port}`;
+      res.end(JSON.stringify({
+        issuer: base,
+        authorization_endpoint: `${base}/authorize`,
+        token_endpoint: `${base}/token`,
+        userinfo_endpoint: `${base}/userinfo`,
+      }));
+      return;
+    }
+    if (url.pathname === '/token') {
+      let body = '';
+      req.on('data', (chunk) => { body += chunk; });
+      req.on('end', () => {
+        const params = new URLSearchParams(body);
+        res.statusCode = params.get('code') === 'test-code' ? 200 : 400;
+        res.end(JSON.stringify({ access_token: 'test-access-token', token_type: 'Bearer' }));
+      });
+      return;
+    }
+    if (url.pathname === '/userinfo') {
+      res.end(JSON.stringify({ sub: 'sso-subject-1', email: 'sso.user@aiwo.dev', name: 'SSO 用户' }));
+      return;
+    }
+    res.statusCode = 404;
+    res.end('{}');
+  });
+  await new Promise<void>((resolve) => idp.listen(0, '127.0.0.1', resolve));
+  const idpPort = (idp.address() as { port: number }).port;
+  try {
+    ok(await call('/api/settings/auth-providers', {
+      token: tokenLin,
+      method: 'POST',
+      body: {
+        name: 'OIDC 测试',
+        slug: 'oidc-sso',
+        issuer: `http://127.0.0.1:${idpPort}`,
+        clientId: 'oidc-client',
+        clientSecret: 'oidc-secret',
+      },
+    }));
+    const start = await fetch(`${base}/api/auth/sso/oidc-sso/start`, { redirect: 'manual' });
+    assert.equal(start.status, 302);
+    const authorization = new URL(start.headers.get('location') ?? '');
+    assert.equal(authorization.pathname, '/authorize');
+    const state = authorization.searchParams.get('state') ?? '';
+    assert.ok(state);
+    assert.ok(authorization.searchParams.get('code_challenge'));
+
+    const callback = await fetch(`${base}/api/auth/sso/oidc-sso/callback?code=test-code&state=${encodeURIComponent(state)}`, { redirect: 'manual' });
+    assert.equal(callback.status, 302);
+    const location = callback.headers.get('location') ?? '';
+    assert.ok(location.startsWith('/login#token='));
+    const token = decodeURIComponent(location.slice('/login#token='.length));
+    const me = ok(await call('/api/auth/me', { token }));
+    assert.equal(me.person.email, 'sso.user@aiwo.dev');
+    const account = ok(await call('/api/account', { token }));
+    assert.equal(account.hasPassword, false);
+    assert.equal(account.identities[0].providerSlug, 'oidc-sso');
+  } finally {
+    idp.close();
+  }
+});

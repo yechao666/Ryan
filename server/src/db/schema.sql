@@ -16,8 +16,46 @@ CREATE TABLE IF NOT EXISTS persons (
   avatar_color  TEXT NOT NULL DEFAULT 'violet',
   is_admin      INTEGER NOT NULL DEFAULT 0,
   password_hash TEXT NOT NULL,
+  password_set  INTEGER NOT NULL DEFAULT 1,
   created_at    TEXT NOT NULL,
   last_seen_at  TEXT
+);
+
+CREATE TABLE IF NOT EXISTS auth_providers (
+  id            TEXT PRIMARY KEY,
+  slug          TEXT NOT NULL UNIQUE,
+  name          TEXT NOT NULL,
+  type          TEXT NOT NULL DEFAULT 'oidc',
+  issuer        TEXT NOT NULL,
+  client_id     TEXT NOT NULL,
+  client_secret TEXT NOT NULL DEFAULT '',
+  scopes        TEXT NOT NULL DEFAULT 'openid profile email',
+  enabled       INTEGER NOT NULL DEFAULT 1,
+  auto_create   INTEGER NOT NULL DEFAULT 1,
+  created_at    TEXT NOT NULL,
+  updated_at    TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS auth_identities (
+  id          TEXT PRIMARY KEY,
+  person_id   TEXT NOT NULL REFERENCES persons(id) ON DELETE CASCADE,
+  provider_id TEXT NOT NULL REFERENCES auth_providers(id) ON DELETE CASCADE,
+  subject     TEXT NOT NULL,
+  email       TEXT,
+  created_at  TEXT NOT NULL,
+  UNIQUE(provider_id, subject)
+);
+CREATE INDEX IF NOT EXISTS idx_auth_identities_person ON auth_identities(person_id);
+
+CREATE TABLE IF NOT EXISTS auth_states (
+  state          TEXT PRIMARY KEY,
+  provider_id    TEXT NOT NULL REFERENCES auth_providers(id) ON DELETE CASCADE,
+  verifier       TEXT NOT NULL,
+  redirect_uri   TEXT NOT NULL,
+  return_to      TEXT NOT NULL DEFAULT '/',
+  bind_person_id TEXT REFERENCES persons(id) ON DELETE CASCADE,
+  created_at     TEXT NOT NULL,
+  expires_at     TEXT NOT NULL
 );
 
 CREATE TABLE IF NOT EXISTS sessions (

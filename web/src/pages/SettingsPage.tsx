@@ -19,6 +19,8 @@ import { api, type SecurityTestResult } from '../lib/api.ts';
 import { useAuth } from '../lib/auth.tsx';
 import { fmtRelative } from '../lib/format.ts';
 import { useAsync } from '../lib/hooks.ts';
+import { AuthProvidersSection } from '../components/settings/AuthProvidersSection.tsx';
+import { AccountsSection } from '../components/settings/AccountsSection.tsx';
 
 interface SecurityFormState {
   enabled: boolean;
@@ -415,6 +417,9 @@ export function SettingsPage() {
               </Card>
             </div>
           </div>
+
+          {isAdmin ? <AuthProvidersSection /> : null}
+          {isAdmin ? <AccountsSection /> : null}
         </>
       ) : null}
     </div>

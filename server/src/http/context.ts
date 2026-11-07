@@ -111,6 +111,7 @@ export function personFromRow(row: {
   title: string | null;
   avatar_color: string;
   is_admin: number;
+  password_set?: number;
   created_at: string;
   last_seen_at: string | null;
 }): Person {
@@ -121,6 +122,7 @@ export function personFromRow(row: {
     title: row.title ?? '',
     avatarColor: row.avatar_color,
     isAdmin: Number(row.is_admin) === 1,
+    hasPassword: row.password_set === undefined ? true : Number(row.password_set) === 1,
     createdAt: row.created_at,
     lastSeenAt: row.last_seen_at ?? undefined,
   };

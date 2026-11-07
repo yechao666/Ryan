@@ -1,6 +1,8 @@
 import type {
   ActivityEvent,
   AssistantSettings,
+  AccountProfile,
+  AuthProvider,
   AuthResponse,
   Automation,
   AutomationRun,
@@ -168,6 +170,64 @@ export const api = {
   // ---- auth / meta ----
   login(email: string, password: string): Promise<AuthResponse> {
     return request('/api/auth/login', { method: 'POST', body: JSON.stringify({ email, password }) });
+  },
+
+  authProviders(): Promise<Pick<AuthProvider, 'id' | 'slug' | 'name' | 'type'>[]> {
+    return request('/api/auth/providers');
+  },
+
+  account(): Promise<AccountProfile> {
+    return request('/api/account');
+  },
+
+  updateAccount(input: { name?: string; title?: string }): Promise<{ person: AuthResponse['person'] }> {
+    return request('/api/account', { method: 'PATCH', body: JSON.stringify(input) });
+  },
+
+  changePassword(input: { currentPassword?: string; newPassword: string }): Promise<{ ok: boolean }> {
+    return request('/api/account/password', { method: 'POST', body: JSON.stringify(input) });
+  },
+
+  startIdentityBind(providerId: string): Promise<{ url: string }> {
+    return request(`/api/account/sso/${providerId}/start`, { method: 'POST', body: '{}' });
+  },
+
+  unlinkIdentity(identityId: string): Promise<{ ok: boolean }> {
+    return request(`/api/account/identities/${identityId}`, { method: 'DELETE' });
+  },
+
+  adminAccounts(): Promise<(AuthResponse['person'] & { identityCount: number })[]> {
+    return request('/api/settings/accounts');
+  },
+
+  createAccount(input: { name: string; email: string; title?: string; password: string; isAdmin?: boolean }): Promise<AuthResponse['person']> {
+    return request('/api/settings/accounts', { method: 'POST', body: JSON.stringify(input) });
+  },
+
+  updateAccountAdmin(id: string, input: { name?: string; title?: string; isAdmin?: boolean; password?: string }): Promise<AuthResponse['person']> {
+    return request(`/api/settings/accounts/${id}`, { method: 'PATCH', body: JSON.stringify(input) });
+  },
+
+  authProviderAdmin(): Promise<AuthProvider[]> {
+    return request('/api/settings/auth-providers');
+  },
+
+  createAuthProvider(input: {
+    name: string; slug: string; issuer: string; clientId: string; clientSecret?: string;
+    scopes?: string; enabled?: boolean; autoCreate?: boolean;
+  }): Promise<AuthProvider> {
+    return request('/api/settings/auth-providers', { method: 'POST', body: JSON.stringify(input) });
+  },
+
+  updateAuthProvider(id: string, input: Partial<{
+    name: string; issuer: string; clientId: string; clientSecret: string;
+    scopes: string; enabled: boolean; autoCreate: boolean;
+  }>): Promise<AuthProvider> {
+    return request(`/api/settings/auth-providers/${id}`, { method: 'PATCH', body: JSON.stringify(input) });
+  },
+
+  deleteAuthProvider(id: string): Promise<{ ok: boolean }> {
+    return request(`/api/settings/auth-providers/${id}`, { method: 'DELETE' });
   },
   me(): Promise<{ person: Person }> {
     return request('/api/auth/me');

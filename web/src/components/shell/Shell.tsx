@@ -29,6 +29,12 @@ const NAV_GROUPS: { label: string; items: NavItem[] }[] = [
       { to: '/settings', label: '系统设置', icon: 'settings' },
     ],
   },
+  {
+    label: '账户',
+    items: [
+      { to: '/account', label: '个人账号', icon: 'user' },
+    ],
+  },
 ];
 
 export function Shell() {
