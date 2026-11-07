@@ -4,6 +4,8 @@ import { createServer, type Server } from 'node:http';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { after, before, test } from 'node:test';
+
+process.env.AIWO_LOCAL_AI = '0';
 import { EventBus } from '../../lib/bus.ts';
 import { openDatabase, migrate } from '../../db/index.ts';
 import { loadEnv } from '../../env.ts';

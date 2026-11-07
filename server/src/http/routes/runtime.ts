@@ -35,7 +35,8 @@ import {
   truncateSummary,
   type TaskRow,
 } from './tasks.ts';
-import { addMemory, buildMemoryBrief, buildMemoryContext, getMemoryBriefMaxChars, memoryAgentIdOf, searchMemories, taskMemoryText } from '../../memory/store.ts';
+import { addMemory, buildMemoryContext, getMemoryBriefMaxChars, memoryAgentIdOf, searchMemories, taskMemoryText } from '../../memory/store.ts';
+import { ensureMemoryBrief } from '../../memory/brief.ts';
 import { memoryWriteIssue } from '../../memory/policy.ts';
 import { buildInstance, getInstanceRow } from './identity-helpers.ts';
 
@@ -254,7 +255,7 @@ export function registerRuntimeRoutes(router: Router): void {
     rc.json({ ok: true, instance: row ? buildInstance(rc.app.db, row) : null, pending: Number(pending?.c ?? 0) });
   });
 
-  router.post('/api/runtime/tasks/claim', (rc) => {
+  router.post('/api/runtime/tasks/claim', async (rc) => {
     const instance = authenticateInstance(rc);
     const db = rc.app.db;
     const now = nowIso();
@@ -304,7 +305,7 @@ export function registerRuntimeRoutes(router: Router): void {
     const person = task.created_by ? rowOf<{ id: string; name: string }>(db, 'SELECT id, name FROM persons WHERE id = ?', [task.created_by]) : undefined;
     const memoryAgentId = memoryAgentIdOf(db, project.id) ?? '';
     const item = getWorkItem(db, task.id)!;
-    const memoryBrief = buildMemoryBrief(db, project.id, getMemoryBriefMaxChars(db, project.id));
+    const memoryBrief = await ensureMemoryBrief(db, project.id);
 
     insertTaskEvent(db, {
       taskId: task.id,

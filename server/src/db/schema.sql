@@ -95,6 +95,14 @@ CREATE TABLE IF NOT EXISTS project_memories (
 CREATE INDEX IF NOT EXISTS idx_project_memories_project ON project_memories(project_id, created_at DESC);
 CREATE UNIQUE INDEX IF NOT EXISTS idx_project_memories_task ON project_memories(project_id, task_id) WHERE task_id IS NOT NULL;
 
+CREATE TABLE IF NOT EXISTS memory_briefs (
+  project_id   TEXT PRIMARY KEY REFERENCES projects(id) ON DELETE CASCADE,
+  text         TEXT NOT NULL DEFAULT '',
+  max_chars    INTEGER NOT NULL DEFAULT 500,
+  source_hash  TEXT NOT NULL DEFAULT '',
+  generated_at TEXT NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS memory_dream_runs (
   id          TEXT PRIMARY KEY,
   project_id  TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,

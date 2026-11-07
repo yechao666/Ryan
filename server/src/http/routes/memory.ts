@@ -8,7 +8,6 @@ import { requirePerson, requireProject } from '../auth.ts';
 import { errors } from '../respond.ts';
 import {
   addMemory,
-  buildMemoryBrief,
   buildMemoryContext,
   deleteMemory,
   getMemoryBriefMaxChars,
@@ -17,6 +16,7 @@ import {
   memoryAgentIdOf,
   searchMemories,
 } from '../../memory/store.ts';
+import { ensureMemoryBrief } from '../../memory/brief.ts';
 import { getDreamSettings, getDreamStatus, runDream, updateDreamSettings } from '../../memory/dream.ts';
 import { checkUserInput } from '../../security/check.ts';
 import type {
@@ -69,16 +69,16 @@ export function registerMemoryRoutes(router: Router): void {
     rc.json(result);
   });
 
-  router.get('/api/projects/:id/memory/brief', (rc) => {
+  router.get('/api/projects/:id/memory/brief', async (rc) => {
     const project = requireProject(rc, rc.params.id, 'view');
-    rc.json(buildMemoryBrief(rc.app.db, project.id, getMemoryBriefMaxChars(rc.app.db, project.id)));
+    rc.json(await ensureMemoryBrief(rc.app.db, project.id));
   });
 
   router.patch('/api/projects/:id/memory/brief', async (rc) => {
     const project = requireProject(rc, rc.params.id, 'manage');
     const input = await rc.body(briefSettingsSchema);
     const maxChars = setMemoryBriefMaxChars(rc.app.db, project.id, input.maxChars);
-    rc.json({ maxChars, brief: buildMemoryBrief(rc.app.db, project.id, maxChars) });
+    rc.json({ maxChars, brief: await ensureMemoryBrief(rc.app.db, project.id, true) });
   });
 
   router.get('/api/projects/:id/memory/dream', (rc) => {

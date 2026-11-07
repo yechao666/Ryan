@@ -4,10 +4,6 @@
  * 只处理 dreamed_at 为空的新记忆，归纳为高层洞见（category=insight），
  * 然后把这些新记忆标记为已做梦；不重放旧记忆，也不执行任务。
  */
-import { spawn } from 'node:child_process';
-import { mkdtemp, readFile, rm } from 'node:fs/promises';
-import { homedir, tmpdir } from 'node:os';
-import { join } from 'node:path';
 import type { Db } from '../db/index.ts';
 import type {
   MemoryDreamRun,
@@ -17,6 +13,7 @@ import type {
 } from '../../../shared/src/types.ts';
 import { addMemory, memoryAgentIdOf } from './store.ts';
 import { newId, nowIso } from '../lib/ids.ts';
+import { runDshText } from '../ai/dsh.ts';
 
 const MAX_BATCH = 50;
 const MIN_INTERVAL_MINUTES = 1;
@@ -174,17 +171,6 @@ function duplicateOf(db: Db, projectId: string, content: string): boolean {
   });
 }
 
-async function deepseekKey(): Promise<string> {
-  if (process.env.DEEPSEEK_API_KEY) return process.env.DEEPSEEK_API_KEY;
-  try {
-    const yaml = await readFile(join(process.env.DSH_HOME || join(homedir(), '.dsh'), '.credentials.yaml'), 'utf8');
-    const match = yaml.match(/DEEPSEEK_API_KEY:\s*["']?([^\s"']+)/);
-    return match?.[1] ?? '';
-  } catch {
-    return '';
-  }
-}
-
 /** 让 DSH 归纳这批新记忆；失败时回退为确定性摘要。 */
 async function synthesize(
   db: Db,
@@ -195,56 +181,21 @@ async function synthesize(
   if (process.env.AIWO_DREAM_AI === '0') {
     return { summary: `已整理 ${rows.length} 条新记忆`, insights: fallback };
   }
-  const key = await deepseekKey();
-  if (!key) return { summary: `已整理 ${rows.length} 条新记忆`, insights: fallback };
-  const dir = await mkdtemp(join(tmpdir(), 'aiwo-dream-'));
-  const child = spawn(process.env.HIVE_DSH_BIN || 'dsh', ['--profile', 'headless', '--json', '-'], {
-    cwd: dir,
-    env: {
-      ...process.env,
-      DSH_HOME: process.env.DSH_HOME || join(homedir(), '.dsh'),
-      DEEPSEEK_API_KEY: key,
-      DSH_HIVE_RUNTIME_DISABLED: '1',
-    },
-    stdio: ['pipe', 'pipe', 'pipe'],
-  });
-  let finalText = '';
-  let text = '';
-  let buffer = '';
-  child.stdout.on('data', (chunk: Buffer) => {
-    buffer += chunk.toString('utf8');
-    const lines = buffer.split('\n');
-    buffer = lines.pop() ?? '';
-    for (const line of lines) {
-      if (!line.trim()) continue;
-      try {
-        const event = JSON.parse(line) as { type?: string; text?: string };
-        if (event.type === 'text' && event.text) text = event.text;
-        if (event.type === 'final' && event.text) finalText = event.text;
-      } catch { /* ignore */ }
-    }
-  });
-  const timeout = setTimeout(() => {
-    try { child.kill('SIGTERM'); } catch { /* noop */ }
-  }, 25_000);
-  timeout.unref?.();
+  const prompt = [
+    '你在做项目记忆巩固（“做梦”）。只根据给定新记忆，归纳可复用的高层洞见。',
+    '不要调用工具，不要编造未出现的事实。合并重复、指出决策与经验。',
+    '只输出 JSON，格式：',
+    '{"summary":"一句话总结","insights":[{"title":"短标题","content":"洞见正文"}]}',
+    '最多 5 条 insights。没有跨任务可复用的有效洞见时，返回空数组 []，不要为了凑数生成泛泛总结。',
+    '',
+    `项目：${projectId}`,
+    '新记忆：',
+    insightLines(rows).slice(0, 30_000),
+  ].join('\n');
+  const output = await runDshText({ prompt, timeoutMs: 25_000, maxChars: 30_000 });
+  if (!output) return { summary: `已整理 ${rows.length} 条新记忆`, insights: fallback };
   try {
-    child.stdin.end([
-      '你在做项目记忆巩固（“做梦”）。只根据给定新记忆，归纳可复用的高层洞见。',
-      '不要调用工具，不要编造未出现的事实。合并重复、指出决策与经验。',
-      '只输出 JSON，格式：',
-      '{"summary":"一句话总结","insights":[{"title":"短标题","content":"洞见正文"}]}',
-      '最多 5 条 insights。没有跨任务可复用的有效洞见时，返回空数组 []，不要为了凑数生成泛泛总结。',
-      '',
-      `项目：${projectId}`,
-      '新记忆：',
-      insightLines(rows).slice(0, 30_000),
-    ].join('\n'));
-    await new Promise<void>((resolve) => {
-      child.once('close', () => resolve());
-      child.once('error', () => resolve());
-    });
-    const parsed = JSON.parse(cleanJson(finalText || text)) as {
+    const parsed = JSON.parse(cleanJson(output)) as {
       summary?: unknown;
       insights?: unknown;
     };
@@ -264,10 +215,6 @@ async function synthesize(
     };
   } catch {
     return { summary: `已整理 ${rows.length} 条新记忆`, insights: fallback };
-  } finally {
-    clearTimeout(timeout);
-    if (child.exitCode === null) child.kill('SIGTERM');
-    await rm(dir, { recursive: true, force: true });
   }
 }
 
