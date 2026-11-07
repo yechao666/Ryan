@@ -87,11 +87,26 @@ CREATE TABLE IF NOT EXISTS project_memories (
   task_id     TEXT,
   metadata    TEXT NOT NULL DEFAULT '{}',
   created_by  TEXT REFERENCES persons(id) ON DELETE SET NULL,
+  dreamed_at   TEXT,
   created_at  TEXT NOT NULL,
   updated_at  TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_project_memories_project ON project_memories(project_id, created_at DESC);
 CREATE UNIQUE INDEX IF NOT EXISTS idx_project_memories_task ON project_memories(project_id, task_id) WHERE task_id IS NOT NULL;
+
+CREATE TABLE IF NOT EXISTS memory_dream_runs (
+  id          TEXT PRIMARY KEY,
+  project_id  TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+  trigger     TEXT NOT NULL DEFAULT 'schedule',
+  status      TEXT NOT NULL DEFAULT 'running',
+  input_count INTEGER NOT NULL DEFAULT 0,
+  insight_count INTEGER NOT NULL DEFAULT 0,
+  summary     TEXT,
+  error       TEXT,
+  started_at  TEXT NOT NULL,
+  finished_at TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_memory_dream_project ON memory_dream_runs(project_id, started_at DESC);
 
 CREATE TABLE IF NOT EXISTS prompt_cards (
   id          TEXT PRIMARY KEY,

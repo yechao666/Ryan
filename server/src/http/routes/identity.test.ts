@@ -372,3 +372,50 @@ test('内置记忆：写入、claim 注入、完成写回', async () => {
   assert.ok(after.memories.some((hit: Json) => hit.taskId === task.id));
   assert.equal(after.agentId, 'aiwo_internal_memory_project');
 });
+
+test('记忆做梦：增量整理新记忆并生成洞见', async () => {
+  process.env.AIWO_DREAM_AI = '0';
+  const project = ok(await call('/api/projects', {
+    token: tokenLin,
+    method: 'POST',
+    body: { name: '做梦项目', slug: 'dream-project', visibility: 'team', ownerTeamId: 'tm_platform', type: 'manual' },
+  }));
+  const first = ok(await call(`/api/projects/${project.id}/memories`, {
+    token: tokenLin,
+    method: 'POST',
+    body: { content: '接口统一使用 snake_case。', category: 'decision' },
+  }));
+  ok(await call(`/api/projects/${project.id}/memories`, {
+    token: tokenLin,
+    method: 'POST',
+    body: { content: '部署前必须运行迁移。', category: 'fact' },
+  }));
+  const configured = ok(await call(`/api/projects/${project.id}/memory/dream`, {
+    token: tokenLin,
+    method: 'PATCH',
+    body: { enabled: true, intervalMinutes: 60 },
+  }));
+  assert.equal(configured.intervalMinutes, 60);
+  const status = ok(await call(`/api/projects/${project.id}/memory/dream`, { token: tokenLin }));
+  assert.equal(status.pendingCount, 2);
+  assert.equal(status.settings.intervalMinutes, 60);
+  const run = ok(await call(`/api/projects/${project.id}/memory/dream/run`, {
+    token: tokenLin,
+    method: 'POST',
+    body: {},
+  }));
+  assert.equal(run.run.status, 'completed');
+  assert.equal(run.run.inputCount, 2);
+  assert.ok(run.run.insightCount >= 1);
+  assert.equal(run.status.pendingCount, 0);
+  const after = ok(await call(`/api/projects/${project.id}/memories?limit=20`, { token: tokenLin }));
+  assert.ok(after.memories.some((hit: Json) => hit.category === 'insight'));
+  assert.ok(after.memories.every((hit: Json) => hit.source !== 'dream' || hit.id !== first.id));
+  const empty = ok(await call(`/api/projects/${project.id}/memory/dream/run`, {
+    token: tokenLin,
+    method: 'POST',
+    body: {},
+  }));
+  assert.equal(empty.run.status, 'skipped');
+  delete process.env.AIWO_DREAM_AI;
+});

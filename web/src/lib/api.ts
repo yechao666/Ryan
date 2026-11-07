@@ -13,6 +13,7 @@ import type {
   InboundDelivery,
   LiveEvent,
   MemoryContextResult,
+  MemoryDreamStatus,
   MemoryHit,
   MemorySearchResult,
   Paginated,
@@ -457,6 +458,18 @@ export const api = {
   memoryContext(projectId: string, agentId?: string, q?: string): Promise<MemoryContextResult> {
     return request(`/api/projects/${projectId}/memory/context${qs({ agentId, q })}`);
   },
+  memoryDream(projectId: string): Promise<MemoryDreamStatus> {
+    return request(`/api/projects/${projectId}/memory/dream`);
+  },
+
+  updateMemoryDream(projectId: string, input: { enabled?: boolean; intervalMinutes?: number }): Promise<MemoryDreamStatus['settings']> {
+    return request(`/api/projects/${projectId}/memory/dream`, { method: 'PATCH', body: JSON.stringify(input) });
+  },
+
+  runMemoryDream(projectId: string): Promise<{ run: MemoryDreamStatus['runs'][number]; status: MemoryDreamStatus }> {
+    return request(`/api/projects/${projectId}/memory/dream/run`, { method: 'POST', body: '{}' });
+  },
+
   projectMemories(projectId: string, limit = 50): Promise<{ memories: MemoryHit[]; agentId: string }> {
     return request(`/api/projects/${projectId}/memories${qs({ limit })}`);
   },

@@ -81,3 +81,4 @@ POST /api/runtime/tasks/:id/complete
 - 完成后 Aiwo 直接写入 `project_memories`，不依赖外部服务
 - 记忆身份由项目决定：`aiwo_<slug>`
 - 检索采用本地词项/中文二元组 + 时间衰减评分；上下文有 token 预算
+- 做梦（memory dream）：调度器按项目周期扫描 `dreamed_at IS NULL` 的新记忆，归纳为 `insight`，只做增量，不重放旧记忆

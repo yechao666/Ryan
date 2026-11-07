@@ -7,7 +7,9 @@ import { useAsync } from '@lib/hooks.ts';
 import {
   Badge,
   Button,
+  Callout,
   Card,
+  Checkbox,
   CodeBlock,
   ConfirmDialog,
   CopyButton,
@@ -38,12 +40,14 @@ const CATEGORY_META: Record<string, { label: string; tone: Tone }> = {
   decision: { label: '决策', tone: 'violet' },
   note: { label: '笔记', tone: 'slate' },
   task_result: { label: '任务结果', tone: 'green' },
+  insight: { label: '洞见', tone: 'amber' },
 };
 
 const CATEGORY_OPTIONS = [
   { value: 'all', label: '全部类型' },
   { value: 'decision', label: '决策' },
   { value: 'task_result', label: '任务结果' },
+  { value: 'insight', label: '洞见' },
   { value: 'fact', label: '事实' },
   { value: 'note', label: '笔记' },
 ];
@@ -53,6 +57,7 @@ const SOURCE_OPTIONS = [
   { value: 'manual', label: '手动' },
   { value: 'task', label: '任务写回' },
   { value: 'agent', label: 'DSH 工具' },
+  { value: 'dream', label: '做梦整理' },
 ];
 
 function categoryMeta(category: string) {
@@ -62,6 +67,7 @@ function categoryMeta(category: string) {
 function sourceLabel(source?: string): string {
   if (source === 'task') return '任务写回';
   if (source === 'agent') return 'DSH 工具';
+  if (source === 'dream') return '做梦整理';
   if (source === 'manual') return '手动';
   return source || '未知';
 }
@@ -74,6 +80,7 @@ export function ProjectMemoryPage() {
   const toast = useToast();
 
   const memories = useAsync(() => api.projectMemories(projectId, 200), [projectId], true);
+  const dream = useAsync(() => api.memoryDream(projectId), [projectId], true);
   const [keyword, setKeyword] = useState('');
   const [category, setCategory] = useState('all');
   const [source, setSource] = useState('all');
@@ -89,6 +96,12 @@ export function ProjectMemoryPage() {
   const [deleteTarget, setDeleteTarget] = useState<MemoryHit | null>(null);
   const [deleting, setDeleting] = useState(false);
 
+  const [dreamEnabled, setDreamEnabled] = useState(true);
+  const [dreamInterval, setDreamInterval] = useState('24');
+  const [dreamUnit, setDreamUnit] = useState('hours');
+  const [savingDream, setSavingDream] = useState(false);
+  const [dreaming, setDreaming] = useState(false);
+
   const [contextQuery, setContextQuery] = useState('');
   const [contextTick, setContextTick] = useState(0);
   const context = useAsync(
@@ -96,6 +109,22 @@ export function ProjectMemoryPage() {
     [projectId, detail.project.memoryAgentId, contextTick],
     true,
   );
+
+  useEffect(() => {
+    const settings = dream.data?.settings;
+    if (!settings) return;
+    setDreamEnabled(settings.enabled);
+    if (settings.intervalMinutes % 1440 === 0) {
+      setDreamInterval(String(settings.intervalMinutes / 1440));
+      setDreamUnit('days');
+    } else if (settings.intervalMinutes % 60 === 0) {
+      setDreamInterval(String(settings.intervalMinutes / 60));
+      setDreamUnit('hours');
+    } else {
+      setDreamInterval(String(settings.intervalMinutes));
+      setDreamUnit('minutes');
+    }
+  }, [dream.data?.settings]);
 
   const all = memories.data?.memories ?? [];
   const filtered = useMemo(() => {
@@ -123,6 +152,7 @@ export function ProjectMemoryPage() {
       decisions: count('decision'),
       taskResults: count('task_result'),
       notes: count('note') + count('fact'),
+      insights: count('insight'),
       latest: all[0]?.createdAt,
     };
   }, [all]);
@@ -173,6 +203,42 @@ export function ProjectMemoryPage() {
       toast.error(cause instanceof Error ? cause.message : '删除记忆失败');
     } finally {
       setDeleting(false);
+    }
+  };
+
+  const saveDream = async () => {
+    const value = Number(dreamInterval);
+    if (!Number.isFinite(value) || value <= 0) {
+      toast.error('请输入有效的做梦间隔');
+      return;
+    }
+    const multiplier = dreamUnit === 'days' ? 1440 : dreamUnit === 'hours' ? 60 : 1;
+    const minutes = Math.max(1, Math.round(value * multiplier));
+    setSavingDream(true);
+    try {
+      await api.updateMemoryDream(projectId, { enabled: dreamEnabled, intervalMinutes: minutes });
+      toast.success('做梦设置已保存');
+      await dream.refresh();
+    } catch (cause) {
+      toast.error(cause instanceof Error ? cause.message : '保存做梦设置失败');
+    } finally {
+      setSavingDream(false);
+    }
+  };
+
+  const runDreamNow = async () => {
+    setDreaming(true);
+    try {
+      const result = await api.runMemoryDream(projectId);
+      const run = result.run;
+      if (run.status === 'skipped') toast.info('没有需要整理的新记忆');
+      else toast.success(`做梦完成：${run.inputCount} 条新记忆 → ${run.insightCount} 条洞见`);
+      await Promise.all([memories.refresh(), dream.refresh()]);
+      setContextTick((tick) => tick + 1);
+    } catch (cause) {
+      toast.error(cause instanceof Error ? cause.message : '做梦失败');
+    } finally {
+      setDreaming(false);
     }
   };
 
@@ -285,6 +351,58 @@ export function ProjectMemoryPage() {
           <div className="card-sub">记忆身份 <span className="mono">{identity}</span></div>
         </Card>
       </div>
+
+      <Card className="card-pad">
+        <SectionHead
+          title={<><Icon name="sparkles" size={14} />记忆做梦</>}
+          desc="增量巩固：只处理上次做梦后新增的记忆，归纳成高层洞见；不会重跑旧记忆，也不会执行任务。"
+          actions={
+            <Button size="sm" variant="primary" icon="sparkles" loading={dreaming} onClick={() => void runDreamNow()}>
+              立即做梦
+            </Button>
+          }
+        />
+        <div className="mt-12" style={{ display: 'flex', alignItems: 'flex-end', gap: 12, flexWrap: 'wrap' }}>
+          <Checkbox
+            checked={dreamEnabled}
+            onChange={() => setDreamEnabled((value) => !value)}
+            label="启用定时做梦"
+          />
+          <Field label="每隔">
+            <div className="hstack gap-4">
+              <Input
+                style={{ width: 88 }}
+                value={dreamInterval}
+                inputMode="numeric"
+                onChange={(event) => setDreamInterval(event.target.value.replace(/[^0-9.]/g, ''))}
+              />
+              <Select
+                value={dreamUnit}
+                options={[
+                  { value: 'minutes', label: '分钟' },
+                  { value: 'hours', label: '小时' },
+                  { value: 'days', label: '天' },
+                ]}
+                onChange={(event) => setDreamUnit(event.target.value)}
+              />
+            </div>
+          </Field>
+          <Button size="sm" variant="outline" icon="check" loading={savingDream} onClick={() => void saveDream()}>
+            保存设置
+          </Button>
+          <span className="tiny dim">
+            待整理 <strong>{dream.data?.pendingCount ?? 0}</strong> 条
+            {dream.data?.settings.lastAt ? ` · 上次 ${fmtRelative(dream.data.settings.lastAt)}` : ' · 尚未做梦'}
+          </span>
+        </div>
+        {dream.error ? <Callout tone="red" icon="alert">{dream.error}</Callout> : null}
+        {dream.data?.lastRun ? (
+          <div className="tiny dim mt-8">
+            最近一次：{dream.data.lastRun.status} · 输入 {dream.data.lastRun.inputCount} 条 · 产出 {dream.data.lastRun.insightCount} 条
+            {dream.data.lastRun.summary ? ` · ${dream.data.lastRun.summary}` : ''}
+          </div>
+        ) : null}
+      </Card>
 
       <div className="toolbar">
         <div className="toolbar-left">

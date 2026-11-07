@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url';
 
 const here = dirname(fileURLToPath(import.meta.url));
 export type Db = DatabaseSync;
-export const SCHEMA_VERSION = 5;
+export const SCHEMA_VERSION = 6;
 
 export function openDatabase(dbPath: string): Db {
   if (dbPath !== ':memory:') mkdirSync(dirname(dbPath), { recursive: true });
@@ -33,6 +33,20 @@ export function migrate(db: Db): void {
   const cardColumns = db.prepare('PRAGMA table_info(prompt_cards)').all() as unknown as { name: string }[];
   if (!cardColumns.some((column) => column.name === 'person_id')) {
     db.exec('ALTER TABLE prompt_cards ADD COLUMN person_id TEXT');
+  }
+  const projectColumns = db.prepare('PRAGMA table_info(projects)').all() as unknown as { name: string }[];
+  if (!projectColumns.some((column) => column.name === 'memory_dream_enabled')) {
+    db.exec('ALTER TABLE projects ADD COLUMN memory_dream_enabled INTEGER NOT NULL DEFAULT 1');
+  }
+  if (!projectColumns.some((column) => column.name === 'memory_dream_interval_minutes')) {
+    db.exec('ALTER TABLE projects ADD COLUMN memory_dream_interval_minutes INTEGER NOT NULL DEFAULT 1440');
+  }
+  if (!projectColumns.some((column) => column.name === 'memory_dream_last_at')) {
+    db.exec('ALTER TABLE projects ADD COLUMN memory_dream_last_at TEXT');
+  }
+  const memoryColumns = db.prepare('PRAGMA table_info(project_memories)').all() as unknown as { name: string }[];
+  if (!memoryColumns.some((column) => column.name === 'dreamed_at')) {
+    db.exec('ALTER TABLE project_memories ADD COLUMN dreamed_at TEXT');
   }
   db.prepare("INSERT OR REPLACE INTO meta (key, value) VALUES ('schema_version', ?)").run(String(SCHEMA_VERSION));
 }

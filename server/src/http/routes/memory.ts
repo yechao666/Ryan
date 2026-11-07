@@ -14,6 +14,7 @@ import {
   memoryAgentIdOf,
   searchMemories,
 } from '../../memory/store.ts';
+import { getDreamSettings, getDreamStatus, runDream, updateDreamSettings } from '../../memory/dream.ts';
 import { checkUserInput } from '../../security/check.ts';
 import type {
   MemoryContextResult,
@@ -35,6 +36,11 @@ const listQuerySchema = z.object({
   limit: z.coerce.number().int().min(1).max(200).default(50),
 });
 
+const dreamSettingsSchema = z.object({
+  enabled: z.boolean().optional(),
+  intervalMinutes: z.number().int().min(1).max(60 * 24 * 30).optional(),
+});
+
 const addSchema = z.object({
   content: z.string().trim().min(1).max(20_000),
   title: z.string().trim().max(200).optional(),
@@ -54,6 +60,24 @@ export function registerMemoryRoutes(router: Router): void {
     const params = rc.query(contextQuerySchema);
     const result: MemoryContextResult = buildMemoryContext(rc.app.db, project.id, params.q ?? '', CONTEXT_BUDGET_TOKENS);
     rc.json(result);
+  });
+
+  router.get('/api/projects/:id/memory/dream', (rc) => {
+    const project = requireProject(rc, rc.params.id, 'view');
+    rc.json(getDreamStatus(rc.app.db, project.id));
+  });
+
+  router.patch('/api/projects/:id/memory/dream', async (rc) => {
+    const project = requireProject(rc, rc.params.id, 'manage');
+    const input = await rc.body(dreamSettingsSchema);
+    rc.json(updateDreamSettings(rc.app.db, project.id, input));
+  });
+
+  router.post('/api/projects/:id/memory/dream/run', async (rc) => {
+    const project = requireProject(rc, rc.params.id, 'manage');
+    const run = await runDream(rc.app.db, project.id, 'manual');
+    if (!run) throw errors.conflict('该项目正在做梦，请稍后再试');
+    rc.json({ run, status: getDreamStatus(rc.app.db, project.id) });
   });
 
   router.get('/api/projects/:id/memories', (rc) => {

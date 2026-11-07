@@ -105,6 +105,10 @@ Aiwo 任务执行者固定为「创建人@Aiwo」；任务不支持对话，只�
 | GET | `/api/projects/:id/memories?limit=` | 列出项目记忆 |
 | POST | `/api/projects/:id/memories` | `{content,title?,category?}` 手动写入 |
 | DELETE | `/api/projects/:id/memories/:memoryId` | 删除项目记忆 |
+| GET | `/api/projects/:id/memory/dream` | 做梦设置、待整理数量与最近运行 |
+| PATCH | `/api/projects/:id/memory/dream` | `{enabled,intervalMinutes}` 设置增量做梦周期 |
+| POST | `/api/projects/:id/memory/dream/run` | 立即执行一次增量做梦 |
+
 
 记忆按项目隔离，任务完成会自动写回。不需要外部 Mnemos 服务或 API Key。
 

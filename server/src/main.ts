@@ -7,6 +7,7 @@ import { createHttpServer } from './http/server.ts';
 import { registerRoutes } from './http/routes/index.ts';
 import { seedIfEmpty } from './seed/seed.ts';
 import { startAutomationScheduler } from './runtime/scheduler.ts';
+import { startMemoryDreamScheduler } from './memory/dream-scheduler.ts';
 
 const env = loadEnv();
 ensureDir(env.dataDir);
@@ -23,6 +24,7 @@ if (env.demoMode && tableCount(db, 'persons') === 0) {
 const router = new Router();
 registerRoutes(router, app);
 const stopScheduler = startAutomationScheduler(app);
+const stopDreamScheduler = startMemoryDreamScheduler(app);
 const server = createHttpServer(app, router);
 server.listen(env.port, env.host, () => {
   console.log(`[aiwo] listening http://${env.host}:${env.port} (demo=${env.demoMode})`);
@@ -34,6 +36,7 @@ function shutdown(signal: string): void {
   closing = true;
   console.log(`[aiwo] ${signal} received, shutting down`);
   stopScheduler();
+  stopDreamScheduler();
   server.close(() => {
     closeDatabase(db);
     process.exit(0);

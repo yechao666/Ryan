@@ -307,6 +307,7 @@ export interface MemoryHit {
   taskId?: string;
   createdAt: string;
   updatedAt?: string;
+  dreamedAt?: string;
   metadata?: Record<string, unknown>;
   signals?: Record<string, number>;
 }
@@ -324,6 +325,32 @@ export interface MemoryContextResult {
   citations: string[];
   configured: boolean;
   error?: string;
+}
+
+export interface MemoryDreamSettings {
+  enabled: boolean;
+  intervalMinutes: number;
+  lastAt?: string;
+}
+
+export interface MemoryDreamRun {
+  id: string;
+  projectId: string;
+  trigger: 'schedule' | 'manual';
+  status: 'running' | 'completed' | 'failed' | 'skipped';
+  inputCount: number;
+  insightCount: number;
+  summary?: string;
+  error?: string;
+  startedAt: string;
+  finishedAt?: string;
+}
+
+export interface MemoryDreamStatus {
+  settings: MemoryDreamSettings;
+  pendingCount: number;
+  lastRun?: MemoryDreamRun;
+  runs: MemoryDreamRun[];
 }
 
 export interface InboundDelivery {
