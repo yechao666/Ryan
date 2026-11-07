@@ -324,6 +324,17 @@ export function TaskDrawer({ taskId, onClose, onChanged, inline = false }: TaskD
               <MetaItem label="最近更新">{task.lastMessageAt ? fmtRelative(task.lastMessageAt) : '—'}</MetaItem>
             </div>
 
+            <div className="ws-drawer-section">
+              <SectionHead
+                title="任务内容"
+                desc="创建任务时填写的目标、背景与验收标准"
+                actions={<CopyButton value={task.prompt.replace(/^\/goal\s*/i, '')} label="复制内容" />}
+              />
+              <div className="ws-task-prompt">
+                <Markdown text={task.prompt.replace(/^\/goal\s*/i, '')} />
+              </div>
+            </div>
+
             {task.promptCards?.length > 0 || task.promptCardIds?.length > 0 ? (
               <div className="ws-drawer-section">
                 <SectionHead

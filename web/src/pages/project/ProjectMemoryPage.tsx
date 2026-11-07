@@ -600,6 +600,43 @@ export function ProjectMemoryPage() {
       )}
 
       <Modal
+        open={Boolean(detailTarget)}
+        onClose={() => setDetailTarget(null)}
+        title={detailTarget?.title || '记忆详情'}
+        description={detailTarget ? `#${detailTarget.id} · ${fmtDateTime(detailTarget.createdAt)}` : undefined}
+        size="lg"
+        footer={
+          <>
+            {detailTarget?.taskId ? (
+              <Link className="btn btn-sm btn-outline" to={`${base}/tasks/${encodeURIComponent(detailTarget.taskId)}`}>
+                <Icon name="list" size={12} />
+                查看来源任务
+              </Link>
+            ) : null}
+            <Button variant="ghost" onClick={() => setDetailTarget(null)}>关闭</Button>
+            <Button variant="danger" icon="trash" onClick={() => detailTarget && setDeleteTarget(detailTarget)}>删除</Button>
+          </>
+        }
+      >
+        {detailTarget ? (
+          <div className="vstack gap-10">
+            <div className="hstack gap-6 wrap">
+              <Badge tone={categoryMeta(detailTarget.category).tone}>{categoryMeta(detailTarget.category).label}</Badge>
+              <Badge tone="slate">{sourceLabel(detailTarget.source)}</Badge>
+              <Badge tone={statusMeta(detailTarget.status).tone}>{statusMeta(detailTarget.status).label}</Badge>
+              <span className="tiny dim">更新于 {fmtRelative(detailTarget.updatedAt ?? detailTarget.createdAt)}</span>
+            </div>
+            <div className="ws-mem-preview" style={{ maxHeight: 420 }}>
+              {detailTarget.content}
+            </div>
+            <div className="hstack gap-6">
+              <CopyButton value={detailTarget.content} label="复制内容" />
+            </div>
+          </div>
+        ) : null}
+      </Modal>
+
+      <Modal
         open={settingsOpen}
         onClose={() => setSettingsOpen(false)}
         title="记忆整理设置"
