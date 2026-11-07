@@ -41,6 +41,12 @@ export function Shell() {
   const { person, logout } = useAuth();
   const location = useLocation();
   const activeProject = location.pathname.match(/^\/projects\/([^/]+)/)?.[1];
+  const navGroups = NAV_GROUPS.map((group) => ({
+    ...group,
+    items: group.label === '账户' && person?.isAdmin
+      ? [...group.items, { to: '/accounts', label: '账号管理', icon: 'users' as IconName }]
+      : group.items,
+  }));
 
   return (
     <div className="shell">
@@ -53,7 +59,7 @@ export function Shell() {
           </div>
         </div>
         <nav className="nav" aria-label="主导航">
-          {NAV_GROUPS.map((group) => (
+          {navGroups.map((group) => (
             <div className="nav-group" key={group.label}>
               <div className="nav-section">{group.label}</div>
               {group.items.map((item) => (
