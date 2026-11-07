@@ -29,12 +29,6 @@ const NAV_GROUPS: { label: string; items: NavItem[] }[] = [
       { to: '/settings', label: '系统设置', icon: 'settings' },
     ],
   },
-  {
-    label: '账户',
-    items: [
-      { to: '/account', label: '个人账号', icon: 'user' },
-    ],
-  },
 ];
 
 export function Shell() {
@@ -43,7 +37,7 @@ export function Shell() {
   const activeProject = location.pathname.match(/^\/projects\/([^/]+)/)?.[1];
   const navGroups = NAV_GROUPS.map((group) => ({
     ...group,
-    items: group.label === '账户' && person?.isAdmin
+    items: group.label === '系统' && person?.isAdmin
       ? [...group.items, { to: '/accounts', label: '账号管理', icon: 'users' as IconName }]
       : group.items,
   }));
@@ -85,11 +79,13 @@ export function Shell() {
         <div className="sidebar-footer">
           <div className="sidebar-account-label">账户</div>
           <div className="sidebar-person">
-            <Avatar name={person?.name ?? '访客'} tone={(person?.avatarColor as never) ?? 'violet'} size="sm" />
-            <div className="sidebar-person__meta">
-              <div className="sidebar-person__name">{person?.name ?? '未登录'}</div>
-              <div className="sidebar-person__title">{person?.title ?? ''}</div>
-            </div>
+            <NavLink to="/account" className="sidebar-person__account" title="打开个人账号">
+              <Avatar name={person?.name ?? '访客'} tone={(person?.avatarColor as never) ?? 'violet'} size="sm" />
+              <div className="sidebar-person__meta">
+                <div className="sidebar-person__name">{person?.name ?? '未登录'}</div>
+                <div className="sidebar-person__title">{person?.title ?? ''}</div>
+              </div>
+            </NavLink>
             <button type="button" className="icon-btn" onClick={() => void logout()} title="退出登录">
               <Icon name="logout" size={15} />
             </button>

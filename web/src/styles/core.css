@@ -961,3 +961,20 @@
   }
   .nav-group .nav-section { display: none; }
 }
+
+.sidebar-person { padding: 0 0 10px; }
+.sidebar-person__account {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  flex: 1;
+  min-width: 0;
+  padding: 6px;
+  border-radius: 9px;
+  color: inherit;
+  transition: background var(--dur) var(--ease);
+}
+.sidebar-person__account:hover,
+.sidebar-person__account.active {
+  background: var(--surface);
+}
