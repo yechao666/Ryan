@@ -46,6 +46,7 @@ interface BasicForm {
   type: ProjectType;
   prompt: string;
   repoUrl: string;
+  workspacePath: string;
   ownerTeamId: string;
 }
 
@@ -64,6 +65,7 @@ export function ProjectSettingsPage() {
     type: detail.project.type,
     prompt: detail.project.prompt ?? '',
     repoUrl: detail.project.repoUrl ?? '',
+    workspacePath: detail.project.workspacePath ?? '',
     ownerTeamId: detail.project.ownerTeamId ?? '',
   });
   const [savingBasic, setSavingBasic] = useState(false);
@@ -92,6 +94,7 @@ export function ProjectSettingsPage() {
       type: detail.project.type,
       prompt: detail.project.prompt ?? '',
       repoUrl: detail.project.repoUrl ?? '',
+      workspacePath: detail.project.workspacePath ?? '',
       ownerTeamId: detail.project.ownerTeamId ?? '',
     });
     setMnemosProjectId(detail.project.mnemosProjectId ?? '');
@@ -138,6 +141,7 @@ export function ProjectSettingsPage() {
         type: form.type,
         prompt: form.prompt,
         repoUrl: form.repoUrl.trim() || undefined,
+        workspacePath: form.workspacePath.trim() || undefined,
         ownerTeamId: form.ownerTeamId || undefined,
       });
       toast.success('项目信息已保存');
@@ -328,11 +332,21 @@ export function ProjectSettingsPage() {
                 onChange={(event) => setForm((prev) => ({ ...prev, ownerTeamId: event.target.value }))}
               />
             </Field>
-            <Field label="仓库地址 / 工作区" hint="远端仓库填 HTTPS；本机项目可填实例上的绝对目录，作为该项目的 ACP 会话工作区。">
+            <Field label="仓库地址" hint="GitHub / GitLab 仓库 HTTPS 地址，用于仓库事件关联。">
               <Input
                 value={form.repoUrl}
                 placeholder="https://github.com/org/repo"
                 onChange={(event) => setForm((prev) => ({ ...prev, repoUrl: event.target.value }))}
+              />
+            </Field>
+            <Field
+              label="项目工作区"
+              hint="DSH 实例上的绝对目录；同一项目的任务与对话共用此目录，可共享工作区数据。"
+            >
+              <Input
+                value={form.workspacePath}
+                placeholder="/srv/workspaces/aiwo-calc"
+                onChange={(event) => setForm((prev) => ({ ...prev, workspacePath: event.target.value }))}
               />
             </Field>
             <div className="ws-form-field-full">

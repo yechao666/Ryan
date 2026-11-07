@@ -18,6 +18,8 @@ export interface AssistantTurn {
   pathname: string;
   projectId?: string;
   taskId?: string;
+  /** 项目对应的 DSH 工作区；缺省使用助手默认工作区。 */
+  workspace?: string;
   token: string;
   apiBase: string;
   /** SSE/流式调用时接收 DSH 原始运行事件。 */
@@ -47,6 +49,10 @@ function profile(): string {
 
 function workspace(): string {
   return process.env.HIVE_DSH_WORKSPACE || REPO_ROOT;
+}
+
+function sessionKey(input: AssistantTurn): string {
+  return `${input.personId}::${input.workspace ?? ''}`;
 }
 
 async function deepseekKey(): Promise<string> {
@@ -108,7 +114,8 @@ async function runAssistantTurnOnce(input: AssistantTurn): Promise<AssistantResu
   if (!apiKey) {
     throw new Error('Aiwo 助手缺少 DEEPSEEK_API_KEY：请在服务器环境中配置，或写入 ~/.dsh/.credentials.yaml');
   }
-  const previous = sessions.get(input.personId);
+  const key = sessionKey(input);
+  const previous = sessions.get(key);
   const args = ['--profile', profile(), '--json'];
   if (previous) args.push('--session-id', previous);
   args.push('-');
@@ -126,7 +133,7 @@ async function runAssistantTurnOnce(input: AssistantTurn): Promise<AssistantResu
   const tokenFile = join(tokenDir, 'token');
   await writeFile(tokenFile, input.token, { mode: 0o600 });
   const child = spawn(dshBin(), args, {
-    cwd: workspace(),
+    cwd: input.workspace || workspace(),
     env: { ...env, HIVE_AUTH_FILE: tokenFile },
     stdio: ['pipe', 'pipe', 'pipe'],
   });
@@ -209,7 +216,7 @@ async function runAssistantTurnOnce(input: AssistantTurn): Promise<AssistantResu
     if (code !== 0) throw new Error(`DSH 助手退出码 ${String(code)}：${(stderr || stdout).trim().slice(-1200) || '无输出'}`);
     const raw = (finalText || lastText).trim();
     if (!raw) throw new Error('DSH 助手没有返回内容');
-    if (sessionId) sessions.set(input.personId, sessionId);
+    if (sessionId) sessions.set(key, sessionId);
     return { ...extractNavigation(raw), sessionId, instance: 'aiwo-assistant' };
   } finally {
     clearTimeout(timeout);
@@ -242,7 +249,7 @@ export async function runAssistantTurn(input: AssistantTurn): Promise<AssistantR
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       if (!SESSION_LOCK_RE.test(message)) throw error;
-      sessions.delete(input.personId);
+      sessions.delete(sessionKey(input));
       return await runAssistantTurnOnce(input);
     }
   } finally {

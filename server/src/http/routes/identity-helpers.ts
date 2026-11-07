@@ -187,6 +187,7 @@ export function buildProjectSummary(db: Db, row: ProjectRow): ProjectSummary {
     type: row.type as ProjectSummary['type'],
     prompt: row.prompt,
     repoUrl: row.repo_url ?? undefined,
+    workspacePath: row.workspace_path ?? undefined,
     status: row.status as ProjectSummary['status'],
     mnemosProjectId: row.mnemos_project_id ?? undefined,
     mnemosConfigured: Boolean(row.mnemos_project_id && row.mnemos_api_key),

@@ -222,6 +222,7 @@ test('多实例调度：两个实例分别领取不同任务，不会抢同一�
     method: 'POST',
   }));
   assert.equal(claimA.task.id, first.id);
+  assert.equal(claimA.project.workspacePath.endsWith('.run/local-git-demo'), true);
   assert.equal(claimB.task.id, other.id);
   assert.notEqual(claimA.task.id, claimB.task.id);
   assert.equal((await call('/api/runtime/tasks/claim', {

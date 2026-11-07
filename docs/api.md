@@ -16,7 +16,7 @@ Base URL: `http://127.0.0.1:4500`。控制台使用会话 Bearer token；实例�
 | GET/PATCH/DELETE | `/api/projects/:id` | 项目详情 / 更新 / 删除 |
 | POST/DELETE | `/api/projects/:id/members` | 项目成员 |
 
-项目字段：`name,slug,description,ownerTeamId,visibility,type,prompt,repoUrl,mnemosProjectId,mnemosApiKey,memoryAgentId`。
+项目字段：`name,slug,description,ownerTeamId,visibility,type,prompt,repoUrl,workspacePath,mnemosProjectId,mnemosApiKey,memoryAgentId`。`workspacePath` 是项目在 DSH 实例上的绝对工作区目录，同一项目的任务与助手对话共用。
 
 ## 提示词卡片（Aiwo 没有智员，用卡片复用工作流/风格/标准）
 

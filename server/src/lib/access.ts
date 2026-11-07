@@ -11,6 +11,7 @@ export interface ProjectRow {
   type: string;
   prompt: string;
   repo_url: string | null;
+  workspace_path: string | null;
   status: string;
   mnemos_project_id: string | null;
   mnemos_api_key: string | null;

@@ -77,6 +77,8 @@ export interface Project {
   type: ProjectType;
   prompt: string;
   repoUrl?: string;
+  /** 项目在 DSH 实例上的工作区绝对目录；任务与对话共用同一目录。 */
+  workspacePath?: string;
   status: 'active' | 'archived';
   mnemosProjectId?: string;
   mnemosConfigured: boolean;
@@ -408,6 +410,7 @@ export interface ClaimedTask {
     slug: string;
     prompt: string;
     repoUrl?: string;
+    workspacePath?: string;
     type: ProjectType;
     memoryAgentId?: string;
   };
@@ -465,6 +468,7 @@ export interface CreateProjectInput {
   type?: ProjectType;
   prompt?: string;
   repoUrl?: string;
+  workspacePath?: string;
   mnemosProjectId?: string;
   mnemosApiKey?: string;
   memoryAgentId?: string;

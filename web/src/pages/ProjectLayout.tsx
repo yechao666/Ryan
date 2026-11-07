@@ -195,6 +195,12 @@ export function ProjectLayout() {
               <Icon name="server" size={13} />
               {counts.instances} 个实例
             </span>
+            {project.workspacePath ? (
+              <span className="ws-project-meta-item mono tiny" title={`DSH 工作区：${project.workspacePath}`}>
+                <Icon name="folder" size={13} />
+                {project.workspacePath}
+              </span>
+            ) : null}
             {project.repoUrl ? (
               <a className="ws-project-meta-item ws-link" href={project.repoUrl} target="_blank" rel="noreferrer">
                 <Icon name="external" size={13} />

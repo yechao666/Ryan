@@ -249,12 +249,13 @@ class Agent {
 
   /** 项目 repoUrl 若是本机绝对目录，则作为本任务 ACP 会话的工作区；否则用实例默认工作区。 */
   workspaceFor(claim) {
-    const repo = claim.project?.repoUrl;
-    if (typeof repo === 'string' && isAbsolute(repo) && existsSync(repo)) {
+    const candidates = [claim.project?.workspacePath, claim.project?.repoUrl];
+    for (const candidate of candidates) {
+      if (typeof candidate !== 'string' || !isAbsolute(candidate) || !existsSync(candidate)) continue;
       try {
-        if (statSync(repo).isDirectory()) return repo;
+        if (statSync(candidate).isDirectory()) return candidate;
       } catch {
-        /* fall through */
+        /* try next */
       }
     }
     return this.config.workspace;

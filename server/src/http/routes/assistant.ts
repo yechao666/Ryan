@@ -5,6 +5,9 @@ import { errors } from '../respond.ts';
 import { runAssistantTurn } from '../../assistant/runner.ts';
 import { checkUserInput } from '../../security/check.ts';
 import type { ServerResponse } from 'node:http';
+import { existsSync, statSync } from 'node:fs';
+import { isAbsolute } from 'node:path';
+import { getProjectRow } from '../../lib/access.ts';
 
 const chatSchema = z.object({
   message: z.string().trim().min(1).max(8_000),
@@ -12,6 +15,22 @@ const chatSchema = z.object({
   projectId: z.string().trim().max(80).optional(),
   taskId: z.string().trim().max(80).optional(),
 });
+
+/** 项目显式 workspacePath 优先；兼容旧数据用 repoUrl 的本地绝对目录；否则用助手默认 workspace。 */
+function projectWorkspace(db: import('../../db/index.ts').Db, projectId: string | undefined): string | undefined {
+  if (!projectId) return undefined;
+  const project = getProjectRow(db, projectId);
+  if (!project) return undefined;
+  for (const candidate of [project.workspace_path, project.repo_url]) {
+    if (typeof candidate !== 'string' || !isAbsolute(candidate) || !existsSync(candidate)) continue;
+    try {
+      if (statSync(candidate).isDirectory()) return candidate;
+    } catch {
+      /* try next */
+    }
+  }
+  return undefined;
+}
 
 function bearerToken(header: string | undefined): string {
   if (!header) return '';
@@ -116,6 +135,7 @@ export function registerAssistantRoutes(router: Router): void {
       pathname: input.pathname || '/',
       projectId: input.projectId,
       taskId: input.taskId,
+      workspace: projectWorkspace(rc.app.db, input.projectId),
       token,
       apiBase:
         process.env.HIVE_API_BASE ||
@@ -197,6 +217,7 @@ export function registerAssistantRoutes(router: Router): void {
         pathname: input.pathname || '/',
         projectId: input.projectId,
         taskId: input.taskId,
+        workspace: projectWorkspace(rc.app.db, input.projectId),
         token,
         apiBase:
           process.env.HIVE_API_BASE ||

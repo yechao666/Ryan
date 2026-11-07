@@ -298,6 +298,7 @@ export function registerRuntimeRoutes(router: Router): void {
         slug: project.slug,
         prompt: project.prompt,
         repoUrl: project.repo_url ?? undefined,
+        workspacePath: project.workspace_path ?? undefined,
         type: project.type as ClaimedTask['project']['type'],
         memoryAgentId,
       },

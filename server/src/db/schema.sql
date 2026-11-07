@@ -58,6 +58,7 @@ CREATE TABLE IF NOT EXISTS projects (
   type              TEXT NOT NULL DEFAULT 'manual',
   prompt            TEXT NOT NULL DEFAULT '',
   repo_url          TEXT,
+  workspace_path    TEXT,
   status            TEXT NOT NULL DEFAULT 'active',
   mnemos_project_id TEXT,
   mnemos_api_key    TEXT,

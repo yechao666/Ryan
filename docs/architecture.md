@@ -18,7 +18,7 @@
 
 - 实例是独立资源，不依赖智员。
 - 一个实例同一时刻执行一个任务；任务租约 3 分钟，progress 续租。
-- ACP `session/new` 的 `cwd` 按任务项目设置：项目 `repoUrl` 是实例本机绝对目录时用项目工作区，否则用实例默认 workspace；同一 ACP 进程可承载多个不同 cwd 的独立 session。
+- ACP `session/new` 的 `cwd` 按项目设置：项目 `workspacePath` 是实例上的绝对目录时用项目工作区，否则用实例默认 workspace；同一 ACP 进程可承载多个不同 cwd 的独立 session。
 - ACP 不可用时自动回退 headless；两种模式都产生同样的 runtime_events。
 - 任务结束即终止，不支持对话。
 - 实例每 5s 查询任务状态；控制台取消后代理自动中止 ACP/headless 会话。
@@ -37,6 +37,7 @@
 ```
 
 - 助手不进入任务队列，不占实例租约。
+- 助手按项目 `workspacePath` 设置 headless cwd；同一人员在同一项目复用会话，切项目时按 workspace 区分会话。
 - 同一人员复用 DSH session，可跨轮对话。
 - token 写入 0600 临时文件，不进入提示词。
 - 前端收到 `navigate` 后跳转，并触发页面刷新。

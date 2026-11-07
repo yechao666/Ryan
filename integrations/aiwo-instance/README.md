@@ -107,7 +107,7 @@ Aiwo 控制台实例页应显示 `online`，`pluginVersion` 为 `0.1.0`。
 | --- | --- | --- |
 | `AIWO_BASE_URL` | `http://127.0.0.1:4500` | Aiwo 地址（`--base`） |
 | `AIWO_INSTANCE_TOKEN` / `AIWO_TOKEN` | 空（必填） | 实例 token（`--token`） |
-| `AIWO_WORKSPACE` | 当前目录 | 默认任务工作区；项目 `repoUrl` 为绝对目录时优先使用项目工作区（`--workspace`） |
+| `AIWO_WORKSPACE` | 当前目录 | 默认任务工作区；项目 `workspacePath`（或 `repoUrl`）为绝对目录时优先使用项目工作区（`--workspace`） |
 | `AIWO_DSH_BIN` | `dsh` | DSH 可执行文件（`--dsh-bin`） |
 | `AIWO_DSH_PROFILE` | `acp` | ACP profile（`--profile`） |
 | `AIWO_HEADLESS_PROFILE` | `headless` | 回退 profile（`--headless-profile`） |
@@ -134,7 +134,7 @@ Aiwo 控制台实例页应显示 `online`，`pluginVersion` 为 `0.1.0`。
    → `# 任务`（task.title + 去掉 `/goal` 前缀的 task.prompt）→ `# 执行者`（executor.label）。
    最终 stdin 一定以 `/goal` 开头。
 2. **ACP**：常驻 `dsh --profile acp`，每任务用项目工作区 `session/new {cwd}` → `session/prompt`；
-   项目 `repoUrl` 若是实例上的绝对目录则作为该会话 `cwd`，否则用 `--workspace` 默认工作区。
+   项目 `workspacePath`（优先）或兼容旧数据的 `repoUrl` 若是实例上的绝对目录则作为该会话 `cwd`，否则用 `--workspace` 默认工作区。
    消费 `session/update`：
    - `agent_message_chunk` → `text`
    - `agent_thought_chunk` → `thinking`

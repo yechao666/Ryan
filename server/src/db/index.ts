@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url';
 
 const here = dirname(fileURLToPath(import.meta.url));
 export type Db = DatabaseSync;
-export const SCHEMA_VERSION = 1;
+export const SCHEMA_VERSION = 2;
 
 export function openDatabase(dbPath: string): Db {
   if (dbPath !== ':memory:') mkdirSync(dirname(dbPath), { recursive: true });
@@ -21,7 +21,12 @@ export function migrate(db: Db): void {
   const schema = readFileSync(join(here, 'schema.sql'), 'utf8');
   db.exec(schema);
   db.exec('PRAGMA foreign_keys = ON;');
-  db.prepare("INSERT OR REPLACE INTO meta (key, value) VALUES ('schema_version', '1')").run();
+  // v1 -> v2：项目显式工作区目录；旧库补列，避免要求重建数据。
+  const columns = db.prepare('PRAGMA table_info(projects)').all() as unknown as { name: string }[];
+  if (!columns.some((column) => column.name === 'workspace_path')) {
+    db.exec('ALTER TABLE projects ADD COLUMN workspace_path TEXT');
+  }
+  db.prepare("INSERT OR REPLACE INTO meta (key, value) VALUES ('schema_version', ?)").run(String(SCHEMA_VERSION));
 }
 
 export function tx<T>(db: Db, fn: () => T): T {
