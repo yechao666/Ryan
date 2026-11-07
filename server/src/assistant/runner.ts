@@ -1,13 +1,13 @@
 import { spawn } from 'node:child_process';
-import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { copyFile, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { homedir, tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = resolve(here, '../../..');
-const API_GUIDE = join(REPO_ROOT, 'docs/api.md');
 const API_HELPER = join(REPO_ROOT, 'integrations/assistant/aiwo-api.mjs');
+const ASSISTANT_TOOL_DIR = process.env.AIWO_ASSISTANT_TOOL_DIR || join(homedir(), '.aiwo', 'assistant-tools');
 
 const sessions = new Map<string, string>();
 
@@ -48,7 +48,16 @@ function profile(): string {
 }
 
 function workspace(): string {
-  return process.env.HIVE_DSH_WORKSPACE || REPO_ROOT;
+  // 助手只在自己的运行目录中工作，不再把 Aiwo 源码仓库作为 cwd。
+  return process.env.HIVE_DSH_WORKSPACE || join(homedir(), '.aiwo', 'assistant');
+}
+
+/** 把通用 API helper 安装到助手工具目录，避免提示词暴露/依赖源码路径。 */
+async function ensureAssistantTool(): Promise<string> {
+  await mkdir(ASSISTANT_TOOL_DIR, { recursive: true });
+  const target = join(ASSISTANT_TOOL_DIR, 'aiwo-api.mjs');
+  await copyFile(API_HELPER, target);
+  return target;
 }
 
 function sessionKey(input: AssistantTurn): string {
@@ -67,7 +76,7 @@ async function deepseekKey(): Promise<string> {
   return '';
 }
 
-function buildPrompt(input: AssistantTurn): string {
+function buildPrompt(input: AssistantTurn, helperPath: string): string {
   return [
     '你是 Aiwo 平台内置的 DSH 系统助手，运行在一个真实的 DSH headless 服务中。',
     'Aiwo 没有智员概念：任务执行者固定为「人员@Aiwo」。你的职责是直接帮助当前人员操作系统，而不是只给出操作步骤。',
@@ -78,15 +87,18 @@ function buildPrompt(input: AssistantTurn): string {
     `当前任务：${input.taskId ?? '未打开具体任务'}${input.taskId ? '（用户说“这个任务”时使用这个 ID）' : ''}`,
     '任务详情页路径格式：/projects/:projectId/tasks/:taskId（不要使用 ?task= 查询参数）。',
     '',
-    '你可以通过 bash 直接调用 Aiwo 的开放 API。API 文档在：',
-    API_GUIDE,
-    '先读取该文档了解所有接口；需要时自行查询项目、DSH 服务、任务、提示词卡片、自动化、记忆等数据。Aiwo 没有智员。',
+    'API 契约只来自稳定 manifest，不通过阅读 Aiwo 源码推断接口。',
+    '当前工作区不是 Aiwo 仓库；禁止使用 ls/grep/find/cat 扫描 Aiwo 源码目录，也不要读取数据库文件。',
+    '先通过 helper 请求 GET /api/assistant/manifest 获取完整接口清单；manifest 是唯一的 API 定义来源。',
     '',
-    '推荐调用方式（token 已在环境变量中，不要打印 token）：',
-    `  node ${API_HELPER} GET /api/projects`,
-    `  node ${API_HELPER} GET "/api/tasks?projectId=prj_xxx&limit=20"`,
-    `  node ${API_HELPER} POST "/api/projects/prj_xxx/tasks" '{"title":"...","prompt":"...","promptCardIds":["pcard_xxx"],"instanceId":"ins_xxx","type":"feature"}'`,
-    '也可以用 curl，但优先使用上面的 helper。',
+    '推荐调用方式（token 已在 env 中，不要打印 token）：',
+    `  node ${helperPath} GET /api/assistant/manifest`,
+    `  node ${helperPath} GET /api/projects`,
+    `  node ${helperPath} GET "/api/tasks?projectId=prj_xxx&limit=20"`,
+    `  node ${helperPath} POST "/api/projects/prj_xxx/tasks" '{"title":"...","prompt":"...","promptCardIds":["pcard_xxx"],"instanceId":"ins_xxx","type":"feature"}'`,
+    '',
+    '常用接口：GET /api/projects、GET /api/teams、GET /api/persons、GET /api/instances、GET /api/tasks、GET /api/prompt-cards；',
+    'POST /api/projects/:id/tasks、POST /api/prompt-cards、POST /api/instances、POST /api/automations/:id/run。',
     '',
     '执行规则：',
     '- 用户明确要求创建/修改/查询时，直接调用 API 完成；先做必要的查询确认 ID 和权限。',
@@ -114,6 +126,10 @@ async function runAssistantTurnOnce(input: AssistantTurn): Promise<AssistantResu
   if (!apiKey) {
     throw new Error('Aiwo 助手缺少 DEEPSEEK_API_KEY：请在服务器环境中配置，或写入 ~/.dsh/.credentials.yaml');
   }
+  const helperPath = await ensureAssistantTool();
+  const prompt = buildPrompt(input, helperPath);
+  const cwd = input.workspace || workspace();
+  await mkdir(cwd, { recursive: true });
   const key = sessionKey(input);
   const previous = sessions.get(key);
   const args = ['--profile', profile(), '--json'];
@@ -133,7 +149,7 @@ async function runAssistantTurnOnce(input: AssistantTurn): Promise<AssistantResu
   const tokenFile = join(tokenDir, 'token');
   await writeFile(tokenFile, input.token, { mode: 0o600 });
   const child = spawn(dshBin(), args, {
-    cwd: input.workspace || workspace(),
+    cwd,
     env: { ...env, HIVE_AUTH_FILE: tokenFile },
     stdio: ['pipe', 'pipe', 'pipe'],
   });
@@ -203,7 +219,7 @@ async function runAssistantTurnOnce(input: AssistantTurn): Promise<AssistantResu
   const timeout = setTimeout(() => child.kill('SIGTERM'), 180_000);
   timeout.unref?.();
   try {
-    child.stdin.end(buildPrompt(input));
+    child.stdin.end(prompt);
     const code = await exitPromise;
     if (buffer.trim()) {
       try {

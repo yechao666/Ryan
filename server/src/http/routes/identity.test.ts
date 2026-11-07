@@ -232,3 +232,12 @@ test('多实例调度：两个实例分别领取不同任务，不会抢同一�
     method: 'POST',
   })).status, 204, '忙碌实例不应再领新单');
 });
+
+test('助手 manifest：包含稳定 API 清单，不泄露凭证', async () => {
+  const manifest = ok(await call('/api/assistant/manifest', { token: tokenLin }));
+  assert.equal(manifest.name, 'Aiwo API');
+  assert.ok(Array.isArray(manifest.endpoints));
+  assert.ok(manifest.endpoints.some((item: Json) => item.method === 'POST' && item.path === '/api/projects/:id/tasks'));
+  assert.ok(manifest.endpoints.some((item: Json) => item.path === '/api/assistant/manifest'));
+  assert.equal(JSON.stringify(manifest).includes('Bearer aiwo'), false);
+});

@@ -5,7 +5,7 @@
 - 前端 `POST /api/assistant/chat`，附带当前人员 token、当前页面/项目上下文。
 - Aiwo 后端启动 `dsh --profile headless --json -`，复用同一人员的 DSH session。
 - 子进程通过 `HIVE_AUTH_FILE` 读取一次性 token 文件；token 不写入提示词。
-- 助手可读取 `docs/api.md`，通过 `integrations/assistant/aiwo-api.mjs` 调用所有开放 API。
+- 助手通过 `GET /api/assistant/manifest` 获取稳定 API 清单，通过 `integrations/assistant/aiwo-api.mjs` 调用开放 API；不需要读取 Aiwo 源码。
 - 写操作直接执行；最终回复可带 `HIVE_NAVIGATE: /path`，前端自动跳转并刷新当前页面。
 - 本地意图解析仅作为 DSH 不可用时的降级。
 

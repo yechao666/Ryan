@@ -37,6 +37,7 @@
 ```
 
 - 助手不进入任务队列，不占服务租约。
+- 助手 API 契约来自 `GET /api/assistant/manifest`；默认 cwd 是独立的 `~/.aiwo/assistant`，不把 Aiwo 源码仓库作为工作区。
 - 助手按项目 ID 的自动工作区设置 headless cwd；同一人员在同一项目复用会话，切项目时按 workspace 区分会话。
 - 同一人员复用 DSH session，可跨轮对话。
 - token 写入 0600 临时文件，不进入提示词。

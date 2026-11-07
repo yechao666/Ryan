@@ -4,6 +4,7 @@ import { requirePerson } from '../auth.ts';
 import { errors } from '../respond.ts';
 import { runAssistantTurn } from '../../assistant/runner.ts';
 import { checkUserInput } from '../../security/check.ts';
+import { assistantApiManifest } from '../../assistant/manifest.ts';
 import type { ServerResponse } from 'node:http';
 import { mkdirSync } from 'node:fs';
 import { homedir } from 'node:os';
@@ -89,6 +90,12 @@ async function streamThinking(res: ServerResponse, text: string): Promise<void> 
 }
 
 export function registerAssistantRoutes(router: Router): void {
+  // 助手/客户端读取稳定 API 清单；不从源码推断接口。
+  router.get('/api/assistant/manifest', (rc) => {
+    requirePerson(rc);
+    rc.json(assistantApiManifest());
+  });
+
   // POST /api/assistant/chat/stream —— SSE 流式助手；DSH 事件实时转发。
   router.post('/api/assistant/chat/stream', async (rc) => {
     const person = requirePerson(rc);
