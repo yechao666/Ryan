@@ -2206,3 +2206,16 @@
 
 .service-card .row-between { flex-wrap: wrap; gap: 8px; }
 .service-card .row-between > .hstack { flex-wrap: wrap; }
+
+.ws-inline-link {
+  margin-left: 6px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--text-link, #a99cff);
+  font: inherit;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
+.ws-inline-link:hover { color: #c9c2ff; }

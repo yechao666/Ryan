@@ -106,6 +106,7 @@ export function InstancesPage() {
   const [editForm, setEditForm] = useState<InstanceFormState>(EMPTY_FORM);
   const [editError, setEditError] = useState<string | null>(null);
   const [savingEdit, setSavingEdit] = useState(false);
+  const [guideOpen, setGuideOpen] = useState(false);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(20);
 
@@ -434,7 +435,14 @@ export function InstancesPage() {
       <PageHead
         eyebrow="服务 · DSH Services"
         title="DSH 服务"
-        desc="服务是 Aiwo 的执行资源：本机或远端 DSH 通过服务代理接入，领取任务并回传执行过程。"
+        desc={
+          <>
+            服务是 Aiwo 的执行资源：本机或远端 DSH 通过服务代理接入，领取任务并回传执行过程。
+            <button type="button" className="ws-inline-link" onClick={() => setGuideOpen(true)}>
+              如何接入 DSH 服务？
+            </button>
+          </>
+        }
         actions={
           <>
             <IconButton icon="refresh" label="刷新服务" onClick={() => void instances.refresh()} />
@@ -550,34 +558,27 @@ export function InstancesPage() {
         </Card>
       )}
 
-      <Card className="card-pad">
-        <SectionHead
-          title="如何接入 DSH 服务"
-          desc="服务只登记连接信息，不绑定项目或工作目录；注册后进入共享调度池，从项目任务队列领取任务。"
-        />
-        <ol className="cx-guide-steps" style={{ marginTop: 10 }}>
-          <li>
-            <span className="cx-guide-step__num">1</span>
-            <div>新增服务，选择本机 / 远端，填写 host、端口等连接信息。</div>
-          </li>
-          <li>
-            <span className="cx-guide-step__num">2</span>
-            <div>本机服务可直接点「启动本机代理」；远端服务复制一次性安装命令在目标机器执行；token 只展示一次。</div>
-          </li>
-          <li>
-            <span className="cx-guide-step__num">3</span>
-            <div>启动后服务会自动注册与心跳，状态从「待接入」变为「在线」，加入调度池。</div>
-          </li>
-          <li>
-            <span className="cx-guide-step__num">4</span>
-            <div>在服务卡片上点击「测试连接」确认心跳，然后即可在任意项目中派发任务。</div>
-          </li>
+      <Modal
+        open={guideOpen}
+        onClose={() => setGuideOpen(false)}
+        title="如何接入 DSH 服务"
+        description="服务只登记连接信息，不绑定项目或工作目录；注册后进入共享调度池。"
+        size="lg"
+        footer={<Button variant="primary" onClick={() => setGuideOpen(false)}>知道了</Button>}
+      >
+        <ol className="cx-guide-steps" style={{ marginTop: 4 }}>
+          <li><span className="cx-guide-step__num">1</span><div>新增服务，选择本机 / 远端，填写 host、端口等连接信息。</div></li>
+          <li><span className="cx-guide-step__num">2</span><div>本机服务可直接点「启动本机代理」；远端服务复制一次性安装命令在目标机器执行；token 只展示一次。</div></li>
+          <li><span className="cx-guide-step__num">3</span><div>启动后服务会自动注册与心跳，状态从「待接入」变为「在线」，加入调度池。</div></li>
+          <li><span className="cx-guide-step__num">4</span><div>在服务行点击「测试连接」确认心跳，然后即可在任意项目中派发任务。</div></li>
         </ol>
-        <CodeBlock
-          title="安装命令模板"
-          code={`node integrations/aiwo-instance/agent.mjs --base http://127.0.0.1:4500 --token aiwo_ins_...`}
-        />
-      </Card>
+        <div className="mt-12">
+          <CodeBlock
+            title="安装命令模板"
+            code={`node integrations/aiwo-instance/agent.mjs --base http://127.0.0.1:4500 --token aiwo_ins_...`}
+          />
+        </div>
+      </Modal>
 
       <Modal
         open={createOpen}
