@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url';
 
 const here = dirname(fileURLToPath(import.meta.url));
 export type Db = DatabaseSync;
-export const SCHEMA_VERSION = 3;
+export const SCHEMA_VERSION = 4;
 
 export function openDatabase(dbPath: string): Db {
   if (dbPath !== ':memory:') mkdirSync(dirname(dbPath), { recursive: true });
@@ -29,6 +29,10 @@ export function migrate(db: Db): void {
   const taskColumns = db.prepare('PRAGMA table_info(work_items)').all() as unknown as { name: string }[];
   if (!taskColumns.some((column) => column.name === 'allowed_service_ids')) {
     db.exec("ALTER TABLE work_items ADD COLUMN allowed_service_ids TEXT NOT NULL DEFAULT '[]'");
+  }
+  const cardColumns = db.prepare('PRAGMA table_info(prompt_cards)').all() as unknown as { name: string }[];
+  if (!cardColumns.some((column) => column.name === 'person_id')) {
+    db.exec('ALTER TABLE prompt_cards ADD COLUMN person_id TEXT');
   }
   db.prepare("INSERT OR REPLACE INTO meta (key, value) VALUES ('schema_version', ?)").run(String(SCHEMA_VERSION));
 }

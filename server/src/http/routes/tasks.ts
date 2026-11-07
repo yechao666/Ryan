@@ -6,6 +6,7 @@ import { errors } from '../respond.ts';
 import { canViewProject, getProjectRow, type ProjectRow } from '../../lib/access.ts';
 import { recordActivity } from '../../lib/activity.ts';
 import { checkUserInput } from '../../security/check.ts';
+import { generateTaskTitle } from '../../tasks/title.ts';
 import type { EventBus } from '../../lib/bus.ts';
 import type { Db } from '../../db/index.ts';
 import { newId, nowIso } from '../../lib/ids.ts';
@@ -350,9 +351,9 @@ export function createTaskRecord(db: Db, bus: EventBus, input: CreateTaskRecordI
   const cardIds = [...new Set(input.promptCardIds ?? [])];
   if (cardIds.length > 0) {
     const placeholders = cardIds.map(() => '?').join(', ');
-    const found = rowsOf<{ id: string; scope: string; project_id: string | null; team_id: string | null }>(
+    const found = rowsOf<{ id: string; scope: string; project_id: string | null; team_id: string | null; person_id: string | null }>(
       db,
-      `SELECT id, scope, project_id, team_id FROM prompt_cards WHERE enabled = 1 AND id IN (${placeholders})`,
+      `SELECT id, scope, project_id, team_id, person_id FROM prompt_cards WHERE enabled = 1 AND id IN (${placeholders})`,
       cardIds,
     );
     if (found.length !== cardIds.length) throw errors.badRequest('引用的提示词卡片不存在或已停用');
@@ -360,7 +361,8 @@ export function createTaskRecord(db: Db, bus: EventBus, input: CreateTaskRecordI
       found.some(
         (card) =>
           (card.scope === 'team' && card.team_id !== project.owner_team_id) ||
-          (card.scope === 'project' && card.project_id !== input.projectId),
+          (card.scope === 'project' && card.project_id !== input.projectId) ||
+          (card.scope === 'person' && card.person_id !== effectiveCreatedBy),
       )
     ) {
       throw errors.badRequest('引用的提示词卡片不在当前项目可用范围内');
@@ -482,7 +484,7 @@ const listQuerySchema = z.object({
 });
 
 const createTaskSchema = z.object({
-  title: z.string().trim().min(1).max(300),
+  title: z.string().trim().max(300).optional(),
   prompt: z.string().min(1).max(20_000),
   promptCardIds: z.array(z.string().min(1)).max(20).optional(),
   instanceId: z.string().min(1).optional(),
@@ -581,9 +583,10 @@ export function registerTaskRoutes(router: Router): void {
     if (!security.allowed) {
       throw errors.badRequest(security.blockedMessage ?? '输入未通过安全检查', { reason: security.reason });
     }
+    const title = input.title?.trim() || await generateTaskTitle(input.prompt);
     const task = createTaskRecord(rc.app.db, rc.app.bus, {
       projectId,
-      title: input.title,
+      title,
       prompt: input.prompt,
       promptCardIds: input.promptCardIds,
       instanceId: input.instanceId,

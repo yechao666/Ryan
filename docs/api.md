@@ -24,10 +24,10 @@ Base URL: `http://127.0.0.1:4500`。控制台使用会话 Bearer token；服务�
 | --- | --- | --- |
 | GET | `/api/prompt-cards` | 当前人员可见卡片；可选 `?projectId=&category=` |
 | GET | `/api/projects/:id/prompt-cards` | 项目可引用的组织/团队/项目卡片 |
-| POST | `/api/prompt-cards` | `{name,category,description,content,scope,projectId?,teamId?,enabled}` |
+| POST | `/api/prompt-cards` | `{name,category,description,content,scope,projectId?,teamId?,personId?,enabled}` |
 | PATCH/DELETE | `/api/prompt-cards/:id` | 编辑 / 删除 |
 
-scope：`org | team | project`；category：`workflow | style | standard | role | other`。
+scope：`org | team | project | person`；person 级卡片仅指定人员可引用；category：`workflow | style | standard | role | other`。
 
 ## DSH 服务资源
 
@@ -61,7 +61,7 @@ node integrations/aiwo-instance/agent.mjs --base http://<aiwo>:4500 --token aiwo
 | --- | --- | --- |
 | GET | `/api/tasks` | `?projectId=&status=&type=&mine=&limit=`；返回 `executorLabel`、`promptCards` |
 | GET | `/api/tasks/:id` | `{task,events,memory}` |
-| POST | `/api/projects/:id/tasks` | `{title,prompt,type,promptCardIds,instanceIds,priority}`；instanceIds 为空时按项目绑定公平调度 |
+| POST | `/api/projects/:id/tasks` | `{title?,prompt,type,promptCardIds,instanceIds,priority}`；title 留空时由 AI 整理，prompt 是任务内容；instanceIds 为空时按项目绑定公平调度 |
 | POST | `/api/tasks/:id/cancel` | 取消任务 |
 
 Aiwo 任务执行者固定为「创建人@Aiwo」；任务不支持对话，只展示执行过程。

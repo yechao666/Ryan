@@ -87,6 +87,7 @@ CREATE TABLE IF NOT EXISTS prompt_cards (
   scope       TEXT NOT NULL DEFAULT 'org',
   project_id  TEXT REFERENCES projects(id) ON DELETE CASCADE,
   team_id     TEXT REFERENCES teams(id) ON DELETE CASCADE,
+  person_id   TEXT REFERENCES persons(id) ON DELETE CASCADE,
   enabled     INTEGER NOT NULL DEFAULT 1,
   created_by  TEXT REFERENCES persons(id) ON DELETE SET NULL,
   created_at  TEXT NOT NULL,

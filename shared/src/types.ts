@@ -29,7 +29,7 @@ export type EventType =
 
 /** 可管理、可被任务引用的提示词卡片。 */
 export type PromptCardCategory = 'workflow' | 'style' | 'standard' | 'role' | 'other';
-export type PromptCardScope = 'org' | 'team' | 'project';
+export type PromptCardScope = 'org' | 'team' | 'project' | 'person';
 
 export interface Person {
   id: string;
@@ -124,6 +124,8 @@ export interface PromptCard {
   projectName?: string;
   teamId?: string;
   teamName?: string;
+  personId?: string;
+  personName?: string;
   enabled: boolean;
   createdBy?: string;
   createdByName?: string;
@@ -139,6 +141,7 @@ export interface PromptCardInput {
   scope?: PromptCardScope;
   projectId?: string;
   teamId?: string;
+  personId?: string;
   enabled?: boolean;
 }
 
@@ -446,7 +449,7 @@ export interface RuntimeEvent {
 }
 
 export interface CreateTaskInput {
-  title: string;
+  title?: string;
   prompt: string;
   promptCardIds?: string[];
   instanceId?: string;

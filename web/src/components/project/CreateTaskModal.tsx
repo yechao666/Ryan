@@ -48,15 +48,14 @@ export function CreateTaskModal({ open, onClose, onCreated }: CreateTaskModalPro
 
   const handleSubmit = async () => {
     const nextErrors: FormErrors = {};
-    if (!title.trim()) nextErrors.title = '请填写任务标题';
-    if (!prompt.trim()) nextErrors.prompt = '请填写交给 Aiwo 的提示词';
+    if (!prompt.trim()) nextErrors.prompt = '请填写任务内容';
     setErrors(nextErrors);
     if (Object.keys(nextErrors).length > 0) return;
 
     setSubmitting(true);
     try {
       const task = await api.createTask(projectId, {
-        title: title.trim(),
+        title: title.trim() || undefined,
         prompt: prompt.trim(),
         promptCardIds,
         instanceIds,
@@ -91,7 +90,7 @@ export function CreateTaskModal({ open, onClose, onCreated }: CreateTaskModalPro
         </>
       }
     >
-      <Field label="任务标题" required error={errors.title} hint="一句话说明要完成的事情。">
+      <Field label="任务标题" error={errors.title} hint="可留空；留空时由 AI 根据任务内容自动整理。">
         <Input
           value={title}
           placeholder="例如：修复登录页在 Safari 下的布局抖动"
@@ -100,7 +99,7 @@ export function CreateTaskModal({ open, onClose, onCreated }: CreateTaskModalPro
       </Field>
 
       <Field
-        label="提示词"
+        label="任务内容"
         required
         error={errors.prompt}
         hint="写清背景、验收标准与相关文件，会与项目提示词、提示词卡片一起下发给 Aiwo。"

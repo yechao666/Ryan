@@ -1935,3 +1935,10 @@
     grid-template-columns: 1fr;
   }
 }
+
+/* 提示词卡片选择弹窗 */
+.ws-prompt-dialog-list {
+  max-height: 48vh;
+  overflow-y: auto;
+  padding-right: 2px;
+}

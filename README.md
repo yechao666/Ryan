@@ -99,6 +99,7 @@ node integrations/aiwo-instance/agent.mjs \
 ## 任务模型
 
 - 任务执行者：`创建人@Aiwo`，没有 agent_id
+- 标题：创建时可留空，由服务端调用 DSH 整理；失败时自动取任务内容首行
 - 提示词：`/goal` + 项目提示词 + 引用的提示词卡片 + 任务要求
 - 服务：项目可绑定多个服务，任务在绑定服务间公平轮询；任务可指定一个或多个允许服务，未指定时按项目绑定调度，项目未绑定时进入共享池
 - 状态：queued / assigned / running / done / failed / cancelled
@@ -108,7 +109,7 @@ node integrations/aiwo-instance/agent.mjs \
 
 ## 提示词卡片
 
-- scope：组织 / 团队 / 项目
+- scope：组织（全员）/ 团队 / 项目 / 人员（仅本人）
 - category：工作流 / 工作风格 / 工作标准 / 角色说明 / 其他
 - 任务与自动化都可以引用多张卡片；服务端校验卡片可用性
 - 卡片内容只在执行时注入，不复制到任务 prompt 中

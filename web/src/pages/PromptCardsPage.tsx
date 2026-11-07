@@ -65,8 +65,10 @@ function scopeMeta(scope: string) {
 }
 
 function cardTarget(card: PromptCard): string | undefined {
+  if (card.scope === 'org') return '全员';
   if (card.scope === 'project') return card.projectName;
   if (card.scope === 'team') return card.teamName;
+  if (card.scope === 'person') return card.personName;
   return undefined;
 }
 
@@ -428,7 +430,7 @@ export function PromptCardsPage() {
         description={
           editing
             ? '卡片范围创建后不可修改；可更新名称、类别、说明、内容与启用状态。'
-            : '卡片会按范围注入引用它的任务提示词。'
+            : '卡片会按范围注入引用它的任务内容。'
         }
         size="lg"
         footer={
@@ -480,7 +482,9 @@ export function PromptCardsPage() {
                     ? '组织范围仅管理员可创建。'
                     : form.scope === 'team'
                       ? '团队级卡片由团队负责人维护。'
-                      : '项目级卡片仅指定项目可引用。'
+                      : form.scope === 'project'
+                        ? '项目级卡片仅指定项目可引用。'
+                        : '人员级卡片仅本人可引用。'
               }
             >
               <Select
@@ -523,6 +527,10 @@ export function PromptCardsPage() {
                   ]}
                   onChange={(event) => update('teamId', event.target.value)}
                 />
+              </Field>
+            ) : form.scope === 'person' ? (
+              <Field label="可见范围" hint="人员级卡片只属于当前人员，不共享给其他人员。">
+                <Input value={`${person?.name ?? '当前人员'}（仅本人）`} disabled readOnly />
               </Field>
             ) : (
               <Field label="可见范围" hint="组织级卡片对全员所有项目可引用。">

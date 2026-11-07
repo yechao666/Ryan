@@ -1,10 +1,11 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import type { PromptCard } from '@shared';
 import { INSTANCE_STATUSES } from '@shared';
 import { api } from '@lib/api.ts';
 import { useAsync } from '@lib/hooks.ts';
-import { Badge, Callout, Checkbox, EmptyState, Field, Select, Skeleton } from '@ui';
+import { Badge, Button, Callout, Checkbox, EmptyState, Field, Icon, Select, Skeleton } from '@ui';
 import { promptCardCategoryMeta } from './meta.ts';
+import { PromptCardDialog } from './PromptCardDialog.tsx';
 
 /** 拉取项目可引用的提示词卡片（组织 / 团队 / 项目级）。 */
 export function useProjectPromptCards(projectId: string, enabled: boolean) {
@@ -24,60 +25,39 @@ export interface PromptCardPickerProps {
  */
 export function PromptCardPicker({ projectId, open, value, onChange }: PromptCardPickerProps) {
   const cards = useProjectPromptCards(projectId, open);
-
-  const toggle = (id: string) => {
-    onChange(value.includes(id) ? value.filter((item) => item !== id) : [...value, id]);
-  };
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const selected = (cards.data ?? []).filter((card) => value.includes(card.id));
 
   return (
     <Field
       label={`提示词卡片${value.length ? `（已选 ${value.length}）` : ''}`}
-      hint="可选，多选；卡片内容会作为可复用上下文随任务一起下发。"
+      hint="卡片内容会作为可复用上下文随任务一起注入；卡片较多时在弹窗中搜索选择。"
     >
-      {cards.loading && !cards.data ? (
-        <div className="vstack gap-8">
-          {[0, 1, 2].map((item) => (
-            <Skeleton key={item} h={46} style={{ borderRadius: 10 }} />
-          ))}
-        </div>
-      ) : cards.error ? (
-        <Callout tone="red" icon="alert">
-          加载提示词卡片失败：{cards.error}
-        </Callout>
-      ) : !cards.data?.length ? (
-        <EmptyState
+      <div className="hstack gap-6 wrap">
+        {selected.length ? selected.map((card) => (
+          <span className="chip" key={card.id}>
+            <Icon name="book" size={11} />
+            {card.name}
+          </span>
+        )) : <span className="tiny dim">未引用提示词卡片</span>}
+        <Button
+          type="button"
+          size="sm"
+          variant="outline"
           icon="book"
-          title="暂无可引用的提示词卡片"
-          description="组织、团队或项目级的提示词卡片会出现在这里；可先在「提示词」页维护。"
-          compact
-        />
-      ) : (
-        <div className="ws-pick-list">
-          {cards.data.map((card) => {
-            const meta = promptCardCategoryMeta(card.category);
-            const selected = value.includes(card.id);
-            return (
-              <div className={`ws-pick-item${selected ? ' active' : ''}`} key={card.id}>
-                <Checkbox
-                  checked={selected}
-                  onChange={() => toggle(card.id)}
-                  label={
-                    <span className="ws-pick-main">
-                      <span className="ws-pick-name truncate">{card.name}</span>
-                      <span className="tiny dim truncate">
-                        {card.description || card.content.slice(0, 90)}
-                      </span>
-                    </span>
-                  }
-                />
-                <Badge tone={meta.tone} size="sm" className="ml-auto">
-                  {meta.label}
-                </Badge>
-              </div>
-            );
-          })}
-        </div>
-      )}
+          onClick={() => setDialogOpen(true)}
+        >
+          选择卡片
+        </Button>
+      </div>
+      {cards.error ? <Callout tone="red" icon="alert">加载提示词卡片失败：{cards.error}</Callout> : null}
+      <PromptCardDialog
+        projectId={projectId}
+        open={dialogOpen}
+        value={value}
+        onChange={onChange}
+        onClose={() => setDialogOpen(false)}
+      />
     </Field>
   );
 }
