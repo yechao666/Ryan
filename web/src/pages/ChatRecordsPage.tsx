@@ -1,29 +1,29 @@
 import { useEffect, useMemo, useState } from 'react';
-import type { Person } from '@shared';
 import {
-  Avatar,
   Badge,
   Button,
   Card,
   ConfirmDialog,
   EmptyState,
   ErrorState,
+  Field,
   Icon,
   IconButton,
+  Input,
   Modal,
   PageHead,
   Pagination,
   SearchInput,
-  Select,
   Table,
   useToast,
   type Column,
 } from '@ui';
 import { api, type AssistantConversationDetail, type AssistantConversationSummary, type AssistantProcessBlock } from '../lib/api.ts';
-import { useAuth } from '../lib/auth.tsx';
 import { fmtDateTime, fmtRelative } from '../lib/format.ts';
 import { useAsync } from '../lib/hooks.ts';
 import { Markdown } from '../components/project/Markdown.tsx';
+
+const ACTIVE_KEY = 'aiwo.assistant.activeConversation.v1';
 
 function toolInput(input: unknown): string {
   if (input == null) return '';
@@ -58,32 +58,60 @@ function ProcessList({ blocks }: { blocks: AssistantProcessBlock[] }) {
 }
 
 export function ChatRecordsPage() {
-  const { person } = useAuth();
   const toast = useToast();
-  const isAdmin = Boolean(person?.isAdmin);
   const conversations = useAsync(() => api.assistantConversations(), []);
-  const persons = useAsync(() => api.persons(), [], isAdmin);
+  const [activeId, setActiveId] = useState(() => localStorage.getItem(ACTIVE_KEY) || '');
   const [search, setSearch] = useState('');
-  const [personId, setPersonId] = useState('all');
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(20);
   const [detail, setDetail] = useState<AssistantConversationDetail | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<AssistantConversationSummary | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [renameTarget, setRenameTarget] = useState<AssistantConversationSummary | null>(null);
+  const [renameTitle, setRenameTitle] = useState('');
+  const [renaming, setRenaming] = useState(false);
+  const [creating, setCreating] = useState(false);
+
+  useEffect(() => {
+    const onActive = (event: Event) => {
+      const id = (event as CustomEvent<{ conversationId?: string }>).detail?.conversationId;
+      if (id) setActiveId(id);
+    };
+    window.addEventListener('aiwo:assistant-active', onActive);
+    return () => window.removeEventListener('aiwo:assistant-active', onActive);
+  }, []);
+
+  useEffect(() => { setPage(1); }, [search, pageSize]);
 
   const filtered = useMemo(() => {
     const needle = search.trim().toLowerCase();
     return (conversations.data?.conversations ?? []).filter((item) => {
-      if (personId !== 'all' && item.personId !== personId) return false;
       if (!needle) return true;
-      return `${item.title} ${item.personName} ${item.preview}`.toLowerCase().includes(needle);
+      return `${item.title} ${item.preview}`.toLowerCase().includes(needle);
     });
-  }, [conversations.data, search, personId]);
+  }, [conversations.data, search]);
   const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
   const currentPage = Math.min(page, totalPages);
   const paged = filtered.slice((currentPage - 1) * pageSize, currentPage * pageSize);
-  useEffect(() => { setPage(1); }, [search, personId, pageSize]);
+
+  const activate = (id: string) => {
+    localStorage.setItem(ACTIVE_KEY, id);
+    setActiveId(id);
+    window.dispatchEvent(new CustomEvent('aiwo:assistant-activate', { detail: { conversationId: id } }));
+    toast.success('已设为活动会话，右侧助手已切换');
+  };
+
+  const create = async () => {
+    setCreating(true);
+    try {
+      const result = await api.createAssistantConversation({ pathname: window.location.pathname });
+      await conversations.refresh();
+      activate(result.conversation.id);
+    } catch (cause) {
+      toast.error(cause instanceof Error ? cause.message : '新建会话失败');
+    } finally { setCreating(false); }
+  };
 
   const openDetail = async (item: AssistantConversationSummary) => {
     setDetailLoading(true);
@@ -94,11 +122,31 @@ export function ChatRecordsPage() {
     } finally { setDetailLoading(false); }
   };
 
+  const saveRename = async () => {
+    if (!renameTarget) return;
+    if (!renameTitle.trim()) { toast.error('会话标题不能为空'); return; }
+    setRenaming(true);
+    try {
+      await api.renameAssistantConversation(renameTarget.id, renameTitle.trim());
+      window.dispatchEvent(new CustomEvent('aiwo:assistant-conversation-renamed', {
+        detail: { conversationId: renameTarget.id, title: renameTitle.trim() },
+      }));
+      setRenameTarget(null);
+      await conversations.refresh();
+      toast.success('会话标题已更新');
+    } catch (cause) {
+      toast.error(cause instanceof Error ? cause.message : '重命名失败');
+    } finally { setRenaming(false); }
+  };
+
   const remove = async () => {
     if (!deleteTarget) return;
     setDeleting(true);
     try {
       await api.deleteAssistantConversation(deleteTarget.id);
+      window.dispatchEvent(new CustomEvent('aiwo:assistant-conversation-deleted', {
+        detail: { conversationId: deleteTarget.id },
+      }));
       toast.success('会话已删除');
       setDeleteTarget(null);
       if (detail?.conversation.id === deleteTarget.id) setDetail(null);
@@ -116,24 +164,16 @@ export function ChatRecordsPage() {
         <div className="hstack gap-8">
           <span className="cx-metric-icon tone-cyan"><Icon name="terminal" size={14} /></span>
           <div className="vstack gap-2" style={{ minWidth: 0 }}>
-            <span className="strong truncate">{item.title || '未命名会话'}</span>
+            <span className="hstack gap-6">
+              <span className="strong truncate">{item.title || '未命名会话'}</span>
+              {item.id === activeId ? <Badge size="sm" tone="green" dot>活动</Badge> : null}
+            </span>
             <span className="tiny dim truncate">{item.preview || '暂无内容'}</span>
           </div>
         </div>
       ),
     },
-    {
-      key: 'person',
-      header: '发起人',
-      width: 170,
-      render: (item) => (
-        <div className="hstack gap-6">
-          <Avatar name={item.personName || '—'} size="sm" tone="violet" />
-          <span className="small truncate">{item.personName || '—'}</span>
-        </div>
-      ),
-    },
-    { key: 'pathname', header: '关联页面', width: 150, render: (item) => <span className="tiny mono truncate" title={item.pathname}>{item.pathname || '/'}</span> },
+    { key: 'pathname', header: '关联页面', width: 160, render: (item) => <span className="tiny mono truncate" title={item.pathname}>{item.pathname || '/'}</span> },
     { key: 'messageCount', header: '消息', width: 70, render: (item) => <span className="tiny dim">{item.messageCount}</span>, sortValue: (item) => item.messageCount },
     {
       key: 'updatedAt',
@@ -145,11 +185,24 @@ export function ChatRecordsPage() {
     {
       key: 'actions',
       header: '操作',
-      width: 120,
+      width: 190,
       align: 'right',
       render: (item) => (
         <div className="hstack gap-2" style={{ justifyContent: 'flex-end' }} onClick={(event) => event.stopPropagation()}>
+          <IconButton
+            icon={item.id === activeId ? 'check' : 'play'}
+            label={item.id === activeId ? '当前活动会话' : '设为活动会话'}
+            size="sm"
+            disabled={item.id === activeId}
+            onClick={() => activate(item.id)}
+          />
           <IconButton icon="eye" label="查看会话" size="sm" onClick={() => void openDetail(item)} />
+          <IconButton
+            icon="pencil"
+            label="重命名会话"
+            size="sm"
+            onClick={() => { setRenameTarget(item); setRenameTitle(item.title); }}
+          />
           <IconButton icon="trash" label="删除会话" size="sm" onClick={() => setDeleteTarget(item)} />
         </div>
       ),
@@ -160,25 +213,20 @@ export function ChatRecordsPage() {
     <div className="page">
       <PageHead
         title="聊天记录"
-        desc={isAdmin ? '查看全平台助手会话与完整执行过程；可按发起人筛选。' : '查看自己的助手会话与完整执行过程。'}
-        actions={<IconButton icon="refresh" label="刷新聊天记录" onClick={() => { void conversations.refresh(); }} />}
+        desc="当前账号的助手会话；新建、重命名、删除，或设为活动会话让右侧助手直接打开。"
+        actions={
+          <>
+            <IconButton icon="refresh" label="刷新聊天记录" onClick={() => void conversations.refresh()} />
+            <Button variant="primary" icon="plus" loading={creating} onClick={() => void create()}>新建会话</Button>
+          </>
+        }
       />
       <div className="toolbar">
         <div className="toolbar-left">
-          <SearchInput value={search} onChange={setSearch} placeholder="搜索标题 / 发起人 / 内容" className="ws-search" />
-          {isAdmin ? (
-            <Select
-              className="ws-filter-select"
-              value={personId}
-              options={[{ value: 'all', label: '全部发起人' }, ...(persons.data ?? []).map((item: Person) => ({ value: item.id, label: item.name }))]}
-              onChange={(event) => setPersonId(event.target.value)}
-            />
-          ) : null}
+          <SearchInput value={search} onChange={setSearch} placeholder="搜索标题 / 内容" className="ws-search" />
           <span className="tiny dim">共 {filtered.length} 个会话</span>
         </div>
-        {(search || personId !== 'all') ? (
-          <Button size="sm" variant="ghost" onClick={() => { setSearch(''); setPersonId('all'); }}>清除筛选</Button>
-        ) : null}
+        {search ? <Button size="sm" variant="ghost" onClick={() => setSearch('')}>清除筛选</Button> : null}
       </div>
 
       {conversations.error && !conversations.data ? (
@@ -193,7 +241,7 @@ export function ChatRecordsPage() {
             resizable
             loading={conversations.loading && !conversations.data}
             onRowClick={(item) => void openDetail(item)}
-            empty={<EmptyState icon="terminal" title="还没有聊天记录" description="在右侧助手发起一次会话后，这里会保存完整消息与执行过程。" compact />}
+            empty={<EmptyState icon="terminal" title="还没有聊天记录" description="新建一个会话，或在右侧助手开始对话。" action={<Button size="sm" variant="primary" icon="plus" onClick={() => void create()}>新建会话</Button>} compact />}
           />
           {!conversations.loading && filtered.length > 0 ? (
             <div className="ws-table-foot">
@@ -219,7 +267,7 @@ export function ChatRecordsPage() {
         open={Boolean(detail) || detailLoading}
         onClose={() => { setDetail(null); setDetailLoading(false); }}
         title={detail?.conversation.title || '会话详情'}
-        description={detail ? `${detail.conversation.personName} · ${detail.conversation.pathname} · ${fmtDateTime(detail.conversation.updatedAt)}` : '正在加载…'}
+        description={detail ? `${detail.conversation.pathname} · ${fmtDateTime(detail.conversation.updatedAt)}` : '正在加载…'}
         size="lg"
         footer={<Button variant="ghost" onClick={() => setDetail(null)}>关闭</Button>}
       >
@@ -228,7 +276,7 @@ export function ChatRecordsPage() {
             {detail.messages.length === 0 ? <EmptyState icon="terminal" title="空会话" compact /> : detail.messages.map((message) => (
               <div className={`chat-msg chat-msg--${message.role}`} key={message.id}>
                 <div className="chat-msg__head">
-                  <span className="chat-msg__author">{message.role === 'user' ? detail.conversation.personName : 'Ryan 助手'}</span>
+                  <span className="chat-msg__author">{message.role === 'user' ? '你' : 'Ryan 助手'}</span>
                   <span className="tiny dim">{fmtRelative(message.createdAt)}</span>
                 </div>
                 {message.role === 'assistant' ? <ProcessList blocks={message.process} /> : null}
@@ -239,6 +287,16 @@ export function ChatRecordsPage() {
             ))}
           </div>
         ) : null}
+      </Modal>
+
+      <Modal
+        open={Boolean(renameTarget)}
+        onClose={() => setRenameTarget(null)}
+        title="重命名会话"
+        description="只修改标题，不影响消息与过程记录。"
+        footer={<><Button variant="ghost" onClick={() => setRenameTarget(null)}>取消</Button><Button variant="primary" icon="check" loading={renaming} onClick={() => void saveRename()}>保存</Button></>}
+      >
+        <Field label="会话标题"><Input value={renameTitle} autoFocus onChange={(event) => setRenameTitle(event.target.value)} /></Field>
       </Modal>
 
       <ConfirmDialog

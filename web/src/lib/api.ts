@@ -510,6 +510,10 @@ export const api = {
     return request(`/api/assistant/conversations${qs(params)}`);
   },
 
+  createAssistantConversation(input: { title?: string; pathname?: string } = {}): Promise<{ conversation: AssistantConversationSummary }> {
+    return request('/api/assistant/conversations', { method: 'POST', body: JSON.stringify(input) });
+  },
+
   assistantConversation(id: string): Promise<AssistantConversationDetail> {
     return request(`/api/assistant/conversations/${id}`);
   },

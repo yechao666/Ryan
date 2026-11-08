@@ -167,8 +167,9 @@ Ryan 任务执行者固定为「创建人@Ryan」；任务不支持对话，只�
 | --- | --- | --- |
 | POST | `/api/assistant/chat` | `{message,pathname,projectId?,taskId?,conversationId?}` → `{reply,navigate?,sessionId?,instance,conversationId}` |
 | POST | `/api/assistant/chat/stream` | 同上请求体（含 conversationId），SSE 返回 `meta/status/thinking/tool/text/done/error`；消息与过程自动保存 |
-| GET | `/api/assistant/conversations?q=&personId=` | 聊天记录列表；管理员可见全平台，普通人员仅自己 |
-| GET | `/api/assistant/conversations/:id` | 会话详情与完整过程事件 |
+| GET | `/api/assistant/conversations?q=` | 当前账号的聊天记录列表（账号隔离） |
+| POST | `/api/assistant/conversations` | `{title?,pathname?}` 新建会话 |
+| GET | `/api/assistant/conversations/:id` | 当前账号的会话详情与完整过程事件 |
 | PATCH | `/api/assistant/conversations/:id` | `{title}` 重命名 |
 | DELETE | `/api/assistant/conversations/:id` | 删除会话及其消息、过程 |
 | GET | `/api/assistant/manifest` | 助手使用的稳定 API 清单与前端路由表；包含任务查询到 `HIVE_NAVIGATE` 的规则 |

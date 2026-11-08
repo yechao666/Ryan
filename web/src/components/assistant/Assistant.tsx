@@ -273,6 +273,72 @@ export function Assistant() {
 
   useEffect(() => () => abortRef.current?.abort(), []);
 
+  useEffect(() => {
+    const activate = async (event: Event) => {
+      const conversationId = (event as CustomEvent<{ conversationId?: string }>).detail?.conversationId;
+      if (!conversationId) return;
+      try {
+        const detail = await api.assistantConversation(conversationId);
+        const next: Conversation = {
+          id: detail.conversation.id,
+          title: detail.conversation.title || '新会话',
+          updatedAt: detail.conversation.updatedAt,
+          messages: detail.messages.map((message) => ({
+            id: message.id,
+            role: message.role,
+            text: message.content,
+            createdAt: message.createdAt,
+            process: message.process.map((block): ProcessBlock => block.kind === 'thinking'
+              ? { id: block.id, kind: 'thinking', text: block.text ?? '', done: true }
+              : { id: block.id, kind: 'tool', callId: block.callId, tool: block.tool ?? 'tool', input: block.input, result: block.result, status: block.status, done: true }),
+            processOpen: true,
+          })),
+        };
+        setConversations((current) => {
+          const exists = current.some((item) => item.id === next.id);
+          return exists ? current.map((item) => item.id === next.id ? next : item) : [next, ...current];
+        });
+        setActiveId(next.id);
+        localStorage.setItem(STORAGE_ACTIVE, next.id);
+        setOpen(true);
+        setMenuOpen(false);
+        setEditing(null);
+        setInput('');
+      } catch (cause) {
+        toast.error(cause instanceof Error ? cause.message : '加载会话失败');
+      }
+    };
+    const removed = (event: Event) => {
+      const conversationId = (event as CustomEvent<{ conversationId?: string }>).detail?.conversationId;
+      if (!conversationId) return;
+      setConversations((current) => {
+        const remaining = current.filter((item) => item.id !== conversationId);
+        if (remaining.length) return remaining;
+        const fresh = createConversation();
+        queueMicrotask(() => {
+          setActiveId(fresh.id);
+          localStorage.setItem(STORAGE_ACTIVE, fresh.id);
+          window.dispatchEvent(new CustomEvent('aiwo:assistant-active', { detail: { conversationId: fresh.id } }));
+        });
+        return [fresh];
+      });
+      setActiveId((current) => current === conversationId ? '' : current);
+    };
+    const renamed = (event: Event) => {
+      const detail = (event as CustomEvent<{ conversationId?: string; title?: string }>).detail;
+      if (!detail?.conversationId || !detail.title) return;
+      setConversations((current) => current.map((item) => item.id === detail.conversationId ? { ...item, title: detail.title! } : item));
+    };
+    window.addEventListener('aiwo:assistant-activate', activate);
+    window.addEventListener('aiwo:assistant-conversation-deleted', removed);
+    window.addEventListener('aiwo:assistant-conversation-renamed', renamed);
+    return () => {
+      window.removeEventListener('aiwo:assistant-activate', activate);
+      window.removeEventListener('aiwo:assistant-conversation-deleted', removed);
+      window.removeEventListener('aiwo:assistant-conversation-renamed', renamed);
+    };
+  }, [toast]);
+
   const updateMessages = (
     conversationId: string,
     updater: (messages: ChatMessage[]) => ChatMessage[],
@@ -318,6 +384,8 @@ export function Assistant() {
     const conversation = createConversation();
     setConversations((current) => [conversation, ...current]);
     setActiveId(conversation.id);
+    localStorage.setItem(STORAGE_ACTIVE, conversation.id);
+    window.dispatchEvent(new CustomEvent('aiwo:assistant-active', { detail: { conversationId: conversation.id } }));
     setInput('');
     setEditing(null);
     setMenuOpen(false);
@@ -330,6 +398,8 @@ export function Assistant() {
     }
     if (busy) abortRef.current?.abort();
     setActiveId(id);
+    localStorage.setItem(STORAGE_ACTIVE, id);
+    window.dispatchEvent(new CustomEvent('aiwo:assistant-active', { detail: { conversationId: id } }));
     setEditing(null);
     setInput('');
     setMenuOpen(false);

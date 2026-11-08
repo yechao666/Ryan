@@ -716,3 +716,26 @@ test('用户 API Key：创建、鉴权、吊销', async () => {
   ok(await call(`/api/account/api-keys/${created.id}`, { token: tokenLin, method: 'DELETE' }));
   assert.equal((await call('/api/auth/me', { token: created.key })).status, 401);
 });
+
+test('助手会话按账号隔离，支持创建/重命名/删除', async () => {
+  const created = ok(await call('/api/assistant/conversations', {
+    token: tokenLin,
+    method: 'POST',
+    body: { title: '我的活动会话', pathname: '/chats' },
+  }));
+  const id = created.conversation.id as string;
+  const own = ok(await call('/api/assistant/conversations', { token: tokenLin }));
+  assert.ok(own.conversations.some((item: Json) => item.id === id));
+  const other = ok(await call('/api/assistant/conversations', { token: tokenChen }));
+  assert.equal(other.conversations.some((item: Json) => item.id === id), false);
+  assert.equal((await call(`/api/assistant/conversations/${id}`, { token: tokenChen })).status, 403);
+  ok(await call(`/api/assistant/conversations/${id}`, {
+    token: tokenLin,
+    method: 'PATCH',
+    body: { title: '重命名后的会话' },
+  }));
+  const detail = ok(await call(`/api/assistant/conversations/${id}`, { token: tokenLin }));
+  assert.equal(detail.conversation.title, '重命名后的会话');
+  ok(await call(`/api/assistant/conversations/${id}`, { token: tokenLin, method: 'DELETE' }));
+  assert.equal((await call(`/api/assistant/conversations/${id}`, { token: tokenLin })).status, 404);
+});

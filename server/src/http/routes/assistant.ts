@@ -64,7 +64,8 @@ function conversationOr404(db: Db, id: string): ConversationRow {
 }
 
 function canAccessConversation(person: Person, row: ConversationRow): boolean {
-  return person.isAdmin || row.person_id === person.id;
+  // 聊天记录按账号隔离：管理员也不能读取他人的会话。
+  return row.person_id === person.id;
 }
 
 function beginConversation(
@@ -221,25 +222,44 @@ async function streamThinking(res: ServerResponse, text: string): Promise<void> 
 }
 
 export function registerAssistantRoutes(router: Router): void {
+  router.post('/api/assistant/conversations', async (rc) => {
+    const person = requirePerson(rc);
+    const input = await rc.body(z.object({
+      title: z.string().trim().max(120).optional(),
+      pathname: z.string().trim().max(500).optional().default('/'),
+    }).optional().default({}));
+    const id = newId('conv');
+    const now = nowIso();
+    const title = input.title?.trim() || '新会话';
+    rc.app.db.prepare(
+      'INSERT INTO assistant_conversations (id, person_id, title, pathname, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)',
+    ).run(id, person.id, title, input.pathname || '/', now, now);
+    rc.json({
+      conversation: {
+        id,
+        title,
+        personId: person.id,
+        personName: person.name,
+        pathname: input.pathname || '/',
+        messageCount: 0,
+        preview: '',
+        createdAt: now,
+        updatedAt: now,
+      },
+    });
+  });
+
   router.get('/api/assistant/conversations', (rc) => {
     const person = requirePerson(rc);
     const query = rc.query(z.object({
       q: z.string().trim().max(200).optional().default(''),
-      personId: z.string().trim().max(80).optional(),
       limit: z.coerce.number().int().min(1).max(300).optional().default(200),
     }));
-    const where: string[] = [];
-    const params: (string | number)[] = [];
-    if (!person.isAdmin) {
-      where.push('c.person_id = ?');
-      params.push(person.id);
-    } else if (query.personId) {
-      where.push('c.person_id = ?');
-      params.push(query.personId);
-    }
+    const where = ['c.person_id = ?'];
+    const params: (string | number)[] = [person.id];
     if (query.q) {
-      where.push('(c.title LIKE ? OR p.name LIKE ?)');
-      params.push(`%${query.q}%`, `%${query.q}%`);
+      where.push('c.title LIKE ?');
+      params.push(`%${query.q}%`);
     }
     params.push(query.limit);
     const rows = rc.app.db.prepare(
