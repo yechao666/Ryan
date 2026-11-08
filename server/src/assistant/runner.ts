@@ -87,6 +87,7 @@ function buildPrompt(input: AssistantTurn): string {
     '你没有 shell、文件读写、文件搜索、web_fetch、skill、subagent 等工具；不要尝试执行命令或读取文件。',
     'API 契约只来自稳定 manifest，不通过阅读源码推断接口。',
     '第一步调用 aiwo_api GET /api/assistant/manifest 获取完整接口清单；manifest 是唯一的 API 定义来源。',
+    'manifest.models 是数据模型；endpoints[].params/query/body/response 是参数与返回定义。调用前先读对应字段，不要猜测字段名或枚举值。',
     '',
     '工具调用形式：aiwo_api({ method: "GET"|"POST"|"PATCH"|"DELETE", path: "/api/...", body?: object })。',
     '常用路径：/api/projects、/api/teams、/api/persons、/api/instances、/api/tasks、/api/prompt-cards；',

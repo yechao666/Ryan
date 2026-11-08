@@ -172,7 +172,7 @@ Ryan 任务执行者固定为「创建人@Ryan」；任务不支持对话，只�
 | GET | `/api/assistant/conversations/:id` | 当前账号的会话详情与完整过程事件 |
 | PATCH | `/api/assistant/conversations/:id` | `{title}` 重命名 |
 | DELETE | `/api/assistant/conversations/:id` | 删除会话及其消息、过程 |
-| GET | `/api/assistant/manifest` | 助手使用的稳定 API 清单与前端路由表；包含任务查询到 `HIVE_NAVIGATE` 的规则 |
+| GET | `/api/assistant/manifest` | 助手 API 契约 v2：认证约定、错误结构、14 个数据模型、59 个端点的 params/query/body/response 与前端路由表 |
 | POST | `/api/assistant/suggestions` | `{pathname,projectId?,taskId?,context?}` → 本机 DSH 生成的 3 条下一步任务推荐 |
 
 

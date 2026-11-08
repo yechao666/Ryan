@@ -255,6 +255,12 @@ test('多实例调度：两个实例分别领取不同任务，不会抢同一�
 test('助手 manifest：包含稳定 API 清单，不泄露凭证', async () => {
   const manifest = ok(await call('/api/assistant/manifest', { token: tokenLin }));
   assert.equal(manifest.name, 'Ryan API');
+  assert.equal(manifest.version, 2);
+  assert.ok(manifest.models?.Task && manifest.models?.Project && manifest.models?.Conversation);
+  const taskList = manifest.endpoints.find((item: Json) => item.method === 'GET' && item.path === '/api/tasks');
+  assert.ok(taskList.query?.status?.enum?.includes('running'));
+  const createTask = manifest.endpoints.find((item: Json) => item.method === 'POST' && item.path === '/api/projects/:id/tasks');
+  assert.equal(createTask.body?.title?.required, true);
   assert.ok(Array.isArray(manifest.endpoints));
   assert.ok(manifest.endpoints.some((item: Json) => item.method === 'POST' && item.path === '/api/projects/:id/tasks'));
   assert.ok(manifest.endpoints.some((item: Json) => item.path === '/api/assistant/manifest'));
