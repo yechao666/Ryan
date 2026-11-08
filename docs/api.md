@@ -76,6 +76,7 @@ Ryan 任务执行者固定为「创建人@Ryan」；任务不支持对话，只�
 | --- | --- | --- |
 | GET | `/api/runtime/instances/agent-package` | 服务 token 拉取服务代理 tar.gz，用于远端安装 |
 | POST | `/api/runtime/instances/register` | 服务 token 注册/更新资源信息 |
+| POST | `/api/runtime/instances/register-key` | DSH 插件用用户 API Key 注册服务，返回一次性服务 token |
 | POST | `/api/runtime/instances/heartbeat` | 心跳，返回 pending |
 | POST | `/api/runtime/tasks/claim` | 领取任务；返回 `{task,project,executor,promptCards,memory}` |
 | GET | `/api/runtime/tasks/:id/status` | 服务侧查询任务状态（用于感知取消） |
@@ -130,6 +131,9 @@ Ryan 任务执行者固定为「创建人@Ryan」；任务不支持对话，只�
 | GET | `/api/account` | 当前人员资料、密码状态、已绑定身份 |
 | PATCH | `/api/account` | `{name?,title?}` 更新账号资料 |
 | POST | `/api/account/password` | `{currentPassword?,newPassword}` 设置/修改本地密码 |
+| GET | `/api/account/api-keys` | 当前账号的 API Key 列表（只返回前缀） |
+| POST | `/api/account/api-keys` | `{name?}` 创建用户 API Key，明文只返回一次 |
+| DELETE | `/api/account/api-keys/:id` | 吊销 API Key |
 | POST | `/api/account/sso/:providerId/start` | 绑定统一认证，返回授权 URL |
 | DELETE | `/api/account/identities/:id` | 解绑统一认证 |
 | GET | `/api/settings/auth-providers` | 管理员查看认证源（Secret 不回显） |

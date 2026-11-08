@@ -39,6 +39,34 @@ export function authenticatePerson(rc: RequestContext, required = true): Person 
     if (required) throw errors.unauthorized();
     return null;
   }
+  if (token.startsWith('ryan_ak_')) {
+    const keyRow = rc.app.db
+      .prepare(
+        `SELECT p.*, k.id AS api_key_id FROM api_keys k JOIN persons p ON p.id = k.person_id
+          WHERE k.key_hash = ? AND k.revoked_at IS NULL`,
+      )
+      .get(sha256(token)) as unknown as
+      | {
+          id: string;
+          email: string;
+          name: string;
+          title: string | null;
+          avatar_color: string;
+          is_admin: number;
+          created_at: string;
+          last_seen_at: string | null;
+          api_key_id: string;
+        }
+      | undefined;
+    if (keyRow) {
+      rc.app.db.prepare('UPDATE api_keys SET last_used_at = ? WHERE id = ?').run(nowIso(), keyRow.api_key_id);
+      const person = personFromRow(keyRow);
+      rc.person = person;
+      return person;
+    }
+    if (required) throw errors.unauthorized('API Key 无效或已被吊销');
+    return null;
+  }
   const row = rc.app.db
     .prepare(
       `SELECT p.* FROM sessions s JOIN persons p ON p.id = s.person_id

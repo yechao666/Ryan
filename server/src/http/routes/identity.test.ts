@@ -701,3 +701,18 @@ test('项目工作区：本机服务可浏览，远端服务明确不可用', as
   assert.equal(remote.available, false);
   assert.ok(remote.reason);
 });
+
+test('用户 API Key：创建、鉴权、吊销', async () => {
+  const created = ok(await call('/api/account/api-keys', {
+    token: tokenLin,
+    method: 'POST',
+    body: { name: 'DSH 测试' },
+  }));
+  assert.match(created.key, /^ryan_ak_/);
+  const keys = ok(await call('/api/account/api-keys', { token: tokenLin }));
+  assert.ok(keys.keys.some((key: Json) => key.id === created.id && key.prefix === created.key.slice(0, 16)));
+  const me = ok(await call('/api/auth/me', { token: created.key }));
+  assert.equal(me.person.id, 'per_linwei');
+  ok(await call(`/api/account/api-keys/${created.id}`, { token: tokenLin, method: 'DELETE' }));
+  assert.equal((await call('/api/auth/me', { token: created.key })).status, 401);
+});

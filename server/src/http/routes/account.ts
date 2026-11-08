@@ -291,6 +291,44 @@ export function registerAccountRoutes(router: Router): void {
     });
   });
 
+  router.get('/api/account/api-keys', (rc) => {
+    const person = requirePerson(rc);
+    const rows = rowsOf<{ id: string; name: string; key_prefix: string; created_at: string; last_used_at: string | null }>(
+      rc.app.db,
+      `SELECT id, name, key_prefix, created_at, last_used_at FROM api_keys
+        WHERE person_id = ? AND revoked_at IS NULL ORDER BY created_at DESC`,
+      [person.id],
+    );
+    rc.json({ keys: rows.map((row) => ({
+      id: row.id,
+      name: row.name,
+      prefix: row.key_prefix,
+      createdAt: row.created_at,
+      lastUsedAt: row.last_used_at ?? undefined,
+    })) });
+  });
+
+  router.post('/api/account/api-keys', async (rc) => {
+    const person = requirePerson(rc);
+    const input = await rc.body(z.object({ name: z.string().trim().max(80).optional() }));
+    const active = rowOf<{ c: number }>(rc.app.db, 'SELECT COUNT(*) AS c FROM api_keys WHERE person_id = ? AND revoked_at IS NULL', [person.id])?.c ?? 0;
+    if (Number(active) >= 20) throw errors.badRequest('API Key 数量已达上限，请先删除不用的 Key');
+    const key = `ryan_ak_${randomToken(24)}`;
+    const id = newId('key');
+    rc.app.db.prepare(
+      'INSERT INTO api_keys (id, person_id, name, key_prefix, key_hash, created_at) VALUES (?, ?, ?, ?, ?, ?)',
+    ).run(id, person.id, input.name?.trim() || 'DSH 插件', key.slice(0, 16), sha256(key), nowIso());
+    rc.json({ id, name: input.name?.trim() || 'DSH 插件', key, createdAt: nowIso() });
+  });
+
+  router.delete('/api/account/api-keys/:id', (rc) => {
+    const person = requirePerson(rc);
+    const key = rowOf<{ id: string }>(rc.app.db, 'SELECT id FROM api_keys WHERE id = ? AND person_id = ? AND revoked_at IS NULL', [rc.params.id!, person.id]);
+    if (!key) throw errors.notFound('API Key 不存在');
+    rc.app.db.prepare('UPDATE api_keys SET revoked_at = ? WHERE id = ?').run(nowIso(), key.id);
+    rc.json({ ok: true });
+  });
+
   router.patch('/api/account', async (rc) => {
     const person = requirePerson(rc);
     const input = await rc.body(z.object({

@@ -199,6 +199,14 @@ export interface ProjectWorkspaceFile {
   dataUrl?: string;
 }
 
+export interface AccountApiKey {
+  id: string;
+  name: string;
+  prefix: string;
+  createdAt: string;
+  lastUsedAt?: string;
+}
+
 /** 新增 DSH 服务的响应：token 与安装命令只返回一次。 */
 export interface InstanceCreateResult {
   instance: DshInstance;
@@ -251,6 +259,18 @@ export const api = {
 
   updateAccount(input: { name?: string; title?: string }): Promise<{ person: AuthResponse['person'] }> {
     return request('/api/account', { method: 'PATCH', body: JSON.stringify(input) });
+  },
+
+  accountApiKeys(): Promise<{ keys: AccountApiKey[] }> {
+    return request('/api/account/api-keys');
+  },
+
+  createAccountApiKey(name?: string): Promise<{ id: string; name: string; key: string; createdAt: string }> {
+    return request('/api/account/api-keys', { method: 'POST', body: JSON.stringify({ name }) });
+  },
+
+  deleteAccountApiKey(id: string): Promise<{ ok: boolean }> {
+    return request(`/api/account/api-keys/${id}`, { method: 'DELETE' });
   },
 
   changePassword(input: { currentPassword?: string; newPassword: string }): Promise<{ ok: boolean }> {

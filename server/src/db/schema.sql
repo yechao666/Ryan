@@ -357,3 +357,16 @@ CREATE TABLE IF NOT EXISTS assistant_messages (
   created_at      TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_assistant_msg_conv ON assistant_messages(conversation_id, created_at ASC);
+
+-- 用户 API Key：供 DSH 插件等外部客户端以人员身份接入 Ryan
+CREATE TABLE IF NOT EXISTS api_keys (
+  id           TEXT PRIMARY KEY,
+  person_id    TEXT NOT NULL REFERENCES persons(id) ON DELETE CASCADE,
+  name         TEXT NOT NULL DEFAULT 'DSH 插件',
+  key_prefix   TEXT NOT NULL,
+  key_hash     TEXT NOT NULL UNIQUE,
+  created_at   TEXT NOT NULL,
+  last_used_at TEXT,
+  revoked_at   TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_api_keys_person ON api_keys(person_id, created_at DESC);

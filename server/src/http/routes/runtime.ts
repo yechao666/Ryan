@@ -16,7 +16,7 @@ import { getProjectRow } from '../../lib/access.ts';
 import { recordActivity } from '../../lib/activity.ts';
 import { tx } from '../../db/index.ts';
 import type { Db } from '../../db/index.ts';
-import { newId, nowIso } from '../../lib/ids.ts';
+import { newId, nowIso, randomToken, sha256 } from '../../lib/ids.ts';
 import type {
   ClaimedTask,
   CompleteTaskInput,
@@ -190,6 +190,49 @@ async function buildAgentPackage(): Promise<string> {
 }
 
 export function registerRuntimeRoutes(router: Router): void {
+  // DSH 插件注册：用户用自己分配的 API Key 领一个服务身份；返回一次性服务 token。
+  router.post('/api/runtime/instances/register-key', async (rc) => {
+    const person = requirePerson(rc);
+    const input = await rc.body(z.object({
+      instanceId: z.string().trim().max(80).optional(),
+      name: z.string().trim().min(1).max(120),
+      kind: z.enum(['local', 'remote']).optional().default('remote'),
+      host: z.string().trim().max(200).optional().default(''),
+      workspacePath: z.string().trim().max(1_000).optional().default(''),
+      workspaceRoot: z.string().trim().max(1_000).optional().default(''),
+      version: z.string().trim().max(80).optional().default(''),
+      pluginVersion: z.string().trim().max(80).optional().default(''),
+    }));
+    const now = nowIso();
+    let id = input.instanceId ?? '';
+    if (id) {
+      const existing = getInstanceRow(rc.app.db, id);
+      if (!existing || existing.created_by !== person.id) throw errors.notFound('服务不存在');
+    } else {
+      id = newId('ins');
+    }
+    const token = `aiwo_ins_${randomToken(32)}`;
+    if (input.instanceId) {
+      rc.app.db.prepare(
+        `UPDATE dsh_instances SET name = ?, kind = ?, host = ?, workspace_path = ?, workspace_root = ?,
+                version = ?, plugin_version = ?, token_hash = ?, token_prefix = ?, revoked_at = NULL,
+                status = 'unconfigured', updated_at = ? WHERE id = ?`,
+      ).run(input.name, input.kind, input.host, input.workspacePath, input.workspaceRoot,
+        input.version, input.pluginVersion, sha256(token), token.slice(0, 18), now, id);
+    } else {
+      rc.app.db.prepare(
+        `INSERT INTO dsh_instances
+           (id, name, kind, host, port, base_url, workspace_path, workspace_root, version, plugin_version,
+            token_hash, token_prefix, status, registered_at, last_seen_at, revoked_at, created_by, created_at, updated_at, metadata)
+         VALUES (?, ?, ?, ?, NULL, NULL, ?, ?, ?, ?, ?, ?, 'unconfigured', ?, NULL, NULL, ?, ?, ?, '{}')`,
+      ).run(id, input.name, input.kind, input.host, input.workspacePath, input.workspaceRoot,
+        input.version, input.pluginVersion, sha256(token), token.slice(0, 18), now, person.id, now, now);
+    }
+    const row = getInstanceRow(rc.app.db, id);
+    if (!row) throw errors.internal('服务注册失败');
+    rc.json({ instance: buildInstance(rc.app.db, row), token });
+  });
+
   // 服务注册：token 由 Ryan 管理端预先创建；插件首次上线时更新资源信息。
   router.post('/api/runtime/instances/register', async (rc) => {
     const instance = authenticateInstance(rc);

@@ -1,0 +1,23 @@
+{
+  "name": "aiwo-instance",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Ryan DSH 实例代理：outbound 连接 Ryan 运行时，用 DSH ACP（headless 回退）执行任务",
+  "bin": {
+    "aiwo-instance": "./agent.mjs"
+  },
+  "scripts": {
+    "start": "node agent.mjs",
+    "test": "node test/smoke.mjs",
+    "check": "node --check agent.mjs && node --check lib/*.mjs && node --check test/smoke.mjs && node --check test/fixtures/fake-dsh.mjs"
+  },
+  "dependencies": {
+    "@agentclientprotocol/sdk": "2.4.0",
+    "zod": "3.25.76"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "license": "MIT"
+}

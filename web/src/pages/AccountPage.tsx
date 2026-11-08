@@ -11,17 +11,19 @@ import {
   Callout,
   Card,
   ConfirmDialog,
+  CopyButton,
   EmptyState,
   ErrorState,
   Field,
   Icon,
   Input,
+  Modal,
   PageHead,
   SectionHead,
   Skeleton,
   useToast,
 } from '@ui';
-import { fmtDateTime } from '@lib/format.ts';
+import { fmtDateTime, fmtRelative } from '@lib/format.ts';
 import { toneFor } from '../components/projects/helpers.tsx';
 
 /** 账号：人员即账号；本地密码 + 多 OIDC 统一认证绑定。 */
@@ -30,6 +32,7 @@ export function AccountPage() {
   const toast = useToast();
   const account = useAsync(() => api.account(), []);
   const providers = useAsync(() => api.authProviders(), []);
+  const apiKeys = useAsync(() => api.accountApiKeys(), []);
   const [name, setName] = useState('');
   const [title, setTitle] = useState('');
   const [savingProfile, setSavingProfile] = useState(false);
@@ -40,6 +43,12 @@ export function AccountPage() {
   const [unlinkTarget, setUnlinkTarget] = useState<{ id: string; name: string } | null>(null);
   const [unlinking, setUnlinking] = useState(false);
   const [binding, setBinding] = useState<string | null>(null);
+  const [keyOpen, setKeyOpen] = useState(false);
+  const [keyName, setKeyName] = useState('DSH 插件');
+  const [creatingKey, setCreatingKey] = useState(false);
+  const [createdKey, setCreatedKey] = useState<string | null>(null);
+  const [deleteKeyTarget, setDeleteKeyTarget] = useState<{ id: string; name: string } | null>(null);
+  const [deletingKey, setDeletingKey] = useState(false);
 
   useEffect(() => {
     if (!account.data) return;
@@ -50,6 +59,30 @@ export function AccountPage() {
   const profile = account.data;
   const linkedProviderIds = new Set(profile?.identities.map((identity) => identity.providerId) ?? []);
   const available = (providers.data ?? []).filter((provider) => !linkedProviderIds.has(provider.id));
+
+  const createApiKey = async () => {
+    setCreatingKey(true);
+    try {
+      const result = await api.createAccountApiKey(keyName.trim() || 'DSH 插件');
+      setCreatedKey(result.key);
+      await apiKeys.refresh();
+    } catch (cause) {
+      toast.error(cause instanceof Error ? cause.message : '创建密钥失败');
+    } finally { setCreatingKey(false); }
+  };
+
+  const deleteApiKey = async () => {
+    if (!deleteKeyTarget) return;
+    setDeletingKey(true);
+    try {
+      await api.deleteAccountApiKey(deleteKeyTarget.id);
+      toast.success('API 密钥已吊销');
+      setDeleteKeyTarget(null);
+      await apiKeys.refresh();
+    } catch (cause) {
+      toast.error(cause instanceof Error ? cause.message : '吊销密钥失败');
+    } finally { setDeletingKey(false); }
+  };
 
   const saveProfile = async () => {
     if (!name.trim()) {
@@ -225,8 +258,67 @@ export function AccountPage() {
               ) : null}
             </div>
           </Card>
+
+          <Card className="card-pad">
+            <SectionHead
+              title={<><Icon name="key" size={14} />API 密钥</>}
+              desc="给 DSH 插件等外部客户端使用；密钥只显示一次，可随时吊销。"
+              actions={<Button size="sm" variant="primary" icon="plus" onClick={() => { setKeyName('DSH 插件'); setCreatedKey(null); setKeyOpen(true); }}>创建密钥</Button>}
+            />
+            <div className="stack" style={{ gap: 8, marginTop: 12 }}>
+              {apiKeys.loading && !apiKeys.data ? <Skeleton h={46} /> : apiKeys.error ? (
+                <Callout tone="red" icon="alert">{apiKeys.error}</Callout>
+              ) : !apiKeys.data?.keys.length ? (
+                <EmptyState icon="key" title="还没有 API 密钥" description="为 DSH 插件创建一把密钥，填入插件配置页即可接入 Ryan。" compact />
+              ) : apiKeys.data.keys.map((key) => (
+                <div className="ws-pick-item" key={key.id}>
+                  <span className="cx-metric-icon tone-amber"><Icon name="key" size={14} /></span>
+                  <div className="ws-pick-main grow">
+                    <span className="ws-pick-name">{key.name}</span>
+                    <span className="tiny dim mono">{key.prefix}… · 创建于 {fmtDateTime(key.createdAt)}{key.lastUsedAt ? ` · 最近使用 ${fmtRelative(key.lastUsedAt)}` : ' · 尚未使用'}</span>
+                  </div>
+                  <Button size="sm" variant="ghost" icon="trash" onClick={() => setDeleteKeyTarget({ id: key.id, name: key.name })}>吊销</Button>
+                </div>
+              ))}
+            </div>
+          </Card>
         </>
       ) : null}
+
+      <Modal
+        open={keyOpen}
+        onClose={() => { setKeyOpen(false); setCreatedKey(null); }}
+        title={createdKey ? 'API 密钥已创建' : '创建 API 密钥'}
+        description={createdKey ? '复制并保存到 DSH 插件配置页；关闭后无法再次查看。' : '密钥将绑定到当前账号，可在任意 DSH 插件中使用。'}
+        footer={createdKey ? <Button variant="primary" onClick={() => { setKeyOpen(false); setCreatedKey(null); }}>我已保存</Button> : (
+          <>
+            <Button variant="ghost" onClick={() => setKeyOpen(false)}>取消</Button>
+            <Button variant="primary" icon="plus" loading={creatingKey} onClick={() => void createApiKey()}>创建</Button>
+          </>
+        )}
+      >
+        {createdKey ? (
+          <div className="vstack gap-10">
+            <Callout tone="amber" icon="alert">这是密钥唯一一次明文展示，请立即复制保存。</Callout>
+            <div className="hstack gap-6">
+              <Input value={createdKey} readOnly className="mono" />
+              <CopyButton value={createdKey} />
+            </div>
+          </div>
+        ) : (
+          <Field label="密钥名称"><Input value={keyName} onChange={(event) => setKeyName(event.target.value)} placeholder="例如：我的 Mac DSH" /></Field>
+        )}
+      </Modal>
+
+      <ConfirmDialog
+        open={Boolean(deleteKeyTarget)}
+        onClose={() => setDeleteKeyTarget(null)}
+        onConfirm={() => void deleteApiKey()}
+        title={`吊销「${deleteKeyTarget?.name ?? ''}」？`}
+        description="吊销后使用该密钥的 DSH 插件会立即失去连接，需要重新创建并配置。"
+        confirmLabel="吊销密钥"
+        loading={deletingKey}
+      />
 
       <ConfirmDialog
         open={Boolean(unlinkTarget)}
