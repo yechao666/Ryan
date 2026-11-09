@@ -1,5 +1,5 @@
 import { spawn } from 'node:child_process';
-import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { copyFile, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { homedir, tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -42,6 +42,22 @@ function dshHome(): string {
 
 function dshBin(): string {
   return process.env.HIVE_DSH_BIN || 'dsh';
+}
+
+/** 助手子进程使用独立 DSH_HOME：macOS 沙箱下写本机 profile 会被拒绝。 */
+async function assistantDshHome(): Promise<string> {
+  const home = join(tmpdir(), 'ryan-assistant-dsh-home');
+  const source = join(dshHome(), 'profiles', 'headless');
+  const target = join(home, 'profiles', 'headless');
+  await mkdir(target, { recursive: true });
+  for (const file of ['package.json', 'cordis.patch.yml', 'cordis.yml', 'pnpm-workspace.yaml']) {
+    try {
+      await copyFile(join(source, file), join(target, file));
+    } catch {
+      /* 源 profile 缺少可选文件时忽略；prepareProfile 会补齐 cordis.yml */
+    }
+  }
+  return home;
 }
 
 function profile(): string {
@@ -128,9 +144,10 @@ async function runAssistantTurnOnce(input: AssistantTurn): Promise<AssistantResu
   if (previous) args.push('--session-id', previous);
   args.push('-');
 
+  const home = await assistantDshHome();
   const env = {
     ...process.env,
-    DSH_HOME: dshHome(),
+    DSH_HOME: home,
     DEEPSEEK_API_KEY: apiKey,
     DSH_HIVE_RUNTIME_DISABLED: '1',
     AIWO_API_BASE: input.apiBase,
