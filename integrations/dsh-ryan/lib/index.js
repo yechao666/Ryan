@@ -72,7 +72,7 @@ export function apply(ctx, config) {
                 body: JSON.stringify({
                     instanceId: state.instanceId,
                     name: cfg.instanceName,
-                    kind: 'remote',
+                    kind: cfg.kind,
                     host: cfg.host,
                     workspacePath: cfg.workspaceRoot,
                     workspaceRoot: cfg.workspaceRoot,

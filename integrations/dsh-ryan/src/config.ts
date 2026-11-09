@@ -11,6 +11,7 @@ export interface RyanPluginConfig {
   apiKey: string;
   instanceName: string;
   host: string;
+  kind: 'local' | 'remote';
   workspaceRoot: string;
   nodePath: string;
   enabled: boolean;
@@ -22,6 +23,7 @@ export const Config = z.object({
   apiKey: z.string().role('secret').default('').volatile(),
   instanceName: z.string().default('').volatile(),
   host: z.string().default('').volatile(),
+  kind: z.union([z.const('local'), z.const('remote')]).default('remote').volatile(),
   workspaceRoot: z.string().default('').volatile(),
   nodePath: z.string().default('').volatile(),
   enabled: z.boolean().default(true).volatile(),
@@ -64,6 +66,7 @@ export function resolveConfig(raw?: RawRyanPluginConfig): RyanPluginConfig {
     apiKey: unwrap(value.apiKey) ?? '',
     instanceName: unwrap(value.instanceName)?.trim() || hostname(),
     host: unwrap(value.host)?.trim() || hostname(),
+    kind: unwrap(value.kind) ?? 'remote',
     workspaceRoot: unwrap(value.workspaceRoot)?.trim() || join(homedir(), '.ryan', 'workspaces'),
     nodePath: unwrap(value.nodePath)?.trim() || findNodePath(),
     enabled: unwrap(value.enabled) ?? true,

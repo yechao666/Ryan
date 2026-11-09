@@ -22,6 +22,7 @@ dsh plugin --profile desktop add link:$PWD
 | `apiKey` | Ryan 账号页创建的 API Key（`ryan_ak_...`）；secret，只显示已配置 |
 | `instanceName` | Ryan 服务列表展示名称，默认主机名 |
 | `host` | 服务主机名，默认主机名 |
+| `kind` | `local` / `remote`，默认 `remote`；DSH 与 Ryan 同机时可用 `local` |
 | `workspaceRoot` | 项目工作区根目录，默认 `~/.ryan/workspaces` |
 | `enabled` | 总开关 |
 

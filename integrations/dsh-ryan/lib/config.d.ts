@@ -6,6 +6,7 @@ export interface RyanPluginConfig {
     apiKey: string;
     instanceName: string;
     host: string;
+    kind: 'local' | 'remote';
     workspaceRoot: string;
     nodePath: string;
     enabled: boolean;
@@ -15,6 +16,7 @@ export declare const Config: z<Schemastery.ObjectS<NoInfer<{
     apiKey: z<string, string, "volatile-defined">;
     instanceName: z<string, string, "volatile-defined">;
     host: z<string, string, "volatile-defined">;
+    kind: z<"local" | "remote", "local" | "remote", "volatile-defined">;
     workspaceRoot: z<string, string, "volatile-defined">;
     nodePath: z<string, string, "volatile-defined">;
     enabled: z<boolean, boolean, "volatile-defined">;
@@ -23,6 +25,7 @@ export declare const Config: z<Schemastery.ObjectS<NoInfer<{
     apiKey: z<string, string, "volatile-defined">;
     instanceName: z<string, string, "volatile-defined">;
     host: z<string, string, "volatile-defined">;
+    kind: z<"local" | "remote", "local" | "remote", "volatile-defined">;
     workspaceRoot: z<string, string, "volatile-defined">;
     nodePath: z<string, string, "volatile-defined">;
     enabled: z<boolean, boolean, "volatile-defined">;
