@@ -1,7 +1,7 @@
 {
   "name": "dsh-ryan",
   "version": "0.1.0",
-  "description": "Ryan DSH 服务插件：用 Ryan 用户 API Key 接入，自动注册、心跳并领取任务。",
+  "description": "Ryan 智能体插件：用 Ryan 用户 API Key 接入，自动注册、心跳并领取任务。",
   "type": "module",
   "engines": {
     "node": "^22.19.0 || >=24.0.0"

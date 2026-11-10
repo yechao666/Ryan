@@ -2,10 +2,11 @@ import { useEffect, useState } from 'react';
 import type { TaskType, WorkItem } from '@shared';
 import { TASK_TYPES } from '@shared';
 import { api } from '@lib/api.ts';
-import { Button, Field, Input, Modal, Select, Textarea, useToast } from '@ui';
+import { Button, Field, Input, Modal, Select, useToast } from '@ui';
 import { useProject } from './context.ts';
 import { PRIORITY_OPTIONS } from './meta.ts';
 import { ProjectInstanceMultiSelect, PromptCardPicker } from './PromptCardPicker.tsx';
+import { MentionTextarea } from './MentionTextarea.tsx';
 
 export interface CreateTaskModalProps {
   open: boolean;
@@ -19,7 +20,7 @@ interface FormErrors {
   prompt?: string;
 }
 
-/** 新建任务弹窗：填写目标与提示词，可选提示卡与 DSH 服务。 */
+/** 新建任务弹窗：填写目标与提示词，可选提示卡与智能体。 */
 export function CreateTaskModal({ open, onClose, onCreated }: CreateTaskModalProps) {
   const { detail } = useProject();
   const projectId = detail.project.id;
@@ -78,7 +79,7 @@ export function CreateTaskModal({ open, onClose, onCreated }: CreateTaskModalPro
       onClose={onClose}
       size="lg"
       title="新建任务"
-      description="任务会进入排队队列；有项目绑定服务时在绑定服务间公平调度，否则进入共享服务池。"
+      description="任务会进入排队队列；有项目绑定智能体时在绑定智能体间公平调度，否则进入共享智能体池。"
       footer={
         <>
           <Button variant="ghost" onClick={onClose}>
@@ -102,13 +103,13 @@ export function CreateTaskModal({ open, onClose, onCreated }: CreateTaskModalPro
         label="任务内容"
         required
         error={errors.prompt}
-        hint="写清背景、验收标准与相关文件，会与项目提示词、提示卡一起下发给 Ryan。"
+        hint="写清背景、验收标准与相关文件；输入 @ 可提及人员或智能体，例如“开发完成后请 @测试智能体 完成测试”。"
       >
-        <Textarea
+        <MentionTextarea
           rows={6}
           value={prompt}
-          placeholder="描述任务背景、要改动的模块、验收标准等…"
-          onChange={(event) => setPrompt(event.target.value)}
+          placeholder="描述任务背景、要改动的模块、验收标准等… 输入 @ 可提及人员或智能体"
+          onChange={setPrompt}
         />
       </Field>
 

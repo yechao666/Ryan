@@ -21,6 +21,7 @@ import {
   useToast,
 } from '@ui';
 import { api } from '../lib/api.ts';
+import { MentionTextarea } from '../components/project/MentionTextarea.tsx';
 import { useDebounced } from '../lib/hooks.ts';
 import { apiErrorMessage, CardGridSkeleton, errorText, useResource } from '../components/projects/helpers.tsx';
 import { ProjectCard } from '../components/projects/index.tsx';
@@ -184,7 +185,7 @@ export function ProjectsPage() {
             <EmptyState
               icon="folder"
               title="还没有项目"
-              description="创建第一个项目，把任务、DSH 服务与项目记忆组织到一起。"
+              description="创建第一个项目，把任务、智能体与项目记忆组织到一起。"
               action={
                 <Button variant="primary" icon="plus" onClick={openCreate}>
                   新建项目
@@ -205,7 +206,7 @@ export function ProjectsPage() {
         open={createOpen}
         onClose={closeCreate}
         title="新建项目"
-        description="创建后即可创建任务、配置记忆；项目工作区由 DSH 服务按项目 ID 自动生成。"
+        description="创建后即可创建任务、配置记忆；项目工作区由智能体按项目 ID 自动生成。"
         size="lg"
         footer={
           <>
@@ -243,11 +244,11 @@ export function ProjectsPage() {
             label="项目提示词"
             hint="项目基本面：目标、规范、约束。任务领取时注入项目提示词与提示卡。"
           >
-            <Textarea
+            <MentionTextarea
               rows={4}
               value={form.prompt}
-              placeholder="例如：这是 Python/FastAPI 订单服务；幂等键必须绑定业务单号；迁移先 staging 验证。"
-              onChange={(event) => update('prompt', event.target.value)}
+              placeholder="例如：这是 Python/FastAPI 订单智能体；输入 @ 可提及人员或智能体。"
+              onChange={(value) => update('prompt', value)}
             />
           </Field>
 

@@ -1,5 +1,6 @@
 import type {
   AutomationTrigger,
+  AgentType,
   InstanceKind,
   InstanceStatus,
   PromptCardCategory,
@@ -91,9 +92,14 @@ export const PROMPT_CARD_SCOPES: { value: PromptCardScope; label: string; desc: 
   { value: 'person', label: '个人', desc: '仅本人可引用' },
 ];
 
+export const AGENT_TYPES: { value: AgentType; label: string; tone: string; desc: string }[] = [
+  { value: 'dsh', label: 'DSH', tone: 'cyan', desc: 'DeepSeek Harness 智能体' },
+  { value: 'claude', label: 'Claude', tone: 'violet', desc: 'Claude 智能体' },
+];
+
 export const INSTANCE_KINDS: { value: InstanceKind; label: string; tone: string; desc: string }[] = [
-  { value: 'local', label: '本机 DSH', tone: 'cyan', desc: '由 Ryan 在本机拉起服务代理' },
-  { value: 'remote', label: '远端 DSH', tone: 'violet', desc: '远端需安装 Ryan 通讯插件' },
+  { value: 'local', label: '本机', tone: 'cyan', desc: '由 Ryan 在本机拉起智能体代理' },
+  { value: 'remote', label: '远端', tone: 'violet', desc: '远端需安装 Ryan 通讯插件' },
 ];
 
 export const INSTANCE_STATUSES: { value: InstanceStatus; label: string; tone: string }[] = [

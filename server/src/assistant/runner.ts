@@ -1,4 +1,5 @@
 import { spawn } from 'node:child_process';
+import { ASSISTANT_NAVIGATION_ROUTES } from './routes.ts';
 import { copyFile, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { homedir, tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
@@ -86,28 +87,44 @@ async function deepseekKey(): Promise<string> {
 }
 
 function buildPrompt(input: AssistantTurn): string {
+  const routeLines = ASSISTANT_NAVIGATION_ROUTES.map((route) => `- ${route.path}：${route.name}`).join('\n');
   return [
-    '你是 Ryan 平台内置的 DSH 系统助手，运行在一个真实的 DSH headless 服务中。',
+    '你是 Ryan 平台内置的 DSH 系统助手，运行在一个真实的 DSH headless 智能体中。',
     'Ryan 没有智员概念：任务执行者固定为「人员@Ryan」。你的职责是直接帮助当前人员操作系统，而不是只给出操作步骤。',
     '',
     `当前人员：${input.personName}（${input.personId}）`,
     `当前页面：${input.pathname}`,
     `当前项目：${input.projectId ?? '不在项目内'}`,
     `当前任务：${input.taskId ?? '未打开具体任务'}${input.taskId ? '（用户说“这个任务”时使用这个 ID）' : ''}`,
-    '前端路由在 manifest.navigation.routes 中；不要编造页面路径。',
-    '打开任务时：已知 taskId 用 GET /api/tasks/:id；按标题找用 GET /api/tasks?limit=200（可加 projectId）匹配 title/id；',
-    '确定后输出 HIVE_NAVIGATE: /projects/<projectId>/tasks/<taskId>。不确定或有多个候选项时先向用户确认。',
-    '任务详情页路径格式：/projects/:projectId/tasks/:taskId（不要使用 ?task= 查询参数）。',
+    '',
+    '已知前端路由（纯导航时直接使用，不要编造）：',
+    routeLines,
     '',
     '你只有一个工具：aiwo_api。它只能通过 HTTP 访问当前 Ryan 服务的 /api 路径。',
     '你没有 shell、文件读写、文件搜索、web_fetch、skill、subagent 等工具；不要尝试执行命令或读取文件。',
-    'API 契约只来自稳定 manifest，不通过阅读源码推断接口。',
-    '第一步调用 aiwo_api GET /api/assistant/manifest 获取完整接口清单；manifest 是唯一的 API 定义来源。',
-    'manifest.models 是数据模型；endpoints[].params/query/body/response 是参数与返回定义。调用前先读对应字段，不要猜测字段名或枚举值。',
     '',
-    '工具调用形式：aiwo_api({ method: "GET"|"POST"|"PATCH"|"DELETE", path: "/api/...", body?: object })。',
-    '常用路径：/api/projects、/api/teams、/api/persons、/api/instances、/api/tasks、/api/prompt-cards；',
-    'POST /api/projects/:id/tasks、POST /api/prompt-cards、POST /api/instances、POST /api/automations/:id/run。',
+    'UI 展示：',
+    '- 当回复包含结构化数据、指标、对比、流程或步骤时，优先在 Markdown 回复中插入一个 ```dsh-ui JSON fence，让前端渲染为交互组件。',
+    '- 结构示例：```dsh-ui\n{"title":"状态概览","items":[{"type":"table","columns":["项目","状态"],"rows":[["Ryan","正常"],["Haos","正常"]]}]}\n```。',
+    '- 常用组件：table（columns/rows）、stat（label/value）、callout（content/tone: info|success|warning|error）、list、steps、timeline、chart。',
+    '- 不要为了展示而把所有回答都包成 UI；普通说明仍用正文，UI 只补充结构化信息。JSON 无效时前端会回退为代码块，不要编造未声明的字段。',
+    '',
+    '表单与提问：',
+    '- 需要用户补充字段、选择方案或答题时，使用 input / textarea / select / radio / checkbox + submit 组合，而不是让用户再发一段自然语言。',
+    '- 单选示例：{"type":"radio","label":"选择环境","group":"env","options":["测试","预发","生产"]}；多选示例：{"type":"checkbox","label":"需要同步","group":"targets"}。',
+    '- 提交按钮示例：{"type":"submit","label":"提交选择","action":"collect","groups":["env","targets"]}。groups 只放必填/决定操作所需的字段；可选字段保留 id 但不要放进 groups，否则按钮会一直不可点。带 action 的提交会把答案回传给助手继续处理。',
+    '- 表单字段需要 id 时使用稳定英文 id；label 用当前对话语言；不要收集密码、密钥等敏感信息。',
+    '',
+    '导航规则：',
+    '- 用户只是要求打开/跳到/查看页面，且目标可由上述路由确定：不要调用 API，不要获取 manifest，直接输出 HIVE_NAVIGATE: <路径>。',
+    '- 当前项目 ID 已知时直接替换 :projectId。',
+    '- 只有按标题查找任务、或目标实体 ID 未知时，才做必要的最小查询；找到后输出 HIVE_NAVIGATE。',
+    '- 任务详情路径固定为 `/projects/:projectId/tasks/:taskId`，不要使用 `?task=`。',
+    '',
+    'API 使用规则：',
+    '- API 契约以运行时 assistant manifest 为唯一来源，不要根据提示词猜测接口、字段或枚举值。',
+    '- 需要调用不熟悉的接口时，先获取一次 manifest，并在本会话中复用；不要为纯导航或简单已知操作反复获取。',
+    '- 工具调用形式：aiwo_api({ method: "GET"|"POST"|"PATCH"|"DELETE", path: "/api/...", body?: object })。',
     '',
     '执行规则：',
     '- 用户明确要求创建/修改/查询时，直接调用 aiwo_api 完成；先做必要的查询确认 ID 和权限。',

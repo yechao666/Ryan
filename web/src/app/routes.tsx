@@ -4,7 +4,6 @@ import { useAuth } from '../lib/auth.tsx';
 import { LoginPage } from '../pages/LoginPage.tsx';
 import { DashboardPage } from '../pages/DashboardPage.tsx';
 import { ProjectsPage } from '../pages/ProjectsPage.tsx';
-import { TeamsPage } from '../pages/TeamsPage.tsx';
 import { TeamDetailPage } from '../pages/TeamDetailPage.tsx';
 import { InstancesPage } from '../pages/InstancesPage.tsx';
 import { PromptCardsPage } from '../pages/PromptCardsPage.tsx';
@@ -17,8 +16,15 @@ import { ProjectTaskDetailPage } from '../pages/project/ProjectTaskDetailPage.ts
 import { ProjectActivityPage } from '../pages/project/ProjectActivityPage.tsx';
 import { ProjectAutomationsPage } from '../pages/project/ProjectAutomationsPage.tsx';
 import { ProjectMemoryPage } from '../pages/project/ProjectMemoryPage.tsx';
+import { ProjectRecordsPage } from '../pages/project/ProjectRecordsPage.tsx';
+import { ProjectMembersPage } from '../pages/project/ProjectMembersPage.tsx';
+import { ProjectPromptCardsPage } from '../pages/project/ProjectPromptCardsPage.tsx';
+import { ProjectRetrospectivePage } from '../pages/project/ProjectRetrospectivePage.tsx';
 import { ProjectSettingsPage } from '../pages/project/ProjectSettingsPage.tsx';
 import { ProjectServicesPage } from '../pages/project/ProjectServicesPage.tsx';
+import { ProjectWecomBotPage } from '../pages/project/ProjectWecomBotPage.tsx';
+import { ProjectContextPage } from '../pages/project/ProjectContextPage.tsx';
+import { NotificationsPage } from '../pages/NotificationsPage.tsx';
 import { AccountPage } from '../pages/AccountPage.tsx';
 import { AccountsPage } from '../pages/AccountsPage.tsx';
 import { ChatRecordsPage } from '../pages/ChatRecordsPage.tsx';
@@ -57,16 +63,23 @@ export function AppRoutes() {
           <Route path="activity" element={<ProjectActivityPage />} />
           <Route path="automations" element={<ProjectAutomationsPage />} />
           <Route path="memory" element={<ProjectMemoryPage />} />
+          <Route path="records" element={<ProjectRecordsPage />} />
+          <Route path="members" element={<ProjectMembersPage />} />
+          <Route path="prompt-cards" element={<ProjectPromptCardsPage />} />
+          <Route path="retrospective" element={<ProjectRetrospectivePage />} />
           <Route path="services" element={<ProjectServicesPage />} />
+          <Route path="wecom-bot" element={<ProjectWecomBotPage />} />
+          <Route path="context" element={<ProjectContextPage />} />
           <Route path="settings" element={<ProjectSettingsPage />} />
         </Route>
-        <Route path="/teams" element={<TeamsPage />} />
+        <Route path="/teams" element={<Navigate to="/accounts?tab=teams" replace />} />
         <Route path="/teams/:teamId" element={<TeamDetailPage />} />
         <Route path="/instances" element={<InstancesPage />} />
         <Route path="/prompt-cards" element={<PromptCardsPage />} />
         <Route path="/account" element={<AccountPage />} />
         <Route path="/accounts" element={<AccountsPage />} />
         <Route path="/chats" element={<ChatRecordsPage />} />
+        <Route path="/notifications" element={<NotificationsPage />} />
         <Route path="/settings" element={<SettingsPage />} />
         <Route path="/tasks" element={<TasksPage />} />
         <Route path="*" element={<Navigate to="/" replace />} />

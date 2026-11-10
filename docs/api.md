@@ -29,7 +29,7 @@ Base URL: `http://127.0.0.1:4500`。控制台使用会话 Bearer token；服务�
 
 scope：`org | team | project | person`；person 级卡片仅指定人员可引用；category：`workflow | style | standard | role | other`。
 
-## DSH 服务资源
+## 智能体资源
 
 | Method | Path | 说明 |
 | --- | --- | --- |
@@ -38,7 +38,7 @@ scope：`org | team | project | person`；person 级卡片仅指定人员可引�
 | PATCH | `/api/instances/:id` | 名称/host/端口/Base URL |
 | DELETE | `/api/instances/:id` | 软删除服务 |
 | POST | `/api/instances/:id/restore` | 恢复已删除服务并重新签发 token |
-| GET | `/api/projects/:id/services` | 项目绑定的 DSH 服务 |
+| GET | `/api/projects/:id/services` | 项目绑定的 智能体 |
 | GET | `/api/projects/:id/services/:serviceId/workspace?path=` | 项目在该服务上的工作目录与文件列表 |
 | GET | `/api/projects/:id/services/:serviceId/file?path=` | 预览工作区文件（本机服务） |
 | PATCH | `/api/projects/:id/services` | `{serviceIds:string[]}` 设置项目绑定服务 |
@@ -50,7 +50,7 @@ scope：`org | team | project | person`；person 级卡片仅指定人员可引�
 创建示例：
 
 ```json
-{"name":"远端 DSH 服务","kind":"remote","host":"192.168.1.50","port":4501}
+{"name":"远端 智能体","kind":"remote","host":"192.168.1.50","port":4501}
 ```
 
 服务插件安装：
@@ -126,8 +126,9 @@ Ryan 任务执行者固定为「创建人@Ryan」；任务不支持对话，只�
 | Method | Path | 说明 |
 | --- | --- | --- |
 | GET | `/api/auth/providers` | 登录页可用的统一认证源 |
-| GET | `/api/auth/sso/:slug/start?returnTo=` | 发起 OIDC 登录 |
-| GET | `/api/auth/sso/:slug/callback` | OIDC 回调，成功后重定向 `/login#token=...` |
+| GET | `/api/auth/sso/:slug/start?returnTo=` | 发起认证：OIDC 或企业微信网页授权 |
+| GET | `/api/auth/sso/:slug/qr` | 获取企业微信扫码登录面板配置（仅 wecom） |
+| GET | `/api/auth/sso/:slug/callback` | 认证回调，成功后重定向 `/login#token=...` |
 | GET | `/api/account` | 当前人员资料、密码状态、已绑定身份 |
 | PATCH | `/api/account` | `{name?,title?}` 更新账号资料 |
 | POST | `/api/account/password` | `{currentPassword?,newPassword}` 设置/修改本地密码 |
@@ -137,7 +138,7 @@ Ryan 任务执行者固定为「创建人@Ryan」；任务不支持对话，只�
 | POST | `/api/account/sso/:providerId/start` | 绑定统一认证，返回授权 URL |
 | DELETE | `/api/account/identities/:id` | 解绑统一认证 |
 | GET | `/api/settings/auth-providers` | 管理员查看认证源（Secret 不回显） |
-| POST | `/api/settings/auth-providers` | 添加 OIDC 认证源 |
+| POST | `/api/settings/auth-providers` | 添加 OIDC / 企业微信认证源 |
 | PATCH | `/api/settings/auth-providers/:id` | 修改/启停认证源 |
 | DELETE | `/api/settings/auth-providers/:id` | 删除认证源 |
 | GET | `/api/settings/accounts` | 管理员查看人员账号 |
@@ -145,11 +146,24 @@ Ryan 任务执行者固定为「创建人@Ryan」；任务不支持对话，只�
 | PATCH | `/api/settings/accounts/:id` | 管理员维护资料/管理员权限/重置密码 |
 | DELETE | `/api/settings/accounts/:id` | 管理员删除账号（不能自删、删最后一个管理员或项目所有者） |
 
-统一认证使用 OIDC authorization code + PKCE；redirect URI 为：
+OIDC 使用 authorization code + PKCE；企业微信使用 Corp ID + Agent ID + Secret 发起网页授权。两类认证源共用回调地址：
 
 ```text
 <AIWO_PUBLIC_URL>/api/auth/sso/<slug>/callback
 ```
+
+| GET | `/api/mentions` | 人员 + 智能体统一 @ 候选 |
+| GET | `/api/projects/:id/context-items` | 项目背景条目 |
+| POST | `/api/projects/:id/context-items` | 新增项目背景 |
+| PATCH | `/api/projects/:id/context-items/:itemId` | 修改/排序项目背景 |
+| DELETE | `/api/projects/:id/context-items/:itemId` | 删除项目背景 |
+| GET | `/api/notifications` | 当前人员通知 |
+| POST | `/api/notifications/:id/read` | 标记通知已读 |
+| POST | `/api/notifications/read-all` | 全部标记已读 |
+| GET | `/api/projects/:id/wecom-bot` | 查项目企业微信机器人 |
+| POST | `/api/projects/:id/wecom-bot/register/start` | 生成项目机器人扫码二维码 |
+| GET | `/api/projects/:id/wecom-bot/register/:attemptId` | 轮询扫码注册状态 |
+| DELETE | `/api/projects/:id/wecom-bot` | 解除项目机器人绑定 |
 
 ## 系统设置 / 安全检查
 
@@ -159,7 +173,7 @@ Ryan 任务执行者固定为「创建人@Ryan」；任务不支持对话，只�
 | PATCH | `/api/settings/security` | `{enabled,endpoint,model,apiKey,timeoutMs,blockMessage}`；endpoint 为空即关闭 |
 | POST | `/api/settings/security/test` | 测试安全模型连通性 |
 | PATCH | `/api/settings/assistant` | `{enabled,instanceId,model}` |
-| PATCH | `/api/settings/default-service` | `{serviceId:string|null}` 设置/取消默认 DSH 服务 |
+| PATCH | `/api/settings/default-service` | `{serviceId:string|null}` 设置/取消默认 智能体 |
 
 ## 助手
 

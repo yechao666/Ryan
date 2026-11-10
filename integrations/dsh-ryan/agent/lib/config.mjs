@@ -107,7 +107,7 @@ function readCli(argv) {
 }
 
 export function usage() {
-  return `Ryan DSH 服务代理 v${PLUGIN_VERSION}
+  return `Ryan 智能体代理 v${PLUGIN_VERSION}
 
 用法：
   node agent.mjs --base <Ryan URL> --token <服务 token> [options]

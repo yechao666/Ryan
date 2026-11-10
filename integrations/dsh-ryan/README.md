@@ -1,6 +1,6 @@
 # dsh-ryan
 
-把当前 **DSH 实例**接入 Ryan：用 Ryan 账号自己创建的 API Key 注册为 DSH 服务，
+把当前 **DSH 实例**接入 Ryan：用 Ryan 账号自己创建的 API Key 注册为 智能体，
 自动心跳、领取任务并用 DSH headless/ACP 执行。
 
 ## 安装

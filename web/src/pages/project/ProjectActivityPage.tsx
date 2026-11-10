@@ -99,7 +99,7 @@ export function ProjectActivityPage() {
     <div className="ws-page">
       <PageHead
         title="实时活动"
-        desc="任务、服务与项目事件的实时流；新事件会自动插入顶部。"
+        desc="任务、智能体与项目事件的实时流；新事件会自动插入顶部。"
         actions={
           <div className="hstack gap-8">
             <span className="ws-live-state">
@@ -155,7 +155,7 @@ export function ProjectActivityPage() {
               showTaskLink
               projectId={projectId}
               emptyTitle={filter === 'all' ? '暂无活动' : '该类型暂无活动'}
-              emptyDescription="任务创建、服务接单、服务上下线等事件会实时出现在这里。"
+              emptyDescription="任务创建、智能体接单、智能体上下线等事件会实时出现在这里。"
             />
           </div>
           <div className="ws-activity-footbar">

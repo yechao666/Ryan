@@ -18,15 +18,15 @@ const NAV_GROUPS: { label: string; items: NavItem[] }[] = [
       { to: '/', label: '概览', icon: 'dashboard', end: true },
       { to: '/projects', label: '项目', icon: 'folder' },
       { to: '/tasks', label: '任务', icon: 'list' },
-      { to: '/teams', label: '团队', icon: 'users' },
       { to: '/prompt-cards', label: '提示卡', icon: 'book' },
     ],
   },
   {
     label: '系统',
     items: [
-      { to: '/instances', label: 'DSH 服务', icon: 'server' },
+      { to: '/instances', label: '智能体', icon: 'server' },
       { to: '/chats', label: '聊天记录', icon: 'terminal' },
+      { to: '/notifications', label: '通知', icon: 'activity' },
       { to: '/settings', label: '系统设置', icon: 'settings' },
     ],
   },
@@ -38,8 +38,8 @@ export function Shell() {
   const activeProject = location.pathname.match(/^\/projects\/([^/]+)/)?.[1];
   const navGroups = NAV_GROUPS.map((group) => ({
     ...group,
-    items: group.label === '系统' && person?.isAdmin
-      ? [...group.items, { to: '/accounts', label: '账号管理', icon: 'users' as IconName }]
+    items: group.label === '系统'
+      ? [...group.items, { to: '/accounts', label: person?.isAdmin ? '账号管理' : '人员与团队', icon: 'users' as IconName }]
       : group.items,
   }));
 
@@ -75,7 +75,7 @@ export function Shell() {
         </nav>
         <div className="sidebar-hint">
           <div className="sidebar-hint__title">工作方式</div>
-          <p>人员 @Ryan 创建项目与任务，提示卡定义工作方式，DSH 服务负责执行；安全检查组拦截高风险输入。</p>
+          <p>人员 @Ryan 创建项目与任务，提示卡定义工作方式，智能体负责执行；安全检查组拦截高风险输入。</p>
         </div>
         <div className="sidebar-footer">
           <div className="sidebar-account-label">账户</div>
@@ -92,7 +92,7 @@ export function Shell() {
             </button>
           </div>
           <div className="sidebar-status">
-            <Dot tone="green" pulse /> 服务正常
+            <Dot tone="green" pulse />系统正常
             <Badge tone="slate">v{APP_VERSION}</Badge>
           </div>
         </div>

@@ -29,6 +29,18 @@ export function migrate(db: Db): void {
     db.exec('ALTER TABLE projects ADD COLUMN workspace_path TEXT');
   }
   const taskColumns = db.prepare('PRAGMA table_info(work_items)').all() as unknown as { name: string }[];
+  if (!taskColumns.some((column) => column.name === 'handoff_person_id')) {
+    db.exec('ALTER TABLE work_items ADD COLUMN handoff_person_id TEXT REFERENCES persons(id) ON DELETE SET NULL');
+  }
+  if (!taskColumns.some((column) => column.name === 'handoff_prompt_card_ids')) {
+    db.exec("ALTER TABLE work_items ADD COLUMN handoff_prompt_card_ids TEXT NOT NULL DEFAULT '[]'");
+  }
+  if (!taskColumns.some((column) => column.name === 'handoff_note')) {
+    db.exec("ALTER TABLE work_items ADD COLUMN handoff_note TEXT NOT NULL DEFAULT ''");
+  }
+  if (!taskColumns.some((column) => column.name === 'notify_person_ids')) {
+    db.exec("ALTER TABLE work_items ADD COLUMN notify_person_ids TEXT NOT NULL DEFAULT '[]'");
+  }
   if (!taskColumns.some((column) => column.name === 'allowed_service_ids')) {
     db.exec("ALTER TABLE work_items ADD COLUMN allowed_service_ids TEXT NOT NULL DEFAULT '[]'");
   }
@@ -37,10 +49,19 @@ export function migrate(db: Db): void {
     db.exec('ALTER TABLE persons ADD COLUMN password_set INTEGER NOT NULL DEFAULT 1');
   }
   const instanceColumns = db.prepare('PRAGMA table_info(dsh_instances)').all() as unknown as { name: string }[];
+  if (!instanceColumns.some((column) => column.name === 'capabilities')) {
+    db.exec("ALTER TABLE dsh_instances ADD COLUMN capabilities TEXT NOT NULL DEFAULT '[]'");
+  }
+  if (!instanceColumns.some((column) => column.name === 'agent_type')) {
+    db.exec("ALTER TABLE dsh_instances ADD COLUMN agent_type TEXT NOT NULL DEFAULT 'dsh'");
+  }
   if (!instanceColumns.some((column) => column.name === 'workspace_root')) {
     db.exec("ALTER TABLE dsh_instances ADD COLUMN workspace_root TEXT NOT NULL DEFAULT ''");
   }
   const cardColumns = db.prepare('PRAGMA table_info(prompt_cards)').all() as unknown as { name: string }[];
+  if (!cardColumns.some((column) => column.name === 'auto_inject')) {
+    db.exec('ALTER TABLE prompt_cards ADD COLUMN auto_inject INTEGER NOT NULL DEFAULT 0');
+  }
   if (!cardColumns.some((column) => column.name === 'person_id')) {
     db.exec('ALTER TABLE prompt_cards ADD COLUMN person_id TEXT');
   }
@@ -53,6 +74,21 @@ export function migrate(db: Db): void {
   }
   if (!projectColumns.some((column) => column.name === 'memory_dream_last_at')) {
     db.exec('ALTER TABLE projects ADD COLUMN memory_dream_last_at TEXT');
+  }
+  if (!projectColumns.some((column) => column.name === 'reports_enabled')) {
+    db.exec('ALTER TABLE projects ADD COLUMN reports_enabled INTEGER NOT NULL DEFAULT 1');
+  }
+  if (!projectColumns.some((column) => column.name === 'weekly_report_day')) {
+    db.exec('ALTER TABLE projects ADD COLUMN weekly_report_day INTEGER NOT NULL DEFAULT 5');
+  }
+  if (!projectColumns.some((column) => column.name === 'weekly_report_time')) {
+    db.exec("ALTER TABLE projects ADD COLUMN weekly_report_time TEXT NOT NULL DEFAULT '17:00'");
+  }
+  if (!projectColumns.some((column) => column.name === 'monthly_report_day')) {
+    db.exec('ALTER TABLE projects ADD COLUMN monthly_report_day INTEGER NOT NULL DEFAULT 1');
+  }
+  if (!projectColumns.some((column) => column.name === 'monthly_report_time')) {
+    db.exec("ALTER TABLE projects ADD COLUMN monthly_report_time TEXT NOT NULL DEFAULT '09:00'");
   }
   if (!projectColumns.some((column) => column.name === 'memory_brief_max_chars')) {
     db.exec('ALTER TABLE projects ADD COLUMN memory_brief_max_chars INTEGER NOT NULL DEFAULT 500');

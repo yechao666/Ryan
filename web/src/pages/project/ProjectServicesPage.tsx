@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { DshInstance } from '@shared';
-import { INSTANCE_STATUSES } from '@shared';
+import { AGENT_TYPES, INSTANCE_STATUSES } from '@shared';
 import { api } from '@lib/api.ts';
 import { useAsync } from '@lib/hooks.ts';
 import {
@@ -22,7 +22,12 @@ import {
 import { useProject } from '../ProjectLayout.tsx';
 import { ProjectWorkspaceBrowser } from '../../components/project/ProjectWorkspaceBrowser.tsx';
 
-/** 项目服务资源：显式添加/解除绑定的 DSH 服务。 */
+/** 项目智能体资源：显式添加/解除绑定的智能体。 */
+function AgentTypeBadge({ type }: { type: string }) {
+  const meta = AGENT_TYPES.find((item) => item.value === type) ?? AGENT_TYPES[0];
+  return <Badge tone={meta.tone as Tone} size="sm">{meta.label}</Badge>;
+}
+
 export function ProjectServicesPage() {
   const { detail, reload } = useProject();
   const projectId = detail.project.id;
@@ -56,7 +61,7 @@ export function ProjectServicesPage() {
       toast.success(message);
       await reload();
     } catch (cause) {
-      toast.error(cause instanceof Error ? cause.message : '保存项目服务绑定失败');
+      toast.error(cause instanceof Error ? cause.message : '保存项目智能体绑定失败');
     } finally {
       setSaving(false);
     }
@@ -69,30 +74,30 @@ export function ProjectServicesPage() {
 
   const addSelected = async () => {
     if (selected.length === 0) return;
-    await save([...serviceIds, ...selected], `已添加 ${selected.length} 个服务`);
+    await save([...serviceIds, ...selected], `已添加 ${selected.length} 个智能体`);
     setAddOpen(false);
   };
 
   return (
     <div className="ws-page">
       <PageHead
-        title="项目 DSH 服务"
-        desc="绑定到本项目的 DSH 服务；本项目的任务只会在绑定服务之间公平调度。不绑定则使用共享服务池。"
+        title="项目智能体"
+        desc="绑定到本项目的智能体资源；项目是跨智能体共享信息区，每个智能体在各自工作区执行任务，共享项目背景、记忆与记录。"
         actions={
           <Button variant="primary" icon="plus" disabled={unbound.length === 0} onClick={openAdd}>
-            添加服务
+            添加智能体
           </Button>
         }
       />
 
       <div className="kpi-grid">
         <Card className="card-pad">
-          <div className="pm-label">已绑定服务</div>
+          <div className="pm-label">已绑定智能体</div>
           <div className="pm-value">{serviceIds.length}</div>
           <div className="card-sub">项目任务调度范围</div>
         </Card>
         <Card className="card-pad">
-          <div className="pm-label">在线服务</div>
+          <div className="pm-label">在线智能体</div>
           <div className="pm-value">{online} / {bound.length}</div>
           <div className="card-sub">可参与公平调度</div>
         </Card>
@@ -103,13 +108,13 @@ export function ProjectServicesPage() {
           title={
             <>
               <Icon name="server" size={14} />
-              已绑定服务
+              已绑定智能体
             </>
           }
-          desc="项目任务默认在这些服务之间按项目轮询公平分配；每个服务都可以解除绑定。"
+          desc="项目任务默认在这些智能体之间按项目轮询公平分配；每个智能体都可以解除绑定。"
           actions={
             <Button size="sm" variant="outline" icon="plus" disabled={unbound.length === 0} onClick={openAdd}>
-              添加服务
+              添加智能体
             </Button>
           }
         />
@@ -122,9 +127,9 @@ export function ProjectServicesPage() {
         ) : bound.length === 0 ? (
           <EmptyState
             icon="server"
-            title="尚未绑定 DSH 服务"
-            description="绑定服务后，项目任务只在绑定服务间调度；不绑定则使用默认服务或共享池。"
-            action={<Button size="sm" variant="primary" icon="plus" onClick={openAdd}>添加服务</Button>}
+            title="尚未绑定智能体"
+            description="绑定智能体后，项目任务只在绑定智能体间调度；不绑定则使用默认智能体或共享池。"
+            action={<Button size="sm" variant="primary" icon="plus" onClick={openAdd}>添加智能体</Button>}
             compact
           />
         ) : (
@@ -152,6 +157,7 @@ export function ProjectServicesPage() {
                       {service.currentTask ? ` · 正在执行：${service.currentTask.title}` : ' · 空闲'}
                     </span>
                   </div>
+                  <AgentTypeBadge type={service.agentType} />
                   <Badge tone={status.tone as Tone} size="sm" dot>{status.label}</Badge>
                   <Button
                     size="sm"
@@ -179,19 +185,19 @@ export function ProjectServicesPage() {
 
       {serviceIds.length === 0 ? (
         <Callout tone="amber" icon="info">
-          当前项目未绑定服务：{defaultService ? `任务将使用默认服务「${defaultService.name}」` : '任务会进入共享服务池，由任意在线服务领取'}。
+          当前项目未绑定智能体：{defaultService ? `任务将使用默认智能体「${defaultService.name}」` : '任务会进入共享智能体池，由任意在线智能体领取'}。
         </Callout>
       ) : (
         <Callout tone="cyan" icon="info">
-          已绑定 {serviceIds.length} 个服务。任务创建时默认在这些服务之间按项目轮询公平分配；也可在新建任务时限定一个或多个服务。
+          已绑定 {serviceIds.length} 个智能体。任务创建时默认在这些智能体之间按项目轮询公平分配；也可在新建任务时限定一个或多个智能体。
         </Callout>
       )}
 
       <Modal
         open={addOpen}
         onClose={() => setAddOpen(false)}
-        title="添加 DSH 服务"
-        description="选择要绑定到本项目的 DSH 服务。已绑定的服务不会出现在这里。"
+        title="添加智能体"
+        description="选择要绑定到本项目的智能体。已绑定的智能体不会出现在这里。"
         footer={
           <>
             <Button variant="ghost" onClick={() => setAddOpen(false)}>取消</Button>
@@ -209,7 +215,7 @@ export function ProjectServicesPage() {
       >
         {unbound.length === 0 ? (
           <Callout tone="amber" icon="info">
-            没有可添加的服务。请先在「服务」页新增 DSH 服务。
+            没有可添加的智能体。请先在「智能体」页新增智能体。
           </Callout>
         ) : (
           <div className="stack" style={{ gap: 8 }}>
@@ -229,6 +235,7 @@ export function ProjectServicesPage() {
                       </span>
                     }
                   />
+                  <AgentTypeBadge type={service.agentType} />
                   <Badge tone={status.tone as Tone} size="sm" dot>{status.label}</Badge>
                 </div>
               );

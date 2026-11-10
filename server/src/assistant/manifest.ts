@@ -16,6 +16,8 @@ const obj = (description: string, properties: Record<string, Field>, required: s
 });
 const id = (description: string) => s(description, { example: 'prj_calc' });
 
+import { ASSISTANT_NAVIGATION_ROUTES } from './routes.ts';
+
 const models = {
   Person: obj('人员即账号。', {
     id: id('人员 ID'), name: s('姓名'), email: s('登录邮箱'), title: s('职位/角色'),
@@ -37,7 +39,7 @@ const models = {
     ownerTeamId: s('归属团队 ID'), ownerTeamName: s('归属团队名'), ownerPersonId: s('负责人 ID'), ownerPersonName: s('负责人姓名'),
     visibility: enumField('可见性', ['private', 'team', 'public']), type: enumField('项目类型', ['manual', 'github', 'gitlab', 'local']),
     prompt: s('项目级提示词/背景说明'), repoUrl: s('代码仓库地址'), status: enumField('项目状态', ['active', 'archived']),
-    serviceIds: arr('绑定 DSH 服务 ID', s('服务 ID')), serviceNames: arr('绑定 DSH 服务名', s('服务名')),
+    serviceIds: arr('绑定 智能体 ID', s('智能体 ID')), serviceNames: arr('绑定 智能体名', s('智能体名')),
     memoryAgentId: s('项目记忆身份'), createdAt: s('创建时间'), updatedAt: s('更新时间'),
   }, ['id', 'slug', 'name', 'ownerPersonId', 'visibility', 'type', 'status', 'createdAt', 'updatedAt']),
   ProjectMember: obj('项目成员。', {
@@ -51,16 +53,16 @@ const models = {
     source: enumField('任务来源', ['human', 'automation', 'webhook', 'api', 'seed']),
     priority: n('优先级，越大越优先'), executorPersonId: s('执行人 ID'), executorLabel: s('展示执行者，如 林薇@Ryan'),
     promptCardIds: arr('引用提示卡 ID', s('提示卡 ID')), promptCards: arr('引用提示卡摘要', obj('提示卡摘要', { id: s('提示卡 ID'), name: s('名称'), category: s('类别') })),
-    instanceId: s('指定 DSH 服务 ID'), instanceName: s('指定服务名'), allowedServiceIds: arr('允许的服务 ID', s('服务 ID')),
+    instanceId: s('指定 智能体 ID'), instanceName: s('指定智能体名'), allowedServiceIds: arr('允许的智能体 ID', s('智能体 ID')),
     createdBy: s('创建人 ID'), createdByName: s('创建人姓名'), createdAt: s('创建时间'), startedAt: s('开始时间'), finishedAt: s('结束时间'),
     result: s('任务结果'), error: s('错误信息'), messageCount: n('对话消息数'), lastMessageAt: s('最近消息时间'),
   }, ['id', 'projectId', 'title', 'prompt', 'status', 'type', 'source', 'executorLabel', 'createdAt']),
   TaskEvent: obj('任务事件。', {
-    id: s('事件 ID'), taskId: s('任务 ID'), projectId: s('项目 ID'), instanceId: s('服务 ID'),
+    id: s('事件 ID'), taskId: s('任务 ID'), projectId: s('项目 ID'), instanceId: s('智能体 ID'),
     type: s('事件类型'), message: s('事件摘要'), payload: f('object', '事件附加数据'), createdAt: s('发生时间'),
   }, ['id', 'taskId', 'projectId', 'type', 'message', 'createdAt']),
-  Instance: obj('DSH 服务；共享调度资源。', {
-    id: id('服务 ID'), name: s('服务名'), kind: enumField('类型', ['local', 'remote']), host: s('主机名/IP'),
+  Instance: obj('智能体；共享调度资源。', {
+    id: id('智能体 ID'), name: s('智能体名'), agentType: enumField('智能体类型', ['dsh', 'claude']), kind: enumField('接入方式', ['local', 'remote']), host: s('主机名/IP'),
     port: n('端口'), baseUrl: s('外部访问 URL'), version: s('DSH 版本'), pluginVersion: s('插件版本'),
     status: enumField('状态', ['online', 'offline', 'unconfigured', 'error', 'revoked']),
     lastSeenAt: s('最后心跳'), registeredAt: s('注册时间'), revokedAt: s('删除时间'), hasToken: b('是否已签发 token'),
@@ -70,14 +72,14 @@ const models = {
     id: id('提示卡 ID'), name: s('名称'), category: enumField('类别', ['workflow', 'style', 'standard', 'role', 'other']),
     description: s('说明'), content: s('提示内容'), scope: enumField('范围', ['org', 'team', 'project', 'person']),
     projectId: s('项目 ID'), projectName: s('项目名'), teamId: s('团队 ID'), teamName: s('团队名'),
-    personId: s('个人范围人员 ID'), personName: s('个人范围人员名'), enabled: b('是否启用'),
+    personId: s('个人范围人员 ID'), personName: s('个人范围人员名'), enabled: b('是否启用'), autoInject: b('是否自动注入到该范围的所有任务'),
     createdBy: s('创建人 ID'), createdByName: s('创建人姓名'), createdAt: s('创建时间'), updatedAt: s('更新时间'),
   }, ['id', 'name', 'category', 'content', 'scope', 'enabled', 'createdAt', 'updatedAt']),
   Automation: obj('自动化规则。', {
     id: id('自动化 ID'), projectId: s('项目 ID'), projectName: s('项目名'), name: s('名称'),
     triggerType: enumField('触发类型', ['manual', 'webhook', 'cron']),
     triggerConfig: obj('触发配置', { events: arr('Webhook 事件', s('事件')), branch: s('分支'), schedule: s('cron 表达式'), secret: s('签名密钥') }),
-    promptTemplate: s('任务提示词模板'), promptCardIds: arr('提示卡 ID', s('提示卡 ID')), instanceId: s('指定服务 ID'),
+    promptTemplate: s('任务提示词模板'), promptCardIds: arr('提示卡 ID', s('提示卡 ID')), instanceId: s('指定智能体 ID'),
     enabled: b('是否启用'), createdBy: s('创建人 ID'), createdByName: s('创建人姓名'), createdAt: s('创建时间'), lastRunAt: s('最近运行时间'), lastRunStatus: s('最近运行状态'),
   }, ['id', 'projectId', 'name', 'triggerType', 'promptTemplate', 'enabled']),
   Conversation: obj('聊天记录摘要。只能访问当前账号自己的会话。', {
@@ -107,7 +109,7 @@ const base: Endpoint[] = [
   { method: 'GET', path: '/api/account/api-keys', summary: '当前账号的 API Key 列表' },
   { method: 'POST', path: '/api/account/api-keys', summary: '创建用户 API Key（仅返回一次明文）' },
   { method: 'DELETE', path: '/api/account/api-keys/:id', summary: '吊销用户 API Key' },
-  { method: 'POST', path: '/api/runtime/instances/register-key', summary: 'DSH 插件用用户 API Key 注册服务，返回一次性服务 token' },
+  { method: 'POST', path: '/api/runtime/instances/register-key', summary: 'DSH 插件用用户 API Key 注册智能体，返回一次性智能体 token' },
   { method: 'POST', path: '/api/account/password', summary: '设置或修改本地密码' },
   { method: 'POST', path: '/api/account/sso/:providerId/start', summary: '发起统一认证绑定' },
   { method: 'DELETE', path: '/api/account/identities/:id', summary: '解除统一认证绑定' },
@@ -126,21 +128,21 @@ const base: Endpoint[] = [
   { method: 'POST', path: '/api/projects', summary: '创建项目' },
   { method: 'GET', path: '/api/projects/:id', summary: '项目详情与成员' },
   { method: 'PATCH', path: '/api/projects/:id', summary: '更新项目' },
-  { method: 'GET', path: '/api/projects/:id/services', summary: '项目绑定的 DSH 服务' },
-  { method: 'PATCH', path: '/api/projects/:id/services', summary: '更新项目绑定的 DSH 服务' },
+  { method: 'GET', path: '/api/projects/:id/services', summary: '项目绑定的 智能体' },
+  { method: 'PATCH', path: '/api/projects/:id/services', summary: '更新项目绑定的 智能体' },
   { method: 'GET', path: '/api/projects/:id/prompt-cards', summary: '项目可引用提示卡' },
-  { method: 'GET', path: '/api/projects/:id/services/:serviceId/workspace', summary: '项目在该 DSH 服务上的工作目录与文件列表' },
+  { method: 'GET', path: '/api/projects/:id/services/:serviceId/workspace', summary: '项目在该 智能体上的工作目录与文件列表' },
   { method: 'GET', path: '/api/projects/:id/services/:serviceId/file', summary: '预览项目工作区文件' },
   { method: 'GET', path: '/api/prompt-cards', summary: '提示卡列表' },
   { method: 'POST', path: '/api/prompt-cards', summary: '创建提示卡' },
-  { method: 'GET', path: '/api/instances', summary: 'DSH 服务列表（共享调度资源，不绑定项目）' },
-  { method: 'POST', path: '/api/instances', summary: '创建 DSH 服务并返回一次性 token 与服务代理安装命令' },
-  { method: 'POST', path: '/api/instances/:id/test', summary: '测试服务心跳' },
-  { method: 'POST', path: '/api/instances/:id/start', summary: '启动本机服务代理' },
-  { method: 'POST', path: '/api/instances/:id/token', summary: '轮换服务 token' },
-  { method: 'PATCH', path: '/api/instances/:id', summary: '编辑 DSH 服务名称、类型与连接信息' },
-  { method: 'DELETE', path: '/api/instances/:id', summary: '删除 DSH 服务（软删除，可在 revoked 状态恢复）' },
-  { method: 'POST', path: '/api/instances/:id/restore', summary: '恢复已删除 DSH 服务并重新签发 token' },
+  { method: 'GET', path: '/api/instances', summary: '智能体列表（共享调度资源，不绑定项目）' },
+  { method: 'POST', path: '/api/instances', summary: '创建 智能体并返回一次性 token 与智能体代理安装命令' },
+  { method: 'POST', path: '/api/instances/:id/test', summary: '测试智能体心跳' },
+  { method: 'POST', path: '/api/instances/:id/start', summary: '启动本机智能体代理' },
+  { method: 'POST', path: '/api/instances/:id/token', summary: '轮换智能体 token' },
+  { method: 'PATCH', path: '/api/instances/:id', summary: '编辑 智能体名称、类型与连接信息' },
+  { method: 'DELETE', path: '/api/instances/:id', summary: '删除 智能体（软删除，可在 revoked 状态恢复）' },
+  { method: 'POST', path: '/api/instances/:id/restore', summary: '恢复已删除 智能体并重新签发 token' },
   { method: 'GET', path: '/api/tasks', summary: '任务列表' },
   { method: 'POST', path: '/api/projects/:id/tasks', summary: '创建任务；执行者由服务端固定为创建人@Ryan' },
   { method: 'GET', path: '/api/tasks/:id', summary: '任务详情、事件与记忆配置' },
@@ -167,7 +169,7 @@ const details: Record<string, Partial<Endpoint>> = {
   'PATCH /api/account': { body: { name: s('姓名'), title: s('职位/角色') }, response: ref('Person') },
   'POST /api/account/api-keys': { body: { name: s('密钥名称，默认 DSH 插件') }, response: obj('创建结果（key 只返回一次）', { id: s('密钥 ID'), name: s('名称'), key: s('明文 API Key，ryan_ak_ 开头'), createdAt: s('创建时间') }) },
   'POST /api/account/password': { body: { currentPassword: s('当前密码；首次设置本地密码时省略'), newPassword: s('新密码，至少 8 位') }, response: obj('结果', { ok: b('是否成功') }) },
-  'POST /api/runtime/instances/register-key': { body: { instanceId: s('已有服务 ID；首次注册省略'), name: s('服务名', { required: true }), kind: enumField('类型', ['local', 'remote']), host: s('主机名'), workspacePath: s('项目工作区路径'), workspaceRoot: s('工作区根目录'), pluginVersion: s('插件版本') }, response: obj('注册结果', { instance: ref('Instance'), token: s('一次性服务 token；后续 heartbeat/claim 使用') }) },
+  'POST /api/runtime/instances/register-key': { body: { instanceId: s('已有智能体 ID；首次注册省略'), name: s('智能体名', { required: true }), agentType: enumField('智能体类型', ['dsh', 'claude']), kind: enumField('接入方式', ['local', 'remote']), host: s('主机名'), workspacePath: s('项目工作区路径'), workspaceRoot: s('工作区根目录'), pluginVersion: s('插件版本') }, response: obj('注册结果', { instance: ref('Instance'), token: s('一次性智能体 token；后续 heartbeat/claim 使用') }) },
   'GET /api/persons': { query: { limit: n('最多返回数量') }, response: arr('人员列表', ref('Person')) },
   'GET /api/teams': { response: arr('团队列表', ref('Team')) },
   'GET /api/projects': { query: { visibility: enumField('按可见性筛选', ['private', 'team', 'public']), q: s('按名称搜索') }, response: arr('项目列表', ref('Project')) },
@@ -175,36 +177,36 @@ const details: Record<string, Partial<Endpoint>> = {
   'GET /api/projects/:id': { params: { id: id('项目 ID') }, response: obj('项目详情', { project: ref('Project'), members: arr('成员', ref('ProjectMember')), counts: f('object', '统计') }) },
   'PATCH /api/projects/:id': { params: { id: id('项目 ID') }, body: { name: s('项目名'), description: s('说明'), visibility: enumField('可见性', ['private', 'team', 'public']), prompt: s('项目背景/规范'), ownerTeamId: s('归属团队 ID') }, response: ref('Project') },
   'GET /api/projects/:id/prompt-cards': { params: { id: id('项目 ID') }, response: arr('可用提示卡', ref('PromptCard')) },
-  'GET /api/projects/:id/services/:serviceId/workspace': { params: { id: id('项目 ID'), serviceId: id('DSH 服务 ID') }, query: { path: s('相对项目工作区路径；空表示根目录') }, response: obj('工作区列表', { projectId: s('项目 ID'), serviceId: s('服务 ID'), workspaceRoot: s('绝对工作区路径'), available: b('是否可在线浏览'), entries: arr('目录条目', ref('WorkspaceEntry')), reason: s('不可浏览原因') }) },
-  'GET /api/projects/:id/services/:serviceId/file': { params: { id: id('项目 ID'), serviceId: id('DSH 服务 ID') }, query: { path: s('相对文件路径', { required: true }) }, response: obj('文件预览', { path: s('路径'), name: s('文件名'), size: n('大小'), binary: b('是否二进制'), truncated: b('是否截断'), content: s('文本内容'), dataUrl: s('图片 Data URL') }) },
+  'GET /api/projects/:id/services/:serviceId/workspace': { params: { id: id('项目 ID'), serviceId: id('智能体 ID') }, query: { path: s('相对项目工作区路径；空表示根目录') }, response: obj('工作区列表', { projectId: s('项目 ID'), serviceId: s('智能体 ID'), workspaceRoot: s('绝对工作区路径'), available: b('是否可在线浏览'), entries: arr('目录条目', ref('WorkspaceEntry')), reason: s('不可浏览原因') }) },
+  'GET /api/projects/:id/services/:serviceId/file': { params: { id: id('项目 ID'), serviceId: id('智能体 ID') }, query: { path: s('相对文件路径', { required: true }) }, response: obj('文件预览', { path: s('路径'), name: s('文件名'), size: n('大小'), binary: b('是否二进制'), truncated: b('是否截断'), content: s('文本内容'), dataUrl: s('图片 Data URL') }) },
   'GET /api/prompt-cards': { query: { category: enumField('类别', ['workflow', 'style', 'standard', 'role', 'other']), projectId: s('项目 ID') }, response: arr('提示卡列表', ref('PromptCard')) },
-  'POST /api/prompt-cards': { body: { name: s('名称', { required: true }), content: s('内容', { required: true }), category: enumField('类别', ['workflow', 'style', 'standard', 'role', 'other']), description: s('说明'), scope: enumField('范围', ['org', 'team', 'project', 'person']), projectId: s('项目 ID'), teamId: s('团队 ID'), enabled: b('是否启用') }, response: ref('PromptCard') },
-  'GET /api/instances': { response: arr('服务列表', ref('Instance')) },
-  'POST /api/instances': { body: { name: s('服务名', { required: true }), kind: enumField('类型', ['local', 'remote']), host: s('主机名'), port: n('端口'), baseUrl: s('外部访问 URL') }, response: obj('创建结果', { instance: ref('Instance'), token: s('一次性服务 token'), command: s('服务代理安装命令') }) },
-  'POST /api/instances/:id/test': { params: { id: id('服务 ID') }, response: obj('测试结果', { ok: b('是否可达'), message: s('说明'), latencyMs: n('延迟') }) },
-  'POST /api/instances/:id/start': { params: { id: id('服务 ID') }, response: obj('启动结果', { started: b('是否启动'), pid: n('进程 ID'), logPath: s('日志路径') }) },
-  'POST /api/instances/:id/token': { params: { id: id('服务 ID') }, response: obj('轮换结果', { token: s('新服务 token'), command: s('安装命令') }) },
-  'PATCH /api/instances/:id': { params: { id: id('服务 ID') }, body: { name: s('服务名'), kind: enumField('类型', ['local', 'remote']), host: s('主机名'), port: f('number|null', '端口；null 清空'), baseUrl: f('string|null', '外部 URL；null 清空'), status: s('状态') }, response: ref('Instance') },
-  'DELETE /api/instances/:id': { params: { id: id('服务 ID') }, response: obj('结果', { ok: b('是否成功') }) },
-  'POST /api/instances/:id/restore': { params: { id: id('服务 ID') }, response: obj('恢复结果', { instance: ref('Instance'), token: s('新服务 token'), command: s('安装命令') }) },
+  'POST /api/prompt-cards': { body: { name: s('名称', { required: true }), content: s('内容', { required: true }), category: enumField('类别', ['workflow', 'style', 'standard', 'role', 'other']), description: s('说明'), scope: enumField('范围', ['org', 'team', 'project', 'person']), projectId: s('项目 ID'), teamId: s('团队 ID'), enabled: b('是否启用'), autoInject: b('是否自动注入到该范围的所有任务') }, response: ref('PromptCard') },
+  'GET /api/instances': { response: arr('智能体列表', ref('Instance')) },
+  'POST /api/instances': { body: { name: s('智能体名', { required: true }), agentType: enumField('智能体类型', ['dsh', 'claude']), kind: enumField('接入方式', ['local', 'remote']), host: s('主机名'), port: n('端口'), baseUrl: s('外部访问 URL') }, response: obj('创建结果', { instance: ref('Instance'), token: s('一次性智能体 token'), command: s('智能体代理安装命令') }) },
+  'POST /api/instances/:id/test': { params: { id: id('智能体 ID') }, response: obj('测试结果', { ok: b('是否可达'), message: s('说明'), latencyMs: n('延迟') }) },
+  'POST /api/instances/:id/start': { params: { id: id('智能体 ID') }, response: obj('启动结果', { started: b('是否启动'), pid: n('进程 ID'), logPath: s('日志路径') }) },
+  'POST /api/instances/:id/token': { params: { id: id('智能体 ID') }, response: obj('轮换结果', { token: s('新智能体 token'), command: s('安装命令') }) },
+  'PATCH /api/instances/:id': { params: { id: id('智能体 ID') }, body: { name: s('智能体名'), agentType: enumField('智能体类型', ['dsh', 'claude']), kind: enumField('接入方式', ['local', 'remote']), host: s('主机名'), port: f('number|null', '端口；null 清空'), baseUrl: f('string|null', '外部 URL；null 清空'), status: s('状态') }, response: ref('Instance') },
+  'DELETE /api/instances/:id': { params: { id: id('智能体 ID') }, response: obj('结果', { ok: b('是否成功') }) },
+  'POST /api/instances/:id/restore': { params: { id: id('智能体 ID') }, response: obj('恢复结果', { instance: ref('Instance'), token: s('新智能体 token'), command: s('安装命令') }) },
   'GET /api/tasks': { query: { projectId: s('项目 ID'), status: enumField('状态', ['queued', 'assigned', 'running', 'waiting_input', 'done', 'failed', 'cancelled']), type: enumField('类型', ['feature', 'bugfix', 'management', 'ops', 'docs', 'other']), mine: enumField('只看我的', ['0', '1']), limit: n('最多返回数量') }, response: arr('任务列表', ref('Task')) },
-  'POST /api/projects/:id/tasks': { params: { id: id('项目 ID') }, body: { title: s('标题', { required: true }), prompt: s('任务内容', { required: true }), promptCardIds: arr('引用提示卡 ID', s('提示卡 ID')), instanceId: s('指定 DSH 服务 ID'), type: enumField('类型', ['feature', 'bugfix', 'management', 'ops', 'docs', 'other']), priority: n('优先级，默认 0'), source: enumField('来源', ['human', 'automation', 'webhook', 'api']) }, response: ref('Task') },
+  'POST /api/projects/:id/tasks': { params: { id: id('项目 ID') }, body: { title: s('标题', { required: true }), prompt: s('任务内容', { required: true }), promptCardIds: arr('引用提示卡 ID', s('提示卡 ID')), instanceId: s('指定 智能体 ID'), type: enumField('类型', ['feature', 'bugfix', 'management', 'ops', 'docs', 'other']), priority: n('优先级，默认 0'), source: enumField('来源', ['human', 'automation', 'webhook', 'api']) }, response: ref('Task') },
   'GET /api/tasks/:id': { params: { id: id('任务 ID') }, response: obj('任务详情', { task: ref('Task'), events: arr('事件', ref('TaskEvent')), memory: f('object', '记忆配置') }) },
   'POST /api/tasks/:id/cancel': { params: { id: id('任务 ID') }, response: obj('结果', { ok: b('是否成功') }) },
   'GET /api/projects/:id/automations': { params: { id: id('项目 ID') }, response: arr('自动化列表', ref('Automation')) },
-  'POST /api/projects/:id/automations': { params: { id: id('项目 ID') }, body: { name: s('名称', { required: true }), triggerType: enumField('触发类型', ['manual', 'webhook', 'cron']), triggerConfig: f('object', '触发配置'), promptTemplate: s('提示词模板', { required: true }), promptCardIds: arr('提示卡 ID', s('提示卡 ID')), instanceId: s('服务 ID'), enabled: b('是否启用') }, response: ref('Automation') },
+  'POST /api/projects/:id/automations': { params: { id: id('项目 ID') }, body: { name: s('名称', { required: true }), triggerType: enumField('触发类型', ['manual', 'webhook', 'cron']), triggerConfig: f('object', '触发配置'), promptTemplate: s('提示词模板', { required: true }), promptCardIds: arr('提示卡 ID', s('提示卡 ID')), instanceId: s('智能体 ID'), enabled: b('是否启用') }, response: ref('Automation') },
   'GET /api/projects/:id/memory/search': { params: { id: id('项目 ID') }, query: { q: s('搜索词', { required: true }), topK: n('返回条数，默认 8') }, response: obj('搜索结果', { hits: arr('记忆命中', f('object', '记忆')), tookMs: n('耗时'), configured: b('是否配置') }) },
   'GET /api/projects/:id/memory/context': { params: { id: id('项目 ID') }, query: { q: s('可选查询') }, response: obj('上下文', { prompt: s('记忆简报'), tokenEstimate: n('token 估算'), citations: arr('引用', s('引用')), configured: b('是否配置') }) },
-  'GET /api/settings': { response: obj('系统设置', { security: f('object', '安全检查配置'), assistant: f('object', '助手配置'), defaultServiceId: s('默认服务 ID') }) },
+  'GET /api/settings': { response: obj('系统设置', { security: f('object', '安全检查配置'), assistant: f('object', '助手配置'), defaultServiceId: s('默认智能体 ID') }) },
   'PATCH /api/settings/security': { body: { enabled: b('是否启用'), endpoint: s('安全模型地址'), model: s('模型名'), apiKey: s('API Key'), timeoutMs: n('超时毫秒'), blockMessage: s('拦截文案') }, response: f('object', '更新后的设置') },
-  'PATCH /api/settings/assistant': { body: { enabled: b('是否启用'), instanceId: s('指定服务 ID'), model: s('模型名') }, response: f('object', '更新后的设置') },
+  'PATCH /api/settings/assistant': { body: { enabled: b('是否启用'), instanceId: s('指定智能体 ID'), model: s('模型名') }, response: f('object', '更新后的设置') },
   'GET /api/assistant/conversations': { query: { q: s('按标题搜索') }, response: obj('会话列表', { conversations: arr('会话', ref('Conversation')) }) },
   'POST /api/assistant/conversations': { body: { title: s('标题，默认新会话'), pathname: s('发起时页面路径') }, response: obj('创建结果', { conversation: ref('Conversation') }) },
   'GET /api/assistant/conversations/:id': { params: { id: id('会话 ID') }, response: ref('ConversationDetail') },
   'PATCH /api/assistant/conversations/:id': { params: { id: id('会话 ID') }, body: { title: s('新标题', { required: true }) }, response: obj('结果', { ok: b('是否成功') }) },
   'DELETE /api/assistant/conversations/:id': { params: { id: id('会话 ID') }, response: obj('结果', { ok: b('是否成功') }) },
-  'GET /api/projects/:id/services': { params: { id: id('项目 ID') }, response: obj('项目服务绑定', { serviceIds: arr('服务 ID', s('服务 ID')), services: arr('服务摘要', obj('服务摘要', { id: s('服务 ID'), name: s('服务名') })) }) },
-  'PATCH /api/projects/:id/services': { params: { id: id('项目 ID') }, body: { serviceIds: arr('要绑定的服务 ID；空数组表示共享池', s('服务 ID'), { required: true }) }, response: obj('更新结果', { serviceIds: arr('服务 ID', s('服务 ID')) }) },
+  'GET /api/projects/:id/services': { params: { id: id('项目 ID') }, response: obj('项目智能体绑定', { serviceIds: arr('智能体 ID', s('智能体 ID')), services: arr('智能体摘要', obj('智能体摘要', { id: s('智能体 ID'), name: s('智能体名') })) }) },
+  'PATCH /api/projects/:id/services': { params: { id: id('项目 ID') }, body: { serviceIds: arr('要绑定的智能体 ID；空数组表示共享池', s('智能体 ID'), { required: true }) }, response: obj('更新结果', { serviceIds: arr('智能体 ID', s('智能体 ID')) }) },
   'GET /api/account/api-keys': { response: obj('API Key 列表', { keys: arr('密钥', obj('密钥摘要', { id: s('ID'), name: s('名称'), prefix: s('前缀'), createdAt: s('创建时间'), lastUsedAt: s('最近使用时间') })) }) },
   'DELETE /api/account/api-keys/:id': { params: { id: id('API Key ID') }, response: obj('结果', { ok: b('是否成功') }) },
   'POST /api/account/sso/:providerId/start': { params: { providerId: id('认证源 ID') }, response: obj('授权入口', { url: s('跳转授权 URL') }) },
@@ -222,8 +224,73 @@ const details: Record<string, Partial<Endpoint>> = {
   'POST /api/assistant/chat/stream': { body: { message: s('用户消息', { required: true }), pathname: s('当前页面路径'), projectId: s('当前项目 ID'), taskId: s('当前任务 ID'), conversationId: s('目标会话 ID；省略自动新建') }, response: { type: 'text/event-stream', description: 'SSE：meta/status/thinking/tool/text/done/error；done 含 conversationId、reply、navigate' } },
 };
 
-export function assistantApiManifest() {
-  return {
+const CATEGORY_RULES: Array<[string, RegExp]> = [
+  ['assistant', /^\/api\/assistant/],
+  ['auth', /^\/api\/auth/],
+  ['account', /^\/api\/account/],
+  ['settings', /^\/api\/settings/],
+  ['projects', /^\/api\/projects/],
+  ['tasks', /^\/api\/tasks/],
+  ['services', /^\/api\/(instances|runtime)/],
+  ['people', /^\/api\/persons/],
+  ['teams', /^\/api\/teams/],
+  ['prompt-cards', /^\/api\/prompt-cards/],
+  ['automations', /^\/api\/automations/],
+  ['events', /^\/api\/events/],
+  ['chats', /^\/api\/chats/],
+  ['dashboard', /^\/api\/dashboard/],
+];
+
+function categoryFor(path: string): string {
+  return CATEGORY_RULES.find(([, pattern]) => pattern.test(path))?.[0] ?? 'general';
+}
+
+function tagsFor(path: string): string[] {
+  const category = categoryFor(path);
+  const segments = path
+    .split('/')
+    .filter((part) => part && part !== 'api' && !part.startsWith(':'))
+    .slice(0, 4);
+  return [...new Set([category, ...segments])];
+}
+
+function collectModelRefs(value: unknown, refs: Set<string>): void {
+  if (Array.isArray(value)) { for (const item of value) collectModelRefs(item, refs); return; }
+  if (!value || typeof value !== 'object') return;
+  const record = value as Record<string, unknown>;
+  if (typeof record.$ref === 'string' && record.$ref.startsWith('#/models/')) {
+    refs.add(record.$ref.slice('#/models/'.length));
+  }
+  for (const child of Object.values(record)) collectModelRefs(child, refs);
+}
+
+export interface AssistantManifestOptions {
+  mode?: 'compact' | 'detail';
+  prefix?: string;
+  category?: string;
+  tag?: string;
+}
+
+/** 渐进式 API 清单：compact 只给索引；detail 按前缀/分类/标签返回匹配端点详情。 */
+export function assistantApiManifest(options: AssistantManifestOptions = {}) {
+  const mode = options.mode ?? 'compact';
+  const prefix = options.prefix?.trim() || '';
+  const category = options.category?.trim() || '';
+  const tag = options.tag?.trim() || '';
+  const allEndpoints = base.map((endpoint) => {
+    const extra = details[`${endpoint.method} ${endpoint.path}`] ?? {};
+    return {
+      ...endpoint,
+      ...extra,
+      category: categoryFor(endpoint.path),
+      tags: tagsFor(endpoint.path),
+    };
+  });
+  const matches = allEndpoints.filter((endpoint) =>
+    (!prefix || endpoint.path.startsWith(prefix))
+    && (!category || endpoint.category === category)
+    && (!tag || endpoint.tags.includes(tag)));
+  const common = {
     name: 'Ryan API',
     version: 2,
     auth: 'Authorization: Bearer <当前人员会话 token>',
@@ -243,14 +310,13 @@ export function assistantApiManifest() {
       permissions: '项目/团队/账号接口按当前人员权限校验；无权限返回 403，资源不存在返回 404。',
     },
     notes: [
-      '所有人员态接口使用当前登录人员 token；服务运行时接口使用服务 token。',
-      '任务执行者固定为人员@Ryan；DSH 服务是共享调度资源。',
-      '项目工作区由 DSH 服务按项目 ID 自动生成，API 不接收工作目录。',
+      '所有人员态接口使用当前登录人员 token；智能体运行时接口使用智能体 token。',
+      '任务执行者固定为人员@Ryan；智能体是共享调度资源。',
+      '项目工作区由 智能体按项目 ID 自动生成，API 不接收工作目录。',
       '账号就是人员；本地密码与统一认证都属于账号能力。',
       '聊天记录严格按账号隔离；管理员也不能读取其他账号的会话。',
       '不要猜测枚举值；使用 models/endpoints 中声明的枚举。',
     ],
-    models,
     navigation: {
       directive: 'HIVE_NAVIGATE: <站内绝对路径>',
       taskLookup: [
@@ -259,21 +325,46 @@ export function assistantApiManifest() {
         '拿到任务后打开 /projects/<projectId>/tasks/<taskId>。',
         '找不到或存在多个候选时先向用户确认，不要编造路径。',
       ],
-      routes: [
-        { path: '/', name: '概览' }, { path: '/projects', name: '项目列表' },
-        { path: '/projects/:projectId', name: '项目概览' }, { path: '/projects/:projectId/tasks', name: '项目任务' },
-        { path: '/projects/:projectId/tasks/:taskId', name: '任务详情' }, { path: '/projects/:projectId/activity', name: '项目活动' },
-        { path: '/projects/:projectId/automations', name: '项目自动化' }, { path: '/projects/:projectId/memory', name: '项目记忆' },
-        { path: '/projects/:projectId/settings', name: '项目设置' }, { path: '/teams', name: '团队列表' },
-        { path: '/teams/:teamId', name: '团队详情' }, { path: '/tasks', name: '全局任务' },
-        { path: '/instances', name: 'DSH 服务' }, { path: '/prompt-cards', name: '提示卡' },
-        { path: '/chats', name: '聊天记录' }, { path: '/account', name: '个人账号' },
-        { path: '/accounts', name: '账号管理（管理员）' }, { path: '/settings', name: '系统设置' },
-      ],
+      routes: ASSISTANT_NAVIGATION_ROUTES,
     },
-    endpoints: base.map((endpoint) => {
-      const extra = details[`${endpoint.method} ${endpoint.path}`] ?? {};
-      return { ...endpoint, ...extra };
-    }),
+    modes: {
+      compact: 'GET /api/assistant/manifest?mode=compact',
+      detail: 'GET /api/assistant/manifest?mode=detail&prefix=/api/projects',
+      detailByCategory: 'GET /api/assistant/manifest?mode=detail&category=projects',
+    },
+    endpointCount: allEndpoints.length,
+  };
+  if (mode === 'compact') {
+    const categories = [...new Set(allEndpoints.map((endpoint) => endpoint.category))]
+      .map((name) => ({ name, count: allEndpoints.filter((endpoint) => endpoint.category === name).length }))
+      .sort((left, right) => right.count - left.count || left.name.localeCompare(right.name));
+    const tags = [...new Set(allEndpoints.flatMap((endpoint) => endpoint.tags))]
+      .map((name) => ({ name, count: allEndpoints.filter((endpoint) => endpoint.tags.includes(name)).length }))
+      .sort((left, right) => right.count - left.count || left.name.localeCompare(right.name));
+    return {
+      ...common,
+      mode: 'compact',
+      categories,
+      tags,
+      models: Object.entries(models).map(([name, model]) => ({ name, description: String((model as Field).description ?? '') })),
+      endpoints: allEndpoints.map(({ method, path, summary, category, tags }) => ({ method, path, summary, category, tags })),
+      next: '需要参数/返回结构时，使用 mode=detail 加 prefix/category/tag 过滤；不要一次性请求全部详情。',
+    };
+  }
+  const matched = prefix || category || tag ? matches : allEndpoints;
+  const refs = new Set<string>();
+  for (const endpoint of matched) collectModelRefs(endpoint, refs);
+  const selectedModels = Object.fromEntries(
+    (matched === allEndpoints ? Object.keys(models) : [...refs])
+      .filter((name) => models[name as keyof typeof models])
+      .map((name) => [name, models[name as keyof typeof models]]),
+  );
+  return {
+    ...common,
+    mode: 'detail',
+    filter: { prefix: prefix || null, category: category || null, tag: tag || null },
+    count: matched.length,
+    models: selectedModels,
+    endpoints: matched,
   };
 }

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import type { DshInstance, InstanceKind } from '@shared';
-import { INSTANCE_KINDS, INSTANCE_STATUSES } from '@shared';
+import type { AgentType, DshInstance, InstanceKind } from '@shared';
+import { AGENT_TYPES, INSTANCE_KINDS, INSTANCE_STATUSES } from '@shared';
 import {
   Badge,
   Button,
@@ -34,10 +34,12 @@ import { useAsync, useInterval } from '../lib/hooks.ts';
 
 interface InstanceFormState {
   name: string;
+  agentType: AgentType;
   kind: InstanceKind;
   host: string;
   port: string;
   baseUrl: string;
+  capabilities: string;
 }
 
 interface SecretState {
@@ -49,10 +51,12 @@ interface SecretState {
 
 const EMPTY_FORM: InstanceFormState = {
   name: '',
+  agentType: 'dsh',
   kind: 'local',
   host: '127.0.0.1',
   port: '4501',
   baseUrl: '',
+  capabilities: '',
 };
 
 function instanceStatusMeta(status: string) {
@@ -74,8 +78,8 @@ function errorMessage(cause: unknown, fallback: string): string {
 }
 
 /**
- * Ryan DSH 服务资源：本机 / 远端服务的创建、接入、测试、token 轮换与吊销。
- * 服务是任务的执行者；创建时的一次性 token 与安装命令只展示一次。
+ * Ryan智能体资源：本机 / 远端智能体的创建、接入、测试、token 轮换与吊销。
+ *智能体是任务的执行者；创建时的一次性 token 与安装命令只展示一次。
  */
 export function InstancesPage() {
   const { person } = useAuth();
@@ -83,7 +87,7 @@ export function InstancesPage() {
   const isAdmin = Boolean(person?.isAdmin);
   const instances = useAsync(() => api.instances(), []);
   const settings = useAsync(() => api.settings(), []);
-  // 服务靠心跳更新在线状态，页面每 15s 静默刷新一次资源视图。
+  //智能体靠心跳更新在线状态，页面每 15s 静默刷新一次资源视图。
   useInterval(() => {
     void instances.refresh();
   }, 15_000);
@@ -103,6 +107,7 @@ export function InstancesPage() {
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [kindFilter, setKindFilter] = useState('all');
+  const [agentTypeFilter, setAgentTypeFilter] = useState('all');
   const [defaultFilter, setDefaultFilter] = useState('all');
   const [taskFilter, setTaskFilter] = useState('all');
   const [editTarget, setEditTarget] = useState<DshInstance | null>(null);
@@ -117,29 +122,33 @@ export function InstancesPage() {
   const defaultServiceId = settings.data?.defaultServiceId ?? '';
   const filteredList = useMemo(() => {
     const needle = search.trim().toLowerCase();
-    return list.filter((item) => {
+    // 已吊销智能体默认隐藏；只有显式选择“已吊销”状态时才展示。
+    const candidates = statusFilter === 'revoked' ? list : list.filter((item) => item.status !== 'revoked');
+    return candidates.filter((item) => {
       if (statusFilter !== 'all' && item.status !== statusFilter) return false;
       if (kindFilter !== 'all' && item.kind !== kindFilter) return false;
+      if (agentTypeFilter !== 'all' && item.agentType !== agentTypeFilter) return false;
       if (defaultFilter === 'default' && defaultServiceId !== item.id) return false;
       if (defaultFilter === 'other' && defaultServiceId === item.id) return false;
       if (taskFilter === 'busy' && !item.currentTask) return false;
       if (taskFilter === 'idle' && item.currentTask) return false;
       if (!needle) return true;
-      return `${item.name} ${item.id} ${item.host} ${item.baseUrl ?? ''}`.toLowerCase().includes(needle);
+      return `${item.name} ${item.id} ${item.host} ${item.baseUrl ?? ''} ${item.capabilities.join(' ')}`.toLowerCase().includes(needle);
     });
-  }, [list, search, statusFilter, kindFilter, defaultFilter, taskFilter, defaultServiceId]);
+  }, [list, search, statusFilter, kindFilter, agentTypeFilter, defaultFilter, taskFilter, defaultServiceId]);
   const totalPages = Math.max(1, Math.ceil(filteredList.length / pageSize));
   const currentPage = Math.min(page, totalPages);
   const pagedList = useMemo(
     () => filteredList.slice((currentPage - 1) * pageSize, currentPage * pageSize),
     [filteredList, currentPage, pageSize],
   );
-  useEffect(() => { setPage(1); }, [search, statusFilter, kindFilter, defaultFilter, taskFilter, pageSize]);
+  useEffect(() => { setPage(1); }, [search, statusFilter, kindFilter, agentTypeFilter, defaultFilter, taskFilter, pageSize]);
   const online = list.filter((item) => item.status === 'online').length;
   const unconfigured = list.filter((item) => item.status === 'unconfigured').length;
   const offline = list.filter((item) => item.status === 'offline').length;
   const abnormal = list.filter((item) => item.status === 'error').length;
   const revoked = list.filter((item) => item.status === 'revoked').length;
+  const activeCount = list.length - revoked;
 
   const update = <K extends keyof InstanceFormState>(key: K, value: InstanceFormState[K]) => {
     setForm((prev) => ({ ...prev, [key]: value }));
@@ -160,10 +169,12 @@ export function InstancesPage() {
     setEditError(null);
     setEditForm({
       name: instance.name,
+      agentType: instance.agentType,
       kind: instance.kind,
       host: instance.host,
       port: instance.port ? String(instance.port) : '',
       baseUrl: instance.baseUrl ?? '',
+      capabilities: instance.capabilities.join(', '),
     });
   };
 
@@ -174,7 +185,7 @@ export function InstancesPage() {
   const handleEdit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!editTarget) return;
-    if (!editForm.name.trim()) { setEditError('请填写服务名称。'); return; }
+    if (!editForm.name.trim()) { setEditError('请填写智能体名称。'); return; }
     let port: number | null | undefined;
     if (editForm.port.trim()) {
       const parsed = Number(editForm.port);
@@ -187,34 +198,36 @@ export function InstancesPage() {
     try {
       await api.updateInstance(editTarget.id, {
         name: editForm.name.trim(),
+        agentType: editForm.agentType,
         kind: editForm.kind,
         host: editForm.host.trim(),
         port,
         baseUrl: editForm.baseUrl.trim() || null,
+        capabilities: editForm.capabilities.split(',').map((item) => item.trim()).filter(Boolean),
       });
-      toast.success('服务配置已更新');
+      toast.success('智能体配置已更新');
       setEditTarget(null);
       await instances.refresh();
     } catch (cause) {
-      setEditError(errorMessage(cause, '更新服务失败'));
+      setEditError(errorMessage(cause, '更新智能体失败'));
     } finally { setSavingEdit(false); }
   };
 
   const handleRestore = async (instance: DshInstance) => {
     try {
       const result = await api.restoreInstance(instance.id);
-      toast.success(`服务「${instance.name}」已恢复，请重新配置代理 token`);
-      setSecret({ title: '服务已恢复', instanceName: instance.name, token: result.token, command: result.command });
+      toast.success(`智能体「${instance.name}」已恢复，请重新配置代理 token`);
+      setSecret({ title: '智能体已恢复', instanceName: instance.name, token: result.token, command: result.command });
       await instances.refresh();
     } catch (cause) {
-      toast.error(errorMessage(cause, '恢复服务失败'));
+      toast.error(errorMessage(cause, '恢复智能体失败'));
     }
   };
 
   const handleCreate = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!form.name.trim()) {
-      setFormError('请填写服务名称。');
+      setFormError('请填写智能体名称。');
       return;
     }
     let port: number | undefined;
@@ -231,23 +244,25 @@ export function InstancesPage() {
     try {
       const created = await api.createInstance({
         name: form.name.trim(),
+        agentType: form.agentType,
         kind: form.kind,
         host: form.host.trim() || undefined,
         port,
         baseUrl: form.baseUrl.trim() || undefined,
+        capabilities: form.capabilities.split(',').map((item) => item.trim()).filter(Boolean),
       });
-      toast.success(`服务「${created.instance.name}」已创建`);
+      toast.success(`智能体「${created.instance.name}」已创建`);
       setForm(EMPTY_FORM);
       setParams({}, { replace: true });
       setSecret({
-        title: '服务已创建',
+        title: '智能体已创建',
         instanceName: created.instance.name,
         token: created.token,
         command: created.command,
       });
       await instances.refresh();
     } catch (cause) {
-      const message = errorMessage(cause, '创建服务失败');
+      const message = errorMessage(cause, '创建智能体失败');
       setFormError(message);
       toast.error(message);
     } finally {
@@ -259,10 +274,10 @@ export function InstancesPage() {
     try {
       const isDefault = defaultServiceId === instance.id;
       await api.updateDefaultService(isDefault ? null : instance.id);
-      toast.success(isDefault ? `已取消默认服务：${instance.name}` : `已设为默认服务：${instance.name}`);
+      toast.success(isDefault ? `已取消默认智能体：${instance.name}` : `已设为默认智能体：${instance.name}`);
       await Promise.all([settings.refresh(), instances.refresh()]);
     } catch (cause) {
-      toast.error(errorMessage(cause, '设置默认服务失败'));
+      toast.error(errorMessage(cause, '设置默认智能体失败'));
     }
   };
 
@@ -270,11 +285,11 @@ export function InstancesPage() {
     setStartingId(instance.id);
     try {
       const result = await api.startInstance(instance.id);
-      toast.success(`已启动「${instance.name}」本机服务代理，等待注册`);
+      toast.success(`已启动「${instance.name}」本机智能体代理，等待注册`);
       if (result.logPath) toast.info(`代理日志：${result.logPath}`);
       await instances.refresh();
     } catch (cause) {
-      toast.error(errorMessage(cause, '启动服务代理失败'));
+      toast.error(errorMessage(cause, '启动智能体代理失败'));
     } finally {
       setStartingId(null);
     }
@@ -304,7 +319,7 @@ export function InstancesPage() {
     setRotating(true);
     try {
       const result = await api.rotateInstanceToken(rotateTarget.id);
-      toast.success(`服务「${rotateTarget.name}」的 token 已轮换`);
+      toast.success(`智能体「${rotateTarget.name}」的 token 已轮换`);
       setSecret({
         title: 'Token 已轮换',
         instanceName: rotateTarget.name,
@@ -325,11 +340,11 @@ export function InstancesPage() {
     setRevoking(true);
     try {
       await api.revokeInstance(revokeTarget.id);
-      toast.success(`服务「${revokeTarget.name}」已删除`);
+      toast.success(`智能体「${revokeTarget.name}」已删除`);
       setRevokeTarget(null);
       await instances.refresh();
     } catch (cause) {
-      toast.error(errorMessage(cause, '吊销服务失败'));
+      toast.error(errorMessage(cause, '吊销智能体失败'));
     } finally {
       setRevoking(false);
     }
@@ -340,7 +355,7 @@ export function InstancesPage() {
   const columns: Column<DshInstance>[] = [
     {
       key: 'name',
-      header: '服务',
+      header: '智能体',
       render: (instance) => {
         const status = instanceStatusMeta(instance.status);
         return (
@@ -355,8 +370,30 @@ export function InstancesPage() {
       },
     },
     {
+      key: 'agentType',
+      header: '智能体类型',
+      width: 110,
+      render: (instance) => {
+        const meta = AGENT_TYPES.find((item) => item.value === instance.agentType) ?? AGENT_TYPES[0];
+        return <Badge size="sm" tone={(meta.tone as Tone) ?? 'slate'}>{meta.label}</Badge>;
+      },
+      sortValue: (instance) => instance.agentType,
+    },
+    {
+      key: 'capabilities',
+      header: '能力',
+      width: 170,
+      render: (instance) => instance.capabilities.length ? (
+        <div className="hstack gap-4 wrap">
+          {instance.capabilities.slice(0, 4).map((capability) => <Badge key={capability} size="sm" tone="slate">{capability}</Badge>)}
+          {instance.capabilities.length > 4 ? <span className="tiny dim">+{instance.capabilities.length - 4}</span> : null}
+        </div>
+      ) : <span className="tiny dim">未标注</span>,
+      sortValue: (instance) => instance.capabilities.join(','),
+    },
+    {
       key: 'kind',
-      header: '类型',
+      header: '接入方式',
       width: 100,
       render: (instance) => {
         const kind = instanceKindMeta(instance.kind);
@@ -423,15 +460,15 @@ export function InstancesPage() {
               <IconButton icon="play" label="启动本机代理" size="sm" disabled={startingId === instance.id} onClick={() => void handleStart(instance)} />
             ) : null}
             <IconButton icon="activity" label="测试连接" size="sm" disabled={testingId === instance.id} onClick={() => void handleTest(instance)} />
-            <IconButton icon="settings" label="编辑服务" size="sm" onClick={() => openEdit(instance)} />
+            <IconButton icon="settings" label="编辑智能体" size="sm" onClick={() => openEdit(instance)} />
             <IconButton icon="key" label="轮换 token" size="sm" onClick={() => setRotateTarget(instance)} />
             <IconButton
               icon="star"
-              label={defaultServiceId === instance.id ? '取消默认服务' : '设为默认服务'}
+              label={defaultServiceId === instance.id ? '取消默认智能体' : '设为默认智能体'}
               size="sm"
               onClick={() => void handleDefault(instance)}
             />
-            <IconButton icon="trash" label="删除服务" size="sm" onClick={() => setRevokeTarget(instance)} />
+            <IconButton icon="trash" label="删除智能体" size="sm" onClick={() => setRevokeTarget(instance)} />
           </div>
         );
       },
@@ -441,22 +478,22 @@ export function InstancesPage() {
   return (
     <div className="page">
       <PageHead
-        eyebrow="服务 · DSH Services"
-        title="DSH 服务"
+        eyebrow="智能体 · Agents"
+        title="智能体资源"
         desc={
           <>
-            服务是 Ryan 的执行资源：本机或远端 DSH 通过服务代理接入，领取任务并回传执行过程。
+           智能体是 Ryan 的执行资源：可运行在本机或指定主机上，通过能力标签说明它擅长的开发、构建、测试等工作。
             <button type="button" className="ws-inline-link" onClick={() => setGuideOpen(true)}>
-              如何接入 DSH 服务？
+              如何接入智能体？
             </button>
           </>
         }
         actions={
           <>
-            <IconButton icon="refresh" label="刷新服务" onClick={() => void instances.refresh()} />
+            <IconButton icon="refresh" label="刷新智能体" onClick={() => void instances.refresh()} />
             {isAdmin ? (
               <Button variant="primary" icon="plus" onClick={openCreate}>
-                新增服务
+                新增智能体
               </Button>
             ) : null}
           </>
@@ -465,19 +502,19 @@ export function InstancesPage() {
 
       {!isAdmin ? (
         <Callout tone="amber" icon="shield">
-          当前账号不是组织管理员：可以查看服务状态，但新增、测试、轮换 token 与吊销需要管理员权限。
+          当前账号不是组织管理员：可以查看智能体状态，但新增、测试、轮换 token 与吊销需要管理员权限。
         </Callout>
       ) : null}
 
       <Card className="service-summary-strip">
         <div className="service-summary-label">
           <Icon name="activity" size={14} />
-          服务概览
+         智能体概览
         </div>
         <div className="service-summary-items">
           <div className="service-summary-item">
             <span className="cx-metric-icon tone-green"><Icon name="server" size={14} /></span>
-            <div><strong>{online}</strong><span>在线服务</span><em>心跳正常，可领取任务</em></div>
+            <div><strong>{online}</strong><span>在线智能体</span><em>心跳正常，可领取任务</em></div>
           </div>
           <div className="service-summary-item">
             <span className="cx-metric-icon tone-amber"><Icon name="package" size={14} /></span>
@@ -489,7 +526,7 @@ export function InstancesPage() {
           </div>
           <div className="service-summary-item">
             <span className="cx-metric-icon tone-violet"><Icon name="layers" size={14} /></span>
-            <div><strong>{list.length}</strong><span>服务总数</span><em>{revoked} 个已吊销</em></div>
+            <div><strong>{activeCount}</strong><span>智能体总数</span><em>{revoked} 个已吊销，默认隐藏</em></div>
           </div>
         </div>
       </Card>
@@ -505,17 +542,27 @@ export function InstancesPage() {
               { value: 'unconfigured', label: '待接入' },
               { value: 'offline', label: '离线' },
               { value: 'error', label: '异常' },
-              { value: 'revoked', label: '已删除' },
+              { value: 'revoked', label: '已吊销（默认隐藏）' },
             ]}
             onChange={(event) => setStatusFilter(event.target.value)}
           />
           <Select
             className="ws-filter-select"
+            value={agentTypeFilter}
+            options={[
+              { value: 'all', label: '全部智能体类型' },
+              { value: 'dsh', label: 'DSH' },
+              { value: 'claude', label: 'Claude' },
+            ]}
+            onChange={(event) => setAgentTypeFilter(event.target.value)}
+          />
+          <Select
+            className="ws-filter-select"
             value={kindFilter}
             options={[
-              { value: 'all', label: '全部类型' },
-              { value: 'local', label: '本机 DSH' },
-              { value: 'remote', label: '远端 DSH' },
+              { value: 'all', label: '全部接入方式' },
+              { value: 'local', label: '本机接入' },
+              { value: 'remote', label: '远端接入' },
             ]}
             onChange={(event) => setKindFilter(event.target.value)}
           />
@@ -524,8 +571,8 @@ export function InstancesPage() {
             value={defaultFilter}
             options={[
               { value: 'all', label: '默认/普通' },
-              { value: 'default', label: '仅默认服务' },
-              { value: 'other', label: '非默认服务' },
+              { value: 'default', label: '仅默认智能体' },
+              { value: 'other', label: '非默认智能体' },
             ]}
             onChange={(event) => setDefaultFilter(event.target.value)}
           />
@@ -545,15 +592,16 @@ export function InstancesPage() {
             placeholder="搜索名称 / ID / Host"
             className="ws-search"
           />
-          <span className="tiny dim">共 {filteredList.length} 个服务</span>
+          <span className="tiny dim">共 {filteredList.length} 个智能体</span>
         </div>
-        {search || statusFilter !== 'all' || kindFilter !== 'all' || defaultFilter !== 'all' || taskFilter !== 'all' ? (
+        {search || statusFilter !== 'all' || agentTypeFilter !== 'all' || kindFilter !== 'all' || defaultFilter !== 'all' || taskFilter !== 'all' ? (
           <Button
             size="sm"
             variant="ghost"
             onClick={() => {
               setSearch('');
               setStatusFilter('all');
+              setAgentTypeFilter('all');
               setKindFilter('all');
               setDefaultFilter('all');
               setTaskFilter('all');
@@ -577,13 +625,13 @@ export function InstancesPage() {
             loading={instances.loading && !instances.data}
             empty={
               filteredList.length === 0 && list.length > 0 ? (
-                <EmptyState icon="filter" title="没有匹配的服务" description="调整搜索或状态筛选。" compact />
+                <EmptyState icon="filter" title="没有匹配的智能体" description="调整搜索或状态筛选。" compact />
               ) : (
                 <EmptyState
                   icon="server"
-                  title="还没有 DSH 服务"
-                  description="新增本机或远端服务，复制安装命令启动服务代理。"
-                  action={isAdmin ? <Button size="sm" variant="primary" icon="plus" onClick={openCreate}>新增服务</Button> : undefined}
+                  title="还没有智能体"
+                  description="新增本机或远端智能体，复制安装命令启动智能体代理。"
+                  action={isAdmin ? <Button size="sm" variant="primary" icon="plus" onClick={openCreate}>新增智能体</Button> : undefined}
                 />
               )
             }
@@ -611,16 +659,16 @@ export function InstancesPage() {
       <Modal
         open={guideOpen}
         onClose={() => setGuideOpen(false)}
-        title="如何接入 DSH 服务"
-        description="服务只登记连接信息，不绑定项目或工作目录；注册后进入共享调度池。"
+        title="如何接入智能体"
+        description="智能体只登记连接信息，不绑定项目或工作目录；注册后进入共享调度池。"
         size="lg"
         footer={<Button variant="primary" onClick={() => setGuideOpen(false)}>知道了</Button>}
       >
         <ol className="cx-guide-steps" style={{ marginTop: 4 }}>
-          <li><span className="cx-guide-step__num">1</span><div>新增服务，选择本机 / 远端，填写 host、端口等连接信息。</div></li>
-          <li><span className="cx-guide-step__num">2</span><div>本机服务可直接点「启动本机代理」；远端服务复制一次性安装命令在目标机器执行；token 只展示一次。</div></li>
-          <li><span className="cx-guide-step__num">3</span><div>启动后服务会自动注册与心跳，状态从「待接入」变为「在线」，加入调度池。</div></li>
-          <li><span className="cx-guide-step__num">4</span><div>在服务行点击「测试连接」确认心跳，然后即可在任意项目中派发任务。</div></li>
+          <li><span className="cx-guide-step__num">1</span><div>新增智能体，选择本机 / 远端，填写 host、端口等连接信息。</div></li>
+          <li><span className="cx-guide-step__num">2</span><div>本机智能体可直接点「启动本机代理」；远端智能体复制一次性安装命令在目标机器执行；token 只展示一次。</div></li>
+          <li><span className="cx-guide-step__num">3</span><div>启动后智能体会自动注册与心跳，状态从「待接入」变为「在线」，加入调度池。</div></li>
+          <li><span className="cx-guide-step__num">4</span><div>在智能体行点击「测试连接」确认心跳，然后即可在任意项目中派发任务。</div></li>
         </ol>
         <div className="mt-12">
           <CodeBlock
@@ -633,8 +681,8 @@ export function InstancesPage() {
       <Modal
         open={createOpen}
         onClose={closeCreate}
-        title="新增 DSH 服务"
-        description="创建后会返回一次性 token 与安装命令，用于在目标机器接入服务代理。"
+        title="新增智能体"
+        description="创建后会返回一次性 token 与安装命令，用于在目标机器接入智能体代理。"
         size="lg"
         footer={
           <>
@@ -642,23 +690,31 @@ export function InstancesPage() {
               取消
             </Button>
             <Button variant="primary" type="submit" form="create-instance-form" loading={submitting} icon="plus">
-              创建服务
+              创建智能体
             </Button>
           </>
         }
       >
         <form id="create-instance-form" className="stack" style={{ gap: 14 }} onSubmit={handleCreate}>
           <div className="grid grid-2">
-            <Field label="服务名称" htmlFor="instance-name" required>
+            <Field label="智能体名称" htmlFor="instance-name" required>
               <Input
                 id="instance-name"
                 value={form.name}
                 autoFocus
-                placeholder="例如：本机 DSH 服务"
+                placeholder="例如：本机智能体"
                 onChange={(event) => update('name', event.target.value)}
               />
             </Field>
-            <Field label="类型" htmlFor="instance-kind" hint="本机由 Ryan 拉起代理；远端需安装通讯插件。">
+            <Field label="智能体类型" htmlFor="instance-agent-type">
+              <Select
+                id="instance-agent-type"
+                value={form.agentType}
+                options={AGENT_TYPES.map((item) => ({ value: item.value, label: item.label }))}
+                onChange={(event) => update('agentType', event.target.value as AgentType)}
+              />
+            </Field>
+            <Field label="接入方式" htmlFor="instance-kind" hint="本机由 Ryan 拉起代理；远端需安装通讯插件。">
               <Select
                 id="instance-kind"
                 value={form.kind}
@@ -667,6 +723,10 @@ export function InstancesPage() {
               />
             </Field>
           </div>
+
+          <Field label="能力标签" htmlFor="instance-capabilities" hint="逗号分隔，例如 linux, build, test；用于说明该智能体能承担哪些工作。">
+            <Input id="instance-capabilities" value={form.capabilities} placeholder="linux, build, test" onChange={(event) => update('capabilities', event.target.value)} />
+          </Field>
 
           <div className="grid grid-3">
             <Field label="Host" htmlFor="instance-host" hint="可为 IP 或主机名。">
@@ -709,8 +769,8 @@ export function InstancesPage() {
       <Modal
         open={Boolean(editTarget)}
         onClose={() => setEditTarget(null)}
-        title="编辑 DSH 服务"
-        description="修改服务名称、类型与连接信息；不会改变 token 和当前在线状态。"
+        title="编辑智能体"
+        description="修改智能体名称、类型与连接信息；不会改变 token 和当前在线状态。"
         size="lg"
         footer={
           <>
@@ -721,13 +781,20 @@ export function InstancesPage() {
       >
         <form id="edit-instance-form" className="stack" style={{ gap: 14 }} onSubmit={handleEdit}>
           <div className="grid grid-2">
-            <Field label="服务名称" required>
+            <Field label="智能体名称" required>
               <Input value={editForm.name} autoFocus onChange={(event) => updateEdit('name', event.target.value)} />
             </Field>
-            <Field label="类型" hint="本机由 Ryan 拉起代理；远端需安装通讯插件。">
+            <Field label="智能体类型">
+              <Select value={editForm.agentType} options={AGENT_TYPES.map((item) => ({ value: item.value, label: item.label }))} onChange={(event) => updateEdit('agentType', event.target.value as AgentType)} />
+            </Field>
+            <Field label="接入方式" hint="本机由 Ryan 拉起代理；远端需安装通讯插件。">
               <Select value={editForm.kind} options={kindOptions} onChange={(event) => updateEdit('kind', event.target.value as InstanceKind)} />
             </Field>
           </div>
+          <Field label="能力标签" hint="逗号分隔，例如 linux, build, test。">
+            <Input value={editForm.capabilities} placeholder="linux, build, test" onChange={(event) => updateEdit('capabilities', event.target.value)} />
+          </Field>
+
           <div className="grid grid-3">
             <Field label="Host"><Input value={editForm.host} placeholder="127.0.0.1" onChange={(event) => updateEdit('host', event.target.value)} /></Field>
             <Field label="Port"><Input type="number" min={1} max={65535} value={editForm.port} onChange={(event) => updateEdit('port', event.target.value)} /></Field>
@@ -740,7 +807,7 @@ export function InstancesPage() {
       <Modal
         open={Boolean(secret)}
         onClose={() => setSecret(null)}
-        title={secret?.title ?? '服务凭据'}
+        title={secret?.title ?? '智能体凭据'}
         description="凭据只展示一次，关闭后无法再次查看。"
         footer={
           <Button variant="primary" onClick={() => setSecret(null)}>
@@ -751,16 +818,16 @@ export function InstancesPage() {
         {secret ? (
           <div className="stack" style={{ gap: 12 }}>
             <Callout tone="amber" icon="alert">
-              <strong>token 只显示一次。</strong>请立即复制保存；如遗失，可在服务卡片上轮换 token。
+              <strong>token 只显示一次。</strong>请立即复制保存；如遗失，可在智能体卡片上轮换 token。
             </Callout>
             <div className="hstack gap-8 wrap">
-              <span className="metric-label">服务</span>
+              <span className="metric-label">智能体</span>
               <span className="strong">{secret.instanceName}</span>
             </div>
             <CodeBlock title="一次性 token" code={secret.token} language="text" />
             <CodeBlock title="安装命令" code={secret.command} />
             <div className="tiny dim">
-              在目标机器执行安装命令即可启动服务代理；服务会注册、心跳并领取项目任务队列中的任务。
+              在目标机器执行安装命令即可启动智能体代理；智能体会注册、心跳并领取项目任务队列中的任务。
             </div>
           </div>
         ) : null}
@@ -771,7 +838,7 @@ export function InstancesPage() {
         onClose={() => setRotateTarget(null)}
         onConfirm={() => void handleRotate()}
         loading={rotating}
-        title="轮换服务 token"
+        title="轮换智能体 token"
         description={
           rotateTarget
             ? `轮换「${rotateTarget.name}」的 token 后，旧 token 立即失效，已运行的代理需要重新配置。`
@@ -785,13 +852,13 @@ export function InstancesPage() {
         onClose={() => setRevokeTarget(null)}
         onConfirm={() => void handleRevoke()}
         loading={revoking}
-        title="删除 DSH 服务"
+        title="删除智能体"
         description={
           revokeTarget
-            ? `删除「${revokeTarget.name}」后，该服务会立即离线且无法再领取任务；可在“已删除”筛选中恢复。`
+            ? `删除「${revokeTarget.name}」后，该智能体会立即离线且无法再领取任务；可在“已删除”筛选中恢复。`
             : undefined
         }
-        confirmLabel="删除服务"
+        confirmLabel="删除智能体"
       />
     </div>
   );

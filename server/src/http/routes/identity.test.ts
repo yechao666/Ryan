@@ -253,7 +253,13 @@ test('多实例调度：两个实例分别领取不同任务，不会抢同一�
 });
 
 test('助手 manifest：包含稳定 API 清单，不泄露凭证', async () => {
-  const manifest = ok(await call('/api/assistant/manifest', { token: tokenLin }));
+  const compact = ok(await call('/api/assistant/manifest', { token: tokenLin }));
+  assert.equal(compact.name, 'Ryan API');
+  assert.equal(compact.mode, 'compact');
+  assert.ok(compact.categories.some((item: Json) => item.name === 'projects'));
+  assert.ok(compact.endpoints.some((item: Json) => item.path === '/api/projects' && !item.body));
+  const manifest = ok(await call('/api/assistant/manifest?mode=detail', { token: tokenLin }));
+  assert.equal(manifest.mode, 'detail');
   assert.equal(manifest.name, 'Ryan API');
   assert.equal(manifest.version, 2);
   assert.ok(manifest.models?.Task && manifest.models?.Project && manifest.models?.Conversation);
@@ -644,6 +650,64 @@ test('统一认证：OIDC 登录自动创建人员并建立会话', async () => 
     assert.equal(account.identities[0].providerSlug, 'oidc-sso');
   } finally {
     idp.close();
+  }
+});
+
+test('企业微信：网页授权登录并自动创建人员账号', async () => {
+  ok(await call('/api/settings/auth-providers', {
+    token: tokenLin,
+    method: 'POST',
+    body: {
+      name: '企业微信测试',
+      slug: 'wecom-sso',
+      type: 'wecom',
+      issuer: 'ww_test_corp',
+      clientId: '1000002',
+      clientSecret: 'wecom-secret',
+      enabled: true,
+      autoCreate: true,
+    },
+  }));
+  const start = await fetch(`${base}/api/auth/sso/wecom-sso/start`, { redirect: 'manual' });
+  assert.equal(start.status, 302);
+  const authorization = new URL(start.headers.get('location') ?? '');
+  assert.equal(authorization.host, 'open.weixin.qq.com');
+  assert.equal(authorization.searchParams.get('appid'), 'ww_test_corp');
+  assert.equal(authorization.searchParams.get('agentid'), '1000002');
+  const state = authorization.searchParams.get('state') ?? '';
+  assert.ok(state);
+  const qr = ok(await call('/api/auth/sso/wecom-sso/qr', { token: tokenLin }));
+  assert.match(qr.qrUrl, /login\.work\.weixin\.qq\.com\/wwlogin\/sso\/login/);
+  assert.equal(qr.appid, 'ww_test_corp');
+
+  const realFetch = globalThis.fetch;
+  globalThis.fetch = (async (input: any, init?: RequestInit) => {
+    const url = new URL(typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url);
+    if (url.host === 'qyapi.weixin.qq.com' && url.pathname === '/cgi-bin/gettoken') {
+      return new Response(JSON.stringify({ errcode: 0, access_token: 'wecom-token', expires_in: 7200 }), { status: 200, headers: { 'content-type': 'application/json' } });
+    }
+    if (url.host === 'qyapi.weixin.qq.com' && url.pathname === '/cgi-bin/auth/getuserinfo') {
+      return new Response(JSON.stringify({ errcode: 0, userid: 'wecom-subject-1' }), { status: 200, headers: { 'content-type': 'application/json' } });
+    }
+    if (url.host === 'qyapi.weixin.qq.com' && url.pathname === '/cgi-bin/user/get') {
+      return new Response(JSON.stringify({ errcode: 0, userid: 'wecom-subject-1', name: '企业微信用户', email: 'wecom.user@ryan.dev' }), { status: 200, headers: { 'content-type': 'application/json' } });
+    }
+    return realFetch(input as never, init);
+  }) as typeof fetch;
+  try {
+    const callback = await fetch(`${base}/api/auth/sso/wecom-sso/callback?code=wecom-code&state=${encodeURIComponent(state)}`, { redirect: 'manual' });
+    assert.equal(callback.status, 302);
+    const location = callback.headers.get('location') ?? '';
+    assert.ok(location.startsWith('/login#token='));
+    const token = decodeURIComponent(location.slice('/login#token='.length));
+    const me = ok(await call('/api/auth/me', { token }));
+    assert.equal(me.person.email, 'wecom.user@ryan.dev');
+    assert.equal(me.person.name, '企业微信用户');
+    const account = ok(await call('/api/account', { token }));
+    assert.equal(account.hasPassword, false);
+    assert.equal(account.identities[0].providerSlug, 'wecom-sso');
+  } finally {
+    globalThis.fetch = realFetch;
   }
 });
 

@@ -150,7 +150,7 @@ export function TeamDetailPage() {
           title="团队不存在"
           description="该团队可能已被删除。"
           action={
-            <Link to="/teams" className="btn btn-secondary btn-sm">
+            <Link to="/accounts?tab=teams" className="btn btn-secondary btn-sm">
               返回团队列表
             </Link>
           }
@@ -225,7 +225,7 @@ export function TeamDetailPage() {
     <div className="page">
       <PageHead
         eyebrow={
-          <Link to="/teams" className="cx-crumb-link">
+          <Link to="/accounts?tab=teams" className="cx-crumb-link">
             ← 团队
           </Link>
         }

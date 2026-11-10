@@ -17,21 +17,23 @@ export interface PromptCardPickerProps {
   open: boolean;
   value: string[];
   onChange: (next: string[]) => void;
+  label?: string;
+  hint?: string;
 }
 
 /**
  * 提示卡多选：引用可复用的工作流 / 风格 / 标准 / 角色卡片，
  * 执行任务时与任务提示词一起注入 DSH。
  */
-export function PromptCardPicker({ projectId, open, value, onChange }: PromptCardPickerProps) {
+export function PromptCardPicker({ projectId, open, value, onChange, label, hint }: PromptCardPickerProps) {
   const cards = useProjectPromptCards(projectId, open);
   const [dialogOpen, setDialogOpen] = useState(false);
   const selected = (cards.data ?? []).filter((card) => value.includes(card.id));
 
   return (
     <Field
-      label={`提示卡${value.length ? `（已选 ${value.length}）` : ''}`}
-      hint="卡片内容会作为可复用上下文随任务一起注入；卡片较多时在弹窗中搜索选择。"
+      label={label ?? `提示卡${value.length ? `（已选 ${value.length}）` : ''}`}
+      hint={hint ?? '卡片内容会作为可复用上下文随任务一起注入；卡片较多时在弹窗中搜索选择。'}
     >
       <div className="hstack gap-6 wrap">
         {selected.length ? selected.map((card) => (
@@ -62,7 +64,7 @@ export function PromptCardPicker({ projectId, open, value, onChange }: PromptCar
   );
 }
 
-/** 拉取项目可调度服务：项目有绑定时只显示绑定服务，否则显示共享池。 */
+/** 拉取项目可调度智能体：项目有绑定时只显示绑定智能体，否则显示共享池。 */
 export function useProjectInstances(projectId: string, enabled: boolean) {
   const query = useAsync(async () => {
     const [instances, binding] = await Promise.all([api.instances(), api.projectServices(projectId)]);
@@ -82,7 +84,7 @@ export interface ProjectInstanceSelectProps {
   onChange: (next: string) => void;
 }
 
-/** 可选 DSH 服务：仅列出绑定当前项目的服务，留空由服务端自动分配。 */
+/** 可选智能体：仅列出绑定当前项目的智能体，留空由服务端自动分配。 */
 export function ProjectInstanceSelect({ projectId, open, value, onChange }: ProjectInstanceSelectProps) {
   const query = useProjectInstances(projectId, open);
 
@@ -95,16 +97,16 @@ export function ProjectInstanceSelect({ projectId, open, value, onChange }: Proj
   ];
 
   return (
-    <Field label="DSH 服务" hint="留空由调度器自动选择可用服务；指定则只由该服务领取。">
+    <Field label="智能体" hint="留空由调度器自动选择可用智能体；指定则只由该智能体领取。">
       {query.loading && !query.data ? (
         <Skeleton h={36} />
       ) : query.error ? (
         <Callout tone="red" icon="alert">
-          加载服务失败：{query.error}
+          加载智能体失败：{query.error}
         </Callout>
       ) : query.instances.length === 0 ? (
         <Callout tone="amber" icon="info">
-          当前没有可用的 DSH 服务，任务会留在队列等待服务上线。
+          当前没有可用的智能体，任务会留在队列等待智能体上线。
         </Callout>
       ) : (
         <Select value={value} options={options} onChange={(event) => onChange(event.target.value)} />
@@ -120,25 +122,25 @@ export interface ProjectInstanceMultiSelectProps {
   onChange: (next: string[]) => void;
 }
 
-/** 任务可指定一个或多个服务；空表示由项目绑定服务公平调度。 */
+/** 任务可指定一个或多个智能体；空表示由项目绑定智能体公平调度。 */
 export function ProjectInstanceMultiSelect({ projectId, open, value, onChange }: ProjectInstanceMultiSelectProps) {
   const query = useProjectInstances(projectId, open);
   const toggle = (id: string) => onChange(value.includes(id) ? value.filter((item) => item !== id) : [...value, id]);
 
   return (
     <Field
-      label={`DSH 服务范围${value.length ? `（已选 ${value.length} 个）` : ''}`}
-      hint="不选则由项目绑定服务公平调度；选择多个时任务只会在这些服务中分配。"
+      label={`智能体范围${value.length ? `（已选 ${value.length} 个）` : ''}`}
+      hint="不选则由项目绑定智能体公平调度；选择多个时任务只会在这些智能体中分配。"
     >
       {query.loading && !query.data ? (
         <Skeleton h={48} />
       ) : query.error ? (
         <Callout tone="red" icon="alert">
-          加载服务失败：{query.error}
+          加载智能体失败：{query.error}
         </Callout>
       ) : query.instances.length === 0 ? (
         <Callout tone="amber" icon="info">
-          项目未绑定服务且服务池为空；任务会留在队列等待服务上线。
+          项目未绑定智能体且智能体池为空；任务会留在队列等待智能体上线。
         </Callout>
       ) : (
         <div className="stack" style={{ gap: 6 }}>
@@ -157,7 +159,7 @@ export function ProjectInstanceMultiSelect({ projectId, open, value, onChange }:
             />
           ))}
           {query.boundIds.length === 0 ? (
-            <span className="tiny dim">项目未绑定服务：以上为共享服务池。</span>
+            <span className="tiny dim">项目未绑定智能体：以上为共享智能体池。</span>
           ) : null}
         </div>
       )}

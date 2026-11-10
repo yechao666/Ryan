@@ -19,6 +19,7 @@ interface PromptCardRow {
   team_id: string | null;
   person_id: string | null;
   enabled: number;
+  auto_inject: number;
   created_by: string | null;
   created_at: string;
   updated_at: string;
@@ -61,6 +62,7 @@ function mapCard(row: PromptCardRow): PromptCard {
     personId: row.person_id ?? undefined,
     personName: row.person_name ?? undefined,
     enabled: Number(row.enabled) === 1,
+    autoInject: Number(row.auto_inject) === 1,
     createdBy: row.created_by ?? undefined,
     createdByName: row.created_by_name ?? undefined,
     createdAt: row.created_at,
@@ -126,6 +128,7 @@ const cardInputSchema = z.object({
   projectId: z.string().min(1).optional(),
   teamId: z.string().min(1).optional(),
   enabled: z.boolean().optional(),
+  autoInject: z.boolean().optional(),
 });
 
 const cardPatchSchema = cardInputSchema.partial();
@@ -182,8 +185,8 @@ export function registerPromptCardRoutes(router: Router): void {
     const id = newId('pcard');
     const now = nowIso();
     rc.app.db.prepare(
-      `INSERT INTO prompt_cards (id, name, category, description, content, scope, project_id, team_id, person_id, enabled, created_by, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO prompt_cards (id, name, category, description, content, scope, project_id, team_id, person_id, enabled, auto_inject, created_by, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     ).run(
       id,
       input.name,
@@ -195,6 +198,7 @@ export function registerPromptCardRoutes(router: Router): void {
       input.teamId ?? null,
       scope === 'person' ? (input.personId ?? person.id) : null,
       input.enabled === false ? 0 : 1,
+      input.autoInject ? 1 : 0,
       person.id,
       now,
       now,
@@ -212,13 +216,14 @@ export function registerPromptCardRoutes(router: Router): void {
     const input = await rc.body(cardPatchSchema);
     const now = nowIso();
     rc.app.db.prepare(
-      `UPDATE prompt_cards SET name = ?, category = ?, description = ?, content = ?, enabled = ?, updated_at = ? WHERE id = ?`,
+      `UPDATE prompt_cards SET name = ?, category = ?, description = ?, content = ?, enabled = ?, auto_inject = ?, updated_at = ? WHERE id = ?`,
     ).run(
       input.name ?? row.name,
       input.category ?? row.category,
       input.description ?? row.description,
       input.content ?? row.content,
       input.enabled === undefined ? row.enabled : input.enabled ? 1 : 0,
+      input.autoInject === undefined ? row.auto_inject : input.autoInject ? 1 : 0,
       now,
       row.id,
     );

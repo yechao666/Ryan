@@ -17,6 +17,7 @@ import type {
   MemoryContextResult,
   MemoryBrief,
   MemoryDreamStatus,
+  MemoryReport,
   MemoryHit,
   MemorySearchResult,
   Paginated,
@@ -207,7 +208,7 @@ export interface AccountApiKey {
   lastUsedAt?: string;
 }
 
-/** 新增 DSH 服务的响应：token 与安装命令只返回一次。 */
+/** 新增智能体的响应：token 与安装命令只返回一次。 */
 export interface InstanceCreateResult {
   instance: DshInstance;
   token: string;
@@ -243,10 +244,70 @@ export interface SecurityTestResult {
   error?: string;
 }
 
+export interface MentionTarget {
+  kind: 'person' | 'agent';
+  id: string;
+  name: string;
+  detail: string;
+}
+
+export interface ProjectContextItem {
+  id: string;
+  projectId: string;
+  title: string;
+  content: string;
+  category: 'repo' | 'requirement' | 'environment' | 'convention' | 'other';
+  sortOrder: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ProjectWecomBot {
+  id: string;
+  projectId: string;
+  remoteBotId: string;
+  status: string;
+  createdAt: string;
+  connectedAt?: string;
+}
+
+export interface ProjectWecomBotRegistration {
+  attemptId: string;
+  status: string;
+  qrCodeDataUrl: string;
+  authUrl: string;
+  expiresAt: string;
+  pollIntervalMs: number;
+}
+
+export interface ProjectWecomBotPoll {
+  attemptId: string;
+  status: string;
+  bot?: ProjectWecomBot;
+  error?: string;
+}
+
+export interface TaskNotificationItem {
+  id: string;
+  taskId?: string;
+  projectId?: string;
+  projectName?: string;
+  taskTitle?: string;
+  type: string;
+  title: string;
+  body: string;
+  readAt?: string;
+  createdAt: string;
+}
+
 export const api = {
   // ---- auth / meta ----
   login(email: string, password: string): Promise<AuthResponse> {
     return request('/api/auth/login', { method: 'POST', body: JSON.stringify({ email, password }) });
+  },
+
+  wecomQr(slug: string): Promise<{ appid: string; agentid: string; redirectUri: string; state: string; authorizeUrl: string; qrUrl: string }> {
+    return request(`/api/auth/sso/${encodeURIComponent(slug)}/qr`);
   },
 
   authProviders(): Promise<Pick<AuthProvider, 'id' | 'slug' | 'name' | 'type'>[]> {
@@ -285,7 +346,7 @@ export const api = {
     return request(`/api/account/identities/${identityId}`, { method: 'DELETE' });
   },
 
-  adminAccounts(): Promise<(AuthResponse['person'] & { identityCount: number })[]> {
+  adminAccounts(): Promise<(AuthResponse['person'] & { identityCount: number; wecomUserId?: string; wecomBoundAt?: string })[]> {
     return request('/api/settings/accounts');
   },
 
@@ -306,14 +367,14 @@ export const api = {
   },
 
   createAuthProvider(input: {
-    name: string; slug: string; issuer: string; clientId: string; clientSecret?: string;
+    name: string; slug: string; type?: 'oidc' | 'wecom'; issuer: string; clientId: string; clientSecret?: string;
     scopes?: string; enabled?: boolean; autoCreate?: boolean;
   }): Promise<AuthProvider> {
     return request('/api/settings/auth-providers', { method: 'POST', body: JSON.stringify(input) });
   },
 
   updateAuthProvider(id: string, input: Partial<{
-    name: string; issuer: string; clientId: string; clientSecret: string;
+    name: string; type: 'oidc' | 'wecom'; issuer: string; clientId: string; clientSecret: string;
     scopes: string; enabled: boolean; autoCreate: boolean;
   }>): Promise<AuthProvider> {
     return request(`/api/settings/auth-providers/${id}`, { method: 'PATCH', body: JSON.stringify(input) });
@@ -384,7 +445,14 @@ export const api = {
   },
   updateProject(
     id: string,
-    input: Partial<CreateProjectInput> & { status?: string },
+    input: Partial<CreateProjectInput> & {
+      status?: string;
+      reportsEnabled?: boolean;
+      weeklyReportDay?: number;
+      weeklyReportTime?: string;
+      monthlyReportDay?: number;
+      monthlyReportTime?: string;
+    },
   ): Promise<ProjectSummary> {
     return request(`/api/projects/${id}`, { method: 'PATCH', body: JSON.stringify(input) });
   },
@@ -407,7 +475,7 @@ export const api = {
   },
   updateInstance(
     id: string,
-    input: { name?: string; kind?: 'local' | 'remote'; host?: string; port?: number | null; baseUrl?: string | null; status?: string },
+    input: { name?: string; agentType?: 'dsh' | 'claude'; kind?: 'local' | 'remote'; host?: string; port?: number | null; baseUrl?: string | null; capabilities?: string[]; status?: string },
   ): Promise<DshInstance> {
     return request(`/api/instances/${id}`, { method: 'PATCH', body: JSON.stringify(input) });
   },
@@ -426,6 +494,38 @@ export const api = {
 
   updateProjectServices(projectId: string, serviceIds: string[]): Promise<{ serviceIds: string[] }> {
     return request(`/api/projects/${projectId}/services`, { method: 'PATCH', body: JSON.stringify({ serviceIds }) });
+  },
+
+  projectContext(projectId: string): Promise<{ items: ProjectContextItem[] }> {
+    return request(`/api/projects/${projectId}/context-items`);
+  },
+
+  createProjectContext(projectId: string, input: { title: string; content?: string; category?: string }): Promise<ProjectContextItem> {
+    return request(`/api/projects/${projectId}/context-items`, { method: 'POST', body: JSON.stringify(input) });
+  },
+
+  updateProjectContext(projectId: string, itemId: string, input: { title?: string; content?: string; category?: string; sortOrder?: number }): Promise<ProjectContextItem> {
+    return request(`/api/projects/${projectId}/context-items/${itemId}`, { method: 'PATCH', body: JSON.stringify(input) });
+  },
+
+  deleteProjectContext(projectId: string, itemId: string): Promise<{ ok: boolean }> {
+    return request(`/api/projects/${projectId}/context-items/${itemId}`, { method: 'DELETE' });
+  },
+
+  projectWecomBot(projectId: string): Promise<{ bot: ProjectWecomBot | null }> {
+    return request(`/api/projects/${projectId}/wecom-bot`);
+  },
+
+  startProjectWecomBotRegistration(projectId: string): Promise<ProjectWecomBotRegistration> {
+    return request(`/api/projects/${projectId}/wecom-bot/register/start`, { method: 'POST' });
+  },
+
+  projectWecomBotRegistration(projectId: string, attemptId: string): Promise<ProjectWecomBotPoll> {
+    return request(`/api/projects/${projectId}/wecom-bot/register/${encodeURIComponent(attemptId)}`);
+  },
+
+  deleteProjectWecomBot(projectId: string): Promise<{ ok: boolean }> {
+    return request(`/api/projects/${projectId}/wecom-bot`, { method: 'DELETE' });
   },
 
   projectWorkspace(projectId: string, serviceId: string, path = ''): Promise<ProjectWorkspaceResponse> {
@@ -483,6 +583,10 @@ export const api = {
     return request('/api/settings/security/test', { method: 'POST' });
   },
 
+  mentionTargets(): Promise<{ targets: MentionTarget[] }> {
+    return request('/api/mentions');
+  },
+
   // ---- tasks ----
   tasks(params: { projectId?: string; status?: string; type?: string; mine?: boolean; limit?: number } = {}): Promise<WorkItem[]> {
     return request(
@@ -503,6 +607,18 @@ export const api = {
   },
   cancelTask(id: string): Promise<WorkItem> {
     return request(`/api/tasks/${id}/cancel`, { method: 'POST' });
+  },
+
+  notifications(unreadOnly = false): Promise<{ unread: number; notifications: TaskNotificationItem[] }> {
+    return request(`/api/notifications${unreadOnly ? '?unread=1' : ''}`);
+  },
+
+  readNotification(id: string): Promise<{ ok: boolean }> {
+    return request(`/api/notifications/${id}/read`, { method: 'POST' });
+  },
+
+  readAllNotifications(): Promise<{ ok: boolean }> {
+    return request('/api/notifications/read-all', { method: 'POST' });
   },
 
   // ---- assistant ----
@@ -667,6 +783,10 @@ export const api = {
 
   updateMemoryBrief(projectId: string, maxChars: number): Promise<{ maxChars: number; brief: MemoryBrief }> {
     return request(`/api/projects/${projectId}/memory/brief`, { method: 'PATCH', body: JSON.stringify({ maxChars }) });
+  },
+
+  memoryReport(projectId: string, period: 'week' | 'month' = 'week', anchor?: string): Promise<MemoryReport> {
+    return request(`/api/projects/${encodeURIComponent(projectId)}/memory/reports?period=${period}${anchor ? `&anchor=${encodeURIComponent(anchor)}` : ''}`);
   },
 
   memoryDream(projectId: string): Promise<MemoryDreamStatus> {

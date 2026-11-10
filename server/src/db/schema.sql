@@ -99,11 +99,30 @@ CREATE TABLE IF NOT EXISTS projects (
   workspace_path    TEXT,
   status            TEXT NOT NULL DEFAULT 'active',
   memory_agent_id   TEXT,
+  reports_enabled   INTEGER NOT NULL DEFAULT 1,
+  weekly_report_day INTEGER NOT NULL DEFAULT 5,
+  weekly_report_time TEXT NOT NULL DEFAULT '17:00',
+  monthly_report_day INTEGER NOT NULL DEFAULT 1,
+  monthly_report_time TEXT NOT NULL DEFAULT '09:00',
   created_at        TEXT NOT NULL,
   updated_at        TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_projects_team ON projects(owner_team_id);
 CREATE INDEX IF NOT EXISTS idx_projects_owner ON projects(owner_person_id);
+
+-- 项目背景/上下文条目，逐条维护并在任务执行时注入
+CREATE TABLE IF NOT EXISTS project_context_items (
+  id          TEXT PRIMARY KEY,
+  project_id  TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+  title       TEXT NOT NULL,
+  content     TEXT NOT NULL DEFAULT '',
+  category    TEXT NOT NULL DEFAULT 'other',
+  sort_order  INTEGER NOT NULL DEFAULT 0,
+  created_by  TEXT REFERENCES persons(id) ON DELETE SET NULL,
+  created_at  TEXT NOT NULL,
+  updated_at  TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_project_context_project ON project_context_items(project_id, sort_order ASC);
 
 CREATE TABLE IF NOT EXISTS project_members (
   project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
@@ -166,6 +185,7 @@ CREATE TABLE IF NOT EXISTS prompt_cards (
   team_id     TEXT REFERENCES teams(id) ON DELETE CASCADE,
   person_id   TEXT REFERENCES persons(id) ON DELETE CASCADE,
   enabled     INTEGER NOT NULL DEFAULT 1,
+  auto_inject INTEGER NOT NULL DEFAULT 0,
   created_by  TEXT REFERENCES persons(id) ON DELETE SET NULL,
   created_at  TEXT NOT NULL,
   updated_at  TEXT NOT NULL
@@ -177,6 +197,7 @@ CREATE INDEX IF NOT EXISTS idx_prompt_cards_project ON prompt_cards(project_id, 
 CREATE TABLE IF NOT EXISTS dsh_instances (
   id             TEXT PRIMARY KEY,
   name           TEXT NOT NULL,
+  agent_type     TEXT NOT NULL DEFAULT 'dsh',
   kind           TEXT NOT NULL DEFAULT 'remote',
   host           TEXT NOT NULL DEFAULT '',
   port           INTEGER,
@@ -185,6 +206,7 @@ CREATE TABLE IF NOT EXISTS dsh_instances (
   workspace_root TEXT NOT NULL DEFAULT '',
   version        TEXT NOT NULL DEFAULT '',
   plugin_version TEXT,
+  capabilities   TEXT NOT NULL DEFAULT '[]',
   token_hash     TEXT NOT NULL UNIQUE,
   token_prefix   TEXT NOT NULL DEFAULT '',
   status         TEXT NOT NULL DEFAULT 'unconfigured',
@@ -197,6 +219,20 @@ CREATE TABLE IF NOT EXISTS dsh_instances (
   metadata       TEXT NOT NULL DEFAULT '{}'
 );
 CREATE INDEX IF NOT EXISTS idx_instances_status ON dsh_instances(status, last_seen_at DESC);
+
+-- 项目级企业微信机器人：扫码注册后保存机器人凭据并接入项目任务
+CREATE TABLE IF NOT EXISTS project_wecom_bots (
+  id            TEXT PRIMARY KEY,
+  project_id    TEXT NOT NULL UNIQUE REFERENCES projects(id) ON DELETE CASCADE,
+  remote_bot_id TEXT NOT NULL UNIQUE,
+  secret        TEXT NOT NULL,
+  status        TEXT NOT NULL DEFAULT 'connecting',
+  created_by    TEXT REFERENCES persons(id) ON DELETE SET NULL,
+  created_at    TEXT NOT NULL,
+  updated_at    TEXT NOT NULL,
+  connected_at  TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_project_wecom_bots_status ON project_wecom_bots(status, updated_at DESC);
 
 CREATE TABLE IF NOT EXISTS instance_projects (
   instance_id TEXT NOT NULL REFERENCES dsh_instances(id) ON DELETE CASCADE,
@@ -214,6 +250,10 @@ CREATE TABLE IF NOT EXISTS work_items (
   title              TEXT NOT NULL,
   prompt             TEXT NOT NULL,
   prompt_card_ids    TEXT NOT NULL DEFAULT '[]',
+  handoff_person_id  TEXT REFERENCES persons(id) ON DELETE SET NULL,
+  handoff_prompt_card_ids TEXT NOT NULL DEFAULT '[]',
+  handoff_note       TEXT NOT NULL DEFAULT '',
+  notify_person_ids  TEXT NOT NULL DEFAULT '[]',
   status             TEXT NOT NULL DEFAULT 'queued',
   priority           INTEGER NOT NULL DEFAULT 0,
   lease_until        TEXT,
@@ -233,6 +273,20 @@ CREATE INDEX IF NOT EXISTS idx_tasks_queue ON work_items(project_id, status, pri
 CREATE INDEX IF NOT EXISTS idx_tasks_instance ON work_items(instance_id, status, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_tasks_created ON work_items(created_at DESC);
 CREATE UNIQUE INDEX IF NOT EXISTS idx_tasks_dedupe ON work_items(project_id, dedupe_key) WHERE dedupe_key IS NOT NULL;
+
+-- 任务完成/接力通知
+CREATE TABLE IF NOT EXISTS task_notifications (
+  id          TEXT PRIMARY KEY,
+  person_id   TEXT NOT NULL REFERENCES persons(id) ON DELETE CASCADE,
+  task_id     TEXT REFERENCES work_items(id) ON DELETE CASCADE,
+  project_id  TEXT REFERENCES projects(id) ON DELETE CASCADE,
+  type        TEXT NOT NULL DEFAULT 'task.completed',
+  title       TEXT NOT NULL,
+  body        TEXT NOT NULL DEFAULT '',
+  read_at     TEXT,
+  created_at  TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_task_notifications_person ON task_notifications(person_id, read_at, created_at DESC);
 
 CREATE TABLE IF NOT EXISTS task_events (
   id          TEXT PRIMARY KEY,

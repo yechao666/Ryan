@@ -57,6 +57,7 @@ export interface ProjectMemberRow {
 export interface InstanceRow {
   id: string;
   name: string;
+  agent_type: string;
   kind: string;
   host: string;
   port: number | null;
@@ -65,6 +66,7 @@ export interface InstanceRow {
   workspace_root: string;
   version: string;
   plugin_version: string | null;
+  capabilities: string;
   token_hash: string;
   token_prefix: string;
   status: string;
@@ -181,6 +183,13 @@ export function buildProjectSummary(db: Db, row: ProjectRow): ProjectSummary {
         WHERE ip.project_id = ? AND i.revoked_at IS NULL ORDER BY i.name ASC`,
     )
     .all(row.id) as unknown as { id: string; name: string }[];
+  const reportSettings: ProjectSummary['reportSettings'] = {
+    enabled: row.reports_enabled !== 0,
+    weeklyDay: Math.min(7, Math.max(1, Number(row.weekly_report_day) || 5)),
+    weeklyTime: /^\d{2}:\d{2}$/.test(row.weekly_report_time) ? row.weekly_report_time : '17:00',
+    monthlyDay: Math.min(28, Math.max(1, Number(row.monthly_report_day) || 1)),
+    monthlyTime: /^\d{2}:\d{2}$/.test(row.monthly_report_time) ? row.monthly_report_time : '09:00',
+  };
   return {
     id: row.id,
     slug: row.slug,
@@ -195,6 +204,7 @@ export function buildProjectSummary(db: Db, row: ProjectRow): ProjectSummary {
     prompt: row.prompt,
     repoUrl: row.repo_url ?? undefined,
     status: row.status as ProjectSummary['status'],
+    reportSettings,
     serviceIds: services.map((service) => service.id),
     serviceNames: services.map((service) => service.name),
     memoryAgentId: `aiwo_${row.slug.replace(/-/g, '_')}`,
@@ -233,12 +243,14 @@ export function buildInstance(db: Db, row: InstanceRow, now = Date.now()): DshIn
   return {
     id: row.id,
     name: row.name,
+    agentType: (row.agent_type === 'claude' ? 'claude' : 'dsh') as DshInstance['agentType'],
     kind: row.kind as DshInstance['kind'],
     host: row.host,
     port: row.port ?? undefined,
     baseUrl: row.base_url ?? undefined,
     version: row.version,
     pluginVersion: row.plugin_version ?? undefined,
+    capabilities: (() => { try { const value: unknown = JSON.parse(row.capabilities || '[]'); return Array.isArray(value) ? value.filter((item): item is string => typeof item === 'string') : []; } catch { return []; } })(),
     status: computeInstanceStatus(row, now),
     lastSeenAt: row.last_seen_at ?? undefined,
     registeredAt: row.registered_at,
@@ -306,7 +318,7 @@ export function listVisibleProjects(db: Db, actor: Actor): ProjectSummary[] {
 }
 
 export function listInstancesForOwner(db: Db, _ownerPersonId: string | null, now = Date.now()): DshInstance[] {
-  return (db.prepare('SELECT * FROM dsh_instances ORDER BY created_at DESC').all() as unknown as InstanceRow[]).map((row) =>
+  return (db.prepare('SELECT * FROM dsh_instances WHERE revoked_at IS NULL ORDER BY created_at DESC').all() as unknown as InstanceRow[]).map((row) =>
     buildInstance(db, row, now),
   );
 }

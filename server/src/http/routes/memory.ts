@@ -18,6 +18,7 @@ import {
 } from '../../memory/store.ts';
 import { ensureMemoryBrief } from '../../memory/brief.ts';
 import { getDreamSettings, getDreamStatus, runDream, updateDreamSettings } from '../../memory/dream.ts';
+import { buildMemoryReport } from '../../memory/report.ts';
 import { checkUserInput } from '../../security/check.ts';
 import type {
   MemoryContextResult,
@@ -43,6 +44,11 @@ const briefSettingsSchema = z.object({
   maxChars: z.number().int().min(100).max(5000),
 });
 
+const reportQuerySchema = z.object({
+  period: z.enum(['week', 'month']).default('week'),
+  anchor: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+});
+
 const dreamSettingsSchema = z.object({
   enabled: z.boolean().optional(),
   intervalMinutes: z.number().int().min(1).max(60 * 24 * 30).optional(),
@@ -51,7 +57,7 @@ const dreamSettingsSchema = z.object({
 const addSchema = z.object({
   content: z.string().trim().min(1).max(20_000),
   title: z.string().trim().max(200).optional(),
-  category: z.enum(['fact', 'decision', 'note', 'task_result']).optional(),
+  category: z.enum(['fact', 'decision', 'progress', 'lesson', 'risk', 'change', 'acceptance', 'assumption', 'dependency', 'note', 'task_result', 'insight']).optional(),
 });
 
 export function registerMemoryRoutes(router: Router): void {
@@ -81,6 +87,12 @@ export function registerMemoryRoutes(router: Router): void {
     rc.json({ maxChars, brief: await ensureMemoryBrief(rc.app.db, project.id, true) });
   });
 
+  router.get('/api/projects/:id/memory/reports', (rc) => {
+    const project = requireProject(rc, rc.params.id, 'view');
+    const params = rc.query(reportQuerySchema);
+    rc.json(buildMemoryReport(rc.app.db, project.id, params.period, params.anchor));
+  });
+
   router.get('/api/projects/:id/memory/dream', (rc) => {
     const project = requireProject(rc, rc.params.id, 'view');
     rc.json(getDreamStatus(rc.app.db, project.id));
@@ -95,7 +107,7 @@ export function registerMemoryRoutes(router: Router): void {
   router.post('/api/projects/:id/memory/dream/run', async (rc) => {
     const project = requireProject(rc, rc.params.id, 'manage');
     const run = await runDream(rc.app.db, project.id, 'manual');
-    if (!run) throw errors.conflict('该项目正在做梦，请稍后再试');
+    if (!run) throw errors.conflict('该项目正在进行复盘总结，请稍后再试');
     rc.json({ run, status: getDreamStatus(rc.app.db, project.id) });
   });
 

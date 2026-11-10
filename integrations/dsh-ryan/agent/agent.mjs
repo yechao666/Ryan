@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Ryan DSH 服务代理。
+ * Ryan 智能体代理。
  *
  * - outbound 连接 Ryan 运行时：注册 → 心跳 → 轮询 claim → 执行 → 上报事件 → complete
  * - 执行优先用常驻 `dsh --profile acp` 子进程（ACP v1 over stdio），
@@ -323,7 +323,13 @@ class Agent {
         status: 'done',
         summary: summary.slice(0, MAX_SUMMARY),
         decisions: extractSection(summary, '决策|关键决策|决策记录'),
-        lessons: extractSection(summary, '经验|经验教训|复盘|风险'),
+        progress: extractSection(summary, '进展|关键进展|阶段进展'),
+        lessons: extractSection(summary, '经验|经验教训|复盘'),
+        risks: extractSection(summary, '风险|风险与阻塞|阻塞'),
+        changes: extractSection(summary, '变更|范围变更|计划变更'),
+        acceptance: extractSection(summary, '验收|验收与质量|质量门禁'),
+        assumptions: extractSection(summary, '假设与待确认|假设|待确认|未决问题'),
+        dependencies: extractSection(summary, '依赖|依赖与承诺|外部依赖'),
         sessionId: sessionId || undefined,
       });
     } catch (error) {
@@ -436,7 +442,13 @@ class Agent {
     const payload = { status: input.status, summary: input.summary };
     if (input.error) payload.error = input.error;
     if (input.decisions?.length) payload.decisions = input.decisions;
+    if (input.progress?.length) payload.progress = input.progress;
     if (input.lessons?.length) payload.lessons = input.lessons;
+    if (input.risks?.length) payload.risks = input.risks;
+    if (input.changes?.length) payload.changes = input.changes;
+    if (input.acceptance?.length) payload.acceptance = input.acceptance;
+    if (input.assumptions?.length) payload.assumptions = input.assumptions;
+    if (input.dependencies?.length) payload.dependencies = input.dependencies;
     if (input.sessionId) payload.sessionId = input.sessionId;
     try {
       await this.api.complete(taskId, payload);

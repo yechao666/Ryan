@@ -220,7 +220,7 @@ export function TasksPage() {
     },
     {
       key: 'instance',
-      header: '服务',
+      header: '智能体',
       width: 150,
       render: (task) => (
         <span className={task.instanceName ? 'truncate' : 'dim truncate'} title={task.instanceName || '自动分配'}>
@@ -294,7 +294,7 @@ export function TasksPage() {
       <PageHead
         eyebrow="任务 · Tasks"
         title="任务"
-        desc="全局任务视图：任务由人员、自动化或仓库事件触发，由服务领取执行。"
+        desc="全局任务视图：任务由人员、自动化或仓库事件触发，由智能体领取执行。"
         actions={
           <>
             <IconButton icon="refresh" label="刷新任务" onClick={() => void reload()} />
@@ -331,7 +331,7 @@ export function TasksPage() {
             value={fmtInt(stats.running)}
             icon="zap"
             tone="amber"
-            hint={hasFilter ? '当前筛选结果' : '服务正在处理'}
+            hint={hasFilter ? '当前筛选结果' : '智能体正在处理'}
           />
           <Stat
             label="等待输入"
@@ -375,7 +375,7 @@ export function TasksPage() {
           <SearchInput
             value={keyword}
             onChange={setKeyword}
-            placeholder="搜索标题 / 短 ID / 执行人 / 服务"
+            placeholder="搜索标题 / 短 ID / 执行人 / 智能体"
             className="ws-search"
             onSubmit={applySearch}
           />

@@ -121,7 +121,7 @@ export function authenticateInstance(rc: RequestContext): { id: string; name: st
     .get(sha256(token)) as unknown as
     | { id: string; name: string; status: string; revoked_at: string | null }
     | undefined;
-  if (!row || row.revoked_at) throw errors.unauthorized('服务令牌无效或已吊销');
+  if (!row || row.revoked_at) throw errors.unauthorized('智能体令牌无效或已吊销');
   rc.app.db
     .prepare("UPDATE dsh_instances SET last_seen_at = ?, status = 'online' WHERE id = ?")
     .run(nowIso(), row.id);

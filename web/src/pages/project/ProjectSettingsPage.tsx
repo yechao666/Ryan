@@ -1,38 +1,30 @@
 import { useEffect, useMemo, useState } from 'react';
-import type { ProjectMember, ProjectRole, ProjectType, Visibility } from '@shared';
+import type { ProjectReportSettings, ProjectType, Visibility } from '@shared';
 import { PROJECT_TYPES, VISIBILITIES } from '@shared';
 import { api } from '@lib/api.ts';
 import { fmtDate, fmtMs } from '@lib/format.ts';
 import { useAsync } from '@lib/hooks.ts';
 import { useAuth } from '@lib/auth.tsx';
 import {
-  Avatar,
   Badge,
   Button,
   Callout,
   Card,
-  ConfirmDialog,
   EmptyState,
   Field,
   Icon,
   IconButton,
   Input,
-  Modal,
   PageHead,
   SectionHead,
   Select,
-  Skeleton,
-  Table,
+  Switch,
   Textarea,
   useToast,
-  type Column,
-  type Tone,
 } from '@ui';
 import { useProject } from '../ProjectLayout.tsx';
-import { PersonPicker } from '../../components/people/PersonPicker.tsx';
+import { MentionTextarea } from '../../components/project/MentionTextarea.tsx';
 import {
-  PROJECT_ROLE_OPTIONS,
-  projectRoleLabel,
   projectTypeMeta,
   visibilityMeta,
 } from '../../components/project/meta.ts';
@@ -50,7 +42,7 @@ interface BasicForm {
   ownerTeamId: string;
 }
 
-/** 项目设置：基本信息、成员与危险操作。 */
+/** 项目设置：基本信息、复盘报告与危险操作。 */
 export function ProjectSettingsPage() {
   const { detail, reload } = useProject();
   const projectId = detail.project.id;
@@ -68,16 +60,9 @@ export function ProjectSettingsPage() {
     ownerTeamId: detail.project.ownerTeamId ?? '',
   });
   const [savingBasic, setSavingBasic] = useState(false);
-
-  const [addOpen, setAddOpen] = useState(false);
-  const [newPersonId, setNewPersonId] = useState('');
-  const [personPickerOpen, setPersonPickerOpen] = useState(false);
-  const [newRole, setNewRole] = useState<ProjectRole>('developer');
-  const [adding, setAdding] = useState(false);
-  const [removeTarget, setRemoveTarget] = useState<ProjectMember | null>(null);
-  const [removing, setRemoving] = useState(false);
-
-  const persons = useAsync(() => api.persons(), [addOpen], addOpen);
+  const [reportForm, setReportForm] = useState<ProjectReportSettings>(detail.project.reportSettings);
+  const [reportBase, setReportBase] = useState<ProjectReportSettings>(detail.project.reportSettings);
+  const [savingReport, setSavingReport] = useState(false);
 
   // 项目详情刷新后同步表单（保存成功后回填最新值）。
   useEffect(() => {
@@ -93,22 +78,9 @@ export function ProjectSettingsPage() {
   }, [detail.project]);
 
   useEffect(() => {
-    if (!addOpen) return;
-    setNewPersonId('');
-    setPersonPickerOpen(false);
-    setNewRole('developer');
-  }, [addOpen]);
-
-  const existingMemberIds = useMemo(
-    () => new Set((detail.members ?? []).map((member) => member.personId)),
-    [detail.members],
-  );
-  const availablePersons = useMemo(
-    () => (persons.data ?? []).filter((item) => !existingMemberIds.has(item.id)),
-    [persons.data, existingMemberIds],
-  );
-
-  const selectedPerson = availablePersons.find((item) => item.id === newPersonId);
+    setReportForm(detail.project.reportSettings);
+    setReportBase(detail.project.reportSettings);
+  }, [detail.project.id]);
 
   const teamOptions = useMemo(
     () => [{ value: '', label: '不归属团队' }, ...(teams.data ?? []).map((team) => ({ value: team.id, label: team.name }))],
@@ -142,81 +114,31 @@ export function ProjectSettingsPage() {
     }
   };
 
-  const handleAddMember = async () => {
-    if (!newPersonId) return;
-    setAdding(true);
+  const handleSaveReport = async () => {
+    setSavingReport(true);
     try {
-      await api.addProjectMember(projectId, newPersonId, newRole);
-      toast.success('成员已加入项目');
-      setAddOpen(false);
+      await api.updateProject(projectId, {
+        reportsEnabled: reportForm.enabled,
+        weeklyReportDay: reportForm.weeklyDay,
+        weeklyReportTime: reportForm.weeklyTime,
+        monthlyReportDay: reportForm.monthlyDay,
+        monthlyReportTime: reportForm.monthlyTime,
+      });
+      toast.success('复盘报告设置已保存');
       await reload();
     } catch (cause) {
-      toast.error(cause instanceof Error ? cause.message : '添加成员失败，请重试');
+      toast.error(cause instanceof Error ? cause.message : '保存复盘报告设置失败，请重试');
     } finally {
-      setAdding(false);
+      setSavingReport(false);
     }
   };
-
-  const handleRemoveMember = async () => {
-    if (!removeTarget) return;
-    setRemoving(true);
-    try {
-      await api.removeProjectMember(projectId, removeTarget.personId);
-      toast.success('成员已移出项目');
-      setRemoveTarget(null);
-      await reload();
-    } catch (cause) {
-      toast.error(cause instanceof Error ? cause.message : '移除成员失败');
-    } finally {
-      setRemoving(false);
-    }
-  };
-
-  const memberColumns: Column<ProjectMember>[] = [
-    {
-      key: 'member',
-      header: '成员',
-      render: (row) => (
-        <div className="hstack gap-10">
-          <Avatar name={row.name} tone="violet" />
-          <div className="vstack" style={{ gap: 1, minWidth: 0 }}>
-            <span className="strong truncate">{row.name}</span>
-            <span className="tiny dim truncate">{row.email}</span>
-          </div>
-        </div>
-      ),
-    },
-    {
-      key: 'role',
-      header: '项目角色',
-      render: (row) => <Badge tone="slate">{projectRoleLabel(row.role)}</Badge>,
-    },
-    {
-      key: 'addedAt',
-      header: '加入时间',
-      render: (row) => <span className="tiny dim">{fmtDate(row.addedAt)}</span>,
-    },
-    {
-      key: 'actions',
-      header: '操作',
-      align: 'right',
-      render: (row) => (
-        <IconButton
-          icon="trash"
-          label={`移除 ${row.name}`}
-          size="sm"
-          onClick={() => setRemoveTarget(row)}
-        />
-      ),
-    },
-  ];
 
   const visibility = visibilityMeta(form.visibility);
   const type = projectTypeMeta(form.type);
 
   return (
     <div className="ws-page">
-      <PageHead title="项目设置" desc="维护项目基本信息、记忆集成与成员权限。工作区由 DSH 服务按项目 ID 自动生成，不需要配置。" />
+      <PageHead title="项目设置" desc="维护项目基本信息、复盘报告与危险操作。项目成员请到「成员」页管理。" />
 
       <div className="ws-settings-stack">
         <Card className="card-pad">
@@ -300,11 +222,11 @@ export function ProjectSettingsPage() {
                 label="项目提示词"
                 hint="项目基本面：目标、规范、约束。任务执行时会把这部分注入 DSH 提示词；改动立即对后续任务生效。"
               >
-                <Textarea
+                <MentionTextarea
                   rows={6}
                   value={form.prompt}
-                  placeholder="例如：这是 Python/FastAPI 订单服务；幂等键必须绑定业务单号；迁移先 staging 验证；合并前必须跑测试。"
-                  onChange={(event) => setForm((prev) => ({ ...prev, prompt: event.target.value }))}
+                  placeholder="例如：这是 Python/FastAPI 订单服务；输入 @ 可提及人员或智能体；合并前必须跑测试。"
+                  onChange={(value) => setForm((prev) => ({ ...prev, prompt: value }))}
                 />
               </Field>
             </div>
@@ -316,41 +238,70 @@ export function ProjectSettingsPage() {
           </div>
         </Card>
 
-        <Card>
-          <div className="card-pad" style={{ paddingBottom: 8 }}>
-            <SectionHead
-              title={
-                <>
-                  <Icon name="users" size={14} />
-                  成员
-                </>
-              }
-              desc="项目成员可以查看项目、创建任务，并按角色获得相应权限。"
-              actions={
-                <Button size="sm" variant="outline" icon="plus" onClick={() => setAddOpen(true)}>
-                  添加成员
-                </Button>
-              }
-            />
-          </div>
-          <Table
-            columns={memberColumns}
-            rows={detail.members ?? []}
-            rowKey={(row) => row.personId}
-            empty={
-              <EmptyState
-                icon="users"
-                title="暂无项目成员"
-                description="添加成员后，他们可以在项目内创建任务并查看执行进展。"
-                action={
-                  <Button size="sm" variant="outline" icon="plus" onClick={() => setAddOpen(true)}>
-                    添加成员
-                  </Button>
-                }
-                compact
-              />
+        <Card className="card-pad">
+          <SectionHead
+            title={
+              <>
+                <Icon name="calendar" size={14} />
+                复盘与报告
+              </>
             }
+            desc="控制是否在项目导航中显示「复盘总结」，并设置周报/月报的计划生成时间。关闭后不会显示报告页。"
+            actions={<Badge tone={reportForm.enabled ? 'green' : 'slate'} size="sm" dot>{reportForm.enabled ? '已开启' : '已关闭'}</Badge>}
           />
+          <div className="ws-form-grid mt-12">
+            <div className="ws-form-field-full between">
+              <div>
+                <div className="strong">启用周报 / 月报</div>
+                <div className="tiny dim mt-4">关闭后隐藏项目导航中的「复盘总结」入口，不影响已有过程记录。</div>
+              </div>
+              <Switch
+                checked={reportForm.enabled}
+                onChange={(checked) => setReportForm((prev) => ({ ...prev, enabled: checked }))}
+                label={reportForm.enabled ? '已开启' : '已关闭'}
+              />
+            </div>
+            <Field label="周报生成日" hint="按周一至周日选择。">
+              <Select
+                value={String(reportForm.weeklyDay)}
+                options={[
+                  { value: '1', label: '周一' }, { value: '2', label: '周二' }, { value: '3', label: '周三' },
+                  { value: '4', label: '周四' }, { value: '5', label: '周五' }, { value: '6', label: '周六' }, { value: '7', label: '周日' },
+                ]}
+                disabled={!reportForm.enabled}
+                onChange={(event) => setReportForm((prev) => ({ ...prev, weeklyDay: Number(event.target.value) }))}
+              />
+            </Field>
+            <Field label="周报生成时间" hint="使用本机本地时间。">
+              <Input
+                type="time"
+                value={reportForm.weeklyTime}
+                disabled={!reportForm.enabled}
+                onChange={(event) => setReportForm((prev) => ({ ...prev, weeklyTime: event.target.value }))}
+              />
+            </Field>
+            <Field label="月报生成日" hint="1–28 日，避免不同月份天数差异。">
+              <Select
+                value={String(reportForm.monthlyDay)}
+                options={Array.from({ length: 28 }, (_, index) => ({ value: String(index + 1), label: `${index + 1} 日` }))}
+                disabled={!reportForm.enabled}
+                onChange={(event) => setReportForm((prev) => ({ ...prev, monthlyDay: Number(event.target.value) }))}
+              />
+            </Field>
+            <Field label="月报生成时间" hint="使用本机本地时间。">
+              <Input
+                type="time"
+                value={reportForm.monthlyTime}
+                disabled={!reportForm.enabled}
+                onChange={(event) => setReportForm((prev) => ({ ...prev, monthlyTime: event.target.value }))}
+              />
+            </Field>
+          </div>
+          <div className="ws-card-actions">
+            <Button variant="primary" icon="check" loading={savingReport} disabled={!reportForm.enabled && reportBase.enabled === false} onClick={() => void handleSaveReport()}>
+              保存报告设置
+            </Button>
+          </div>
         </Card>
 
         {isOwnerOrAdmin ? (
@@ -371,73 +322,6 @@ export function ProjectSettingsPage() {
         ) : null}
       </div>
 
-      <Modal
-        open={addOpen}
-        onClose={() => setAddOpen(false)}
-        title="添加项目成员"
-        description="从组织成员中选择一位加入本项目。"
-        footer={
-          <>
-            <Button variant="ghost" onClick={() => setAddOpen(false)}>
-              取消
-            </Button>
-            <Button
-              variant="primary"
-              loading={adding}
-              disabled={!newPersonId}
-              onClick={() => void handleAddMember()}
-            >
-              添加
-            </Button>
-          </>
-        }
-      >
-        <Field label="成员" required hint="人员较多时可在对话框中搜索姓名、邮箱或职位。">
-          {persons.loading && !persons.data ? (
-            <Skeleton h={46} style={{ borderRadius: 10 }} />
-          ) : persons.error ? (
-            <Callout tone="red" icon="alert">加载成员列表失败：{persons.error}</Callout>
-          ) : !availablePersons.length ? (
-            <EmptyState icon="users" title="没有可添加的成员" description="组织内成员都已在项目中。" compact />
-          ) : selectedPerson ? (
-            <div className="ws-pick-item">
-              <Avatar name={selectedPerson.name} tone={(selectedPerson.avatarColor as never) ?? 'violet'} size="sm" />
-              <div className="ws-pick-main grow">
-                <span className="ws-pick-name">{selectedPerson.name}</span>
-                <span className="tiny dim">{selectedPerson.title || '—'} · {selectedPerson.email}</span>
-              </div>
-              <Button size="sm" variant="ghost" icon="users" onClick={() => setPersonPickerOpen(true)}>更换</Button>
-            </div>
-          ) : (
-            <Button variant="outline" icon="users" onClick={() => setPersonPickerOpen(true)}>选择人员</Button>
-          )}
-          <PersonPicker
-            open={personPickerOpen}
-            people={availablePersons}
-            teams={(teams.data ?? []).map((team) => ({ id: team.id, name: team.name }))}
-            value={newPersonId}
-            onClose={() => setPersonPickerOpen(false)}
-            onSelect={(selected) => setNewPersonId(selected.id)}
-          />
-        </Field>
-        <Field label="项目角色" required hint="所有者可删除项目，维护者可管理服务、提示卡与自动化，开发者可创建任务，观察者只读。">
-          <Select
-            value={newRole}
-            options={PROJECT_ROLE_OPTIONS}
-            onChange={(event) => setNewRole(event.target.value as ProjectRole)}
-          />
-        </Field>
-      </Modal>
-
-      <ConfirmDialog
-        open={Boolean(removeTarget)}
-        onClose={() => setRemoveTarget(null)}
-        onConfirm={() => void handleRemoveMember()}
-        title="移除项目成员"
-        description={`确认把「${removeTarget?.name ?? ''}」移出项目？其历史任务与记录会保留。`}
-        confirmLabel="移除成员"
-        loading={removing}
-      />
     </div>
   );
 }

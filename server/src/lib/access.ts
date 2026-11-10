@@ -12,6 +12,11 @@ export interface ProjectRow {
   prompt: string;
   repo_url: string | null;
   status: string;
+  reports_enabled: number;
+  weekly_report_day: number;
+  weekly_report_time: string;
+  monthly_report_day: number;
+  monthly_report_time: string;
   memory_agent_id: string | null;
   created_at: string;
   updated_at: string;

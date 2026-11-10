@@ -315,13 +315,32 @@ export function TaskDrawer({ taskId, onClose, onChanged, inline = false }: TaskD
                   {task.executorLabel || 'Ryan'}
                 </span>
               </MetaItem>
-              <MetaItem label="服务">{task.instanceName || '自动分配'}</MetaItem>
+              <MetaItem label="智能体">{task.instanceName || '自动分配'}</MetaItem>
               <MetaItem label="创建人">{task.createdByName || '—'}</MetaItem>
+              {typeof task.metadata?.wecomSenderId === 'string' ? (
+                <MetaItem label="企微发送人">
+                  <span className="hstack gap-6" style={{ minWidth: 0 }}>
+                    <Icon name="wechat" size={12} />
+                    <span className="truncate" title={String(task.metadata.wecomSenderId)} style={{ maxWidth: 170 }}>
+                      {typeof task.metadata.wecomSenderName === 'string' &&
+                      task.metadata.wecomSenderName &&
+                      task.metadata.wecomSenderName !== task.metadata.wecomSenderId
+                        ? task.metadata.wecomSenderName
+                        : '企业微信用户'}
+                    </span>
+                  </span>
+                </MetaItem>
+              ) : null}
               <MetaItem label="创建时间">{fmtDateTime(task.createdAt)}</MetaItem>
               <MetaItem label="开始时间">{task.startedAt ? fmtDateTime(task.startedAt) : '—'}</MetaItem>
               <MetaItem label="结束时间">{task.finishedAt ? fmtDateTime(task.finishedAt) : '—'}</MetaItem>
               <MetaItem label="运行时长">{fmtDuration(task.startedAt, task.finishedAt)}</MetaItem>
               <MetaItem label="最近更新">{task.lastMessageAt ? fmtRelative(task.lastMessageAt) : '—'}</MetaItem>
+              {task.handoffPersonId ? (
+                <MetaItem label="完成后接力">
+                  <span className="hstack gap-6"><Icon name="arrowRight" size={12} />{task.handoffPersonName || task.handoffPersonId}</span>
+                </MetaItem>
+              ) : null}
             </div>
 
             <div className="ws-drawer-section ws-detail-panel is-violet">
@@ -334,6 +353,20 @@ export function TaskDrawer({ taskId, onClose, onChanged, inline = false }: TaskD
                 <Markdown text={task.prompt.replace(/^\/goal\s*/i, '')} />
               </div>
             </div>
+
+            {task.handoffPersonId ? (
+              <div className="ws-drawer-section ws-detail-panel is-cyan">
+                <SectionHead
+                  title={<><span className="ws-detail-icon"><Icon name="arrowRight" size={13} /></span>完成后接力</>}
+                  desc="任务完成后自动创建接力任务，交给下一位成员"
+                />
+                <div className="tiny muted" style={{ lineHeight: 1.7 }}>
+                  接力给：<strong>{task.handoffPersonName || task.handoffPersonId}</strong>
+                  {task.notifyPersonIds?.length ? ` · 同时通知 ${task.notifyPersonIds.length} 人` : ''}
+                  {task.handoffNote ? <div className="mt-6" style={{ whiteSpace: 'pre-wrap' }}>{task.handoffNote}</div> : null}
+                </div>
+              </div>
+            ) : null}
 
             {task.promptCards?.length > 0 || task.promptCardIds?.length > 0 ? (
               <div className="ws-drawer-section ws-detail-panel is-blue">
@@ -431,8 +464,8 @@ export function TaskDrawer({ taskId, onClose, onChanged, inline = false }: TaskD
             {task.allowedServiceNames?.length ? (
               <div className="ws-drawer-section ws-detail-panel is-amber">
                 <SectionHead
-                  title={<><span className="ws-detail-icon"><Icon name="server" size={13} /></span>服务调度范围</>}
-                  desc={`任务只会在这些服务上运行${task.instanceName ? `；当前：${task.instanceName}` : ''}`}
+                  title={<><span className="ws-detail-icon"><Icon name="server" size={13} /></span>智能体调度范围</>}
+                  desc={`任务只会在这些智能体上运行${task.instanceName ? `；当前：${task.instanceName}` : ''}`}
                 />
                 <div className="badge-dot-list">
                   {task.allowedServiceNames.map((name, index) => (

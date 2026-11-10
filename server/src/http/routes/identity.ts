@@ -92,6 +92,11 @@ const projectUpdateSchema = z.object({
   repoUrl: z.string().trim().max(500).nullable().optional(),
   ownerTeamId: z.string().trim().min(1).nullable().optional(),
   status: projectStatusSchema.optional(),
+  reportsEnabled: z.boolean().optional(),
+  weeklyReportDay: z.coerce.number().int().min(1).max(7).optional(),
+  weeklyReportTime: z.string().regex(/^(?:[01]\d|2[0-3]):[0-5]\d$/).optional(),
+  monthlyReportDay: z.coerce.number().int().min(1).max(28).optional(),
+  monthlyReportTime: z.string().regex(/^(?:[01]\d|2[0-3]):[0-5]\d$/).optional(),
 });
 
 const projectMemberSchema = z.object({
@@ -564,6 +569,26 @@ export function registerIdentityRoutes(router: Router): void {
     if (body.status !== undefined) {
       updates.push('status = ?');
       params.push(body.status);
+    }
+    if (body.reportsEnabled !== undefined) {
+      updates.push('reports_enabled = ?');
+      params.push(body.reportsEnabled ? 1 : 0);
+    }
+    if (body.weeklyReportDay !== undefined) {
+      updates.push('weekly_report_day = ?');
+      params.push(body.weeklyReportDay);
+    }
+    if (body.weeklyReportTime !== undefined) {
+      updates.push('weekly_report_time = ?');
+      params.push(body.weeklyReportTime);
+    }
+    if (body.monthlyReportDay !== undefined) {
+      updates.push('monthly_report_day = ?');
+      params.push(body.monthlyReportDay);
+    }
+    if (body.monthlyReportTime !== undefined) {
+      updates.push('monthly_report_time = ?');
+      params.push(body.monthlyReportTime);
     }
     updates.push('updated_at = ?');
     params.push(nowIso());

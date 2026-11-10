@@ -21,24 +21,28 @@ function installCommand(baseUrl: string, token: string): string {
 
 const createSchema = z.object({
   name: z.string().trim().min(1).max(120),
+  agentType: z.enum(['dsh', 'claude']).optional().default('dsh'),
   kind: z.enum(['local', 'remote']).optional(),
   host: z.string().trim().max(200).optional(),
   port: z.number().int().min(1).max(65535).optional(),
   baseUrl: z.string().trim().max(500).optional(),
+  capabilities: z.array(z.string().trim().min(1).max(40)).max(20).optional(),
 });
 
 const updateSchema = z.object({
   name: z.string().trim().min(1).max(120).optional(),
+  agentType: z.enum(['dsh', 'claude']).optional(),
   kind: z.enum(['local', 'remote']).optional(),
   host: z.string().trim().max(200).optional(),
   port: z.number().int().min(1).max(65535).nullable().optional(),
   baseUrl: z.string().trim().max(500).nullable().optional(),
+  capabilities: z.array(z.string().trim().min(1).max(40)).max(20).optional(),
   status: z.enum(['unconfigured', 'online', 'offline', 'error']).optional(),
 });
 
 function instanceWith(db: import('../../db/index.ts').Db, id: string): DshInstance {
   const row = getInstanceRow(db, id);
-  if (!row) throw errors.notFound('服务不存在');
+  if (!row) throw errors.notFound('智能体不存在');
   return buildInstance(db, row);
 }
 
@@ -77,9 +81,9 @@ function projectWorkspaceForService(
   serviceId: string,
 ): { row: import('./identity-helpers.ts').InstanceRow; root: string; workspace: string } {
   const row = getInstanceRow(db, serviceId);
-  if (!row) throw errors.notFound('DSH 服务不存在');
+  if (!row) throw errors.notFound('智能体不存在');
   const linked = db.prepare('SELECT 1 FROM instance_projects WHERE instance_id = ? AND project_id = ?').get(serviceId, projectId);
-  if (!linked) throw errors.badRequest('该 DSH 服务未绑定到当前项目');
+  if (!linked) throw errors.badRequest('该 智能体未绑定到当前项目');
   const root = workspaceRootFor(row);
   const safeProject = projectId.replace(/[^A-Za-z0-9._-]/g, '_');
   return { row, root, workspace: join(root, 'projects', safeProject) };
@@ -137,7 +141,7 @@ export function registerInstanceRoutes(router: Router): void {
       const service = rc.app.db
         .prepare('SELECT id FROM dsh_instances WHERE id = ? AND revoked_at IS NULL')
         .get(serviceId) as unknown as { id: string } | undefined;
-      if (!service) throw errors.badRequest(`DSH 服务不存在或已吊销：${serviceId}`);
+      if (!service) throw errors.badRequest(`智能体不存在或已吊销：${serviceId}`);
     }
     const now = nowIso();
     rc.app.db.prepare('DELETE FROM instance_projects WHERE project_id = ?').run(project.id);
@@ -162,17 +166,19 @@ export function registerInstanceRoutes(router: Router): void {
     const kind = input.kind ?? 'remote';
     rc.app.db.prepare(
       `INSERT INTO dsh_instances
-         (id, name, kind, host, port, base_url, workspace_path, version, plugin_version,
+         (id, name, agent_type, kind, host, port, base_url, workspace_path, version, plugin_version, capabilities,
           token_hash, token_prefix, status, registered_at, last_seen_at, revoked_at, created_by, created_at, updated_at, metadata)
-       VALUES (?, ?, ?, ?, ?, ?, ?, '', NULL, ?, ?, 'unconfigured', ?, NULL, NULL, ?, ?, ?, '{}')`,
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, '', NULL, ?, ?, ?, 'unconfigured', ?, NULL, NULL, ?, ?, ?, '{}')`,
     ).run(
       id,
       input.name,
+      input.agentType ?? 'dsh',
       kind,
       input.host ?? '',
       input.port ?? null,
       input.baseUrl ?? null,
       '',
+      JSON.stringify(input.capabilities ?? []),
       sha256(token),
       token.slice(0, 18),
       now,
@@ -187,19 +193,21 @@ export function registerInstanceRoutes(router: Router): void {
   router.patch('/api/instances/:id', async (rc) => {
     requireAdmin(rc);
     const row = getInstanceRow(rc.app.db, rc.params.id);
-    if (!row) throw errors.notFound('服务不存在');
+    if (!row) throw errors.notFound('智能体不存在');
     const input = await rc.body(updateSchema);
     const now = nowIso();
     rc.app.db.prepare(
       `UPDATE dsh_instances
-          SET name = ?, kind = ?, host = ?, port = ?, base_url = ?, status = ?, updated_at = ?
+          SET name = ?, agent_type = ?, kind = ?, host = ?, port = ?, base_url = ?, capabilities = ?, status = ?, updated_at = ?
         WHERE id = ?`,
     ).run(
       input.name ?? row.name,
+      input.agentType ?? row.agent_type,
       input.kind ?? row.kind,
       input.host ?? row.host,
       input.port === undefined ? row.port : input.port,
       input.baseUrl === undefined ? row.base_url : input.baseUrl,
+      input.capabilities === undefined ? row.capabilities : JSON.stringify(input.capabilities),
       input.status ?? row.status,
       now,
       row.id,
@@ -210,7 +218,7 @@ export function registerInstanceRoutes(router: Router): void {
   router.post('/api/instances/:id/token', (rc) => {
     requireAdmin(rc);
     const row = getInstanceRow(rc.app.db, rc.params.id);
-    if (!row) throw errors.notFound('服务不存在');
+    if (!row) throw errors.notFound('智能体不存在');
     const token = `aiwo_ins_${randomToken(32)}`;
     rc.app.db.prepare("UPDATE dsh_instances SET token_hash = ?, token_prefix = ?, status = 'unconfigured', updated_at = ? WHERE id = ?").run(
       sha256(token),
@@ -222,13 +230,13 @@ export function registerInstanceRoutes(router: Router): void {
     rc.json({ token, command: installCommand(base, token) });
   });
 
-  // 本机服务：由 Ryan 直接启动本地服务代理（轮换 token 后以环境变量注入）。
+  // 本机智能体：由 Ryan 直接启动本地智能体代理（轮换 token 后以环境变量注入）。
   router.post('/api/instances/:id/start', async (rc) => {
     requireAdmin(rc);
     const row = getInstanceRow(rc.app.db, rc.params.id);
-    if (!row) throw errors.notFound('服务不存在');
-    if (row.kind !== 'local') throw errors.badRequest('仅本机服务支持服务端自动启动；远端请复制安装命令执行');
-    if (computeInstanceStatus(row) === 'online') throw errors.conflict('服务已在线，无需重复启动');
+    if (!row) throw errors.notFound('智能体不存在');
+    if (row.kind !== 'local') throw errors.badRequest('仅本机智能体支持服务端自动启动；远端请复制安装命令执行');
+    if (computeInstanceStatus(row) === 'online') throw errors.conflict('智能体已在线，无需重复启动');
 
     const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../../../..');
     const agentPath = join(repoRoot, 'integrations/aiwo-instance/agent.mjs');
@@ -264,7 +272,7 @@ export function registerInstanceRoutes(router: Router): void {
       child.on('error', () => {});
     } catch (error) {
       closeSync(logFd);
-      throw errors.internal(`启动本机服务代理失败：${error instanceof Error ? error.message : String(error)}`);
+      throw errors.internal(`启动本机智能体代理失败：${error instanceof Error ? error.message : String(error)}`);
     }
     closeSync(logFd);
 
@@ -277,8 +285,8 @@ export function registerInstanceRoutes(router: Router): void {
   router.post('/api/instances/:id/restore', (rc) => {
     requireAdmin(rc);
     const row = getInstanceRow(rc.app.db, rc.params.id);
-    if (!row) throw errors.notFound('服务不存在');
-    if (!row.revoked_at) throw errors.conflict('服务未被删除');
+    if (!row) throw errors.notFound('智能体不存在');
+    if (!row.revoked_at) throw errors.conflict('智能体未被删除');
     const token = `aiwo_ins_${randomToken(32)}`;
     rc.app.db.prepare(
       "UPDATE dsh_instances SET revoked_at = NULL, status = 'unconfigured', token_hash = ?, token_prefix = ?, last_seen_at = NULL, updated_at = ? WHERE id = ?",
@@ -294,7 +302,7 @@ export function registerInstanceRoutes(router: Router): void {
   router.post('/api/instances/:id/test', (rc) => {
     requireAdmin(rc);
     const row = getInstanceRow(rc.app.db, rc.params.id);
-    if (!row) throw errors.notFound('服务不存在');
+    if (!row) throw errors.notFound('智能体不存在');
     const status = computeInstanceStatus(row);
     const lastSeen = row.last_seen_at ? Date.parse(row.last_seen_at) : 0;
     rc.json({
@@ -302,7 +310,7 @@ export function registerInstanceRoutes(router: Router): void {
       status,
       latencyMs: lastSeen ? Date.now() - lastSeen : null,
       pluginVersion: row.plugin_version,
-      message: status === 'online' ? '服务在线，插件心跳正常' : row.status === 'unconfigured' ? '尚未安装/连接插件' : '服务离线',
+      message: status === 'online' ? '智能体在线，插件心跳正常' : row.status === 'unconfigured' ? '尚未安装/连接插件' : '智能体离线',
     });
   });
 
@@ -319,7 +327,7 @@ export function registerInstanceRoutes(router: Router): void {
       available: target.row.kind === 'local',
       workspaceRoot: target.workspace,
       path: query.path,
-      reason: target.row.kind === 'local' ? undefined : '该服务是远端 DSH，工作区位于服务所在机器；当前仅支持本机服务在线浏览。',
+      reason: target.row.kind === 'local' ? undefined : '该智能体是远端智能体，工作区位于智能体所在机器；当前仅支持本机智能体在线浏览。',
       ...directoryEntries(target.root, target.workspace, query.path),
     };
     rc.json(response);
@@ -330,7 +338,7 @@ export function registerInstanceRoutes(router: Router): void {
     const project = requireProject(rc, rc.params.id!, 'view');
     const query = rc.query(z.object({ path: z.string().trim().min(1).max(1_000) }));
     const target = projectWorkspaceForService(rc.app.db, project.id, rc.params.serviceId!);
-    if (target.row.kind !== 'local') throw errors.badRequest('远端服务暂不支持在线预览文件');
+    if (target.row.kind !== 'local') throw errors.badRequest('远端智能体暂不支持在线预览文件');
     const absolute = safeWorkspacePath(target.workspace, query.path);
     if (!existsSync(absolute)) throw errors.notFound('文件不存在');
     const stat = statSync(absolute);
@@ -372,7 +380,7 @@ export function registerInstanceRoutes(router: Router): void {
   router.delete('/api/instances/:id', (rc) => {
     requireAdmin(rc);
     const row = getInstanceRow(rc.app.db, rc.params.id);
-    if (!row) throw errors.notFound('服务不存在');
+    if (!row) throw errors.notFound('智能体不存在');
     rc.app.db.prepare("UPDATE dsh_instances SET revoked_at = ?, status = 'revoked', updated_at = ? WHERE id = ?").run(nowIso(), nowIso(), row.id);
     rc.json({ ok: true });
   });

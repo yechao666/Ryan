@@ -15,6 +15,7 @@ export default defineConfig({
       '@ui': resolve(here, 'src/components/ui/index.tsx'),
       '@charts': resolve(here, 'src/components/charts/index.tsx'),
       '@lib': resolve(here, 'src/lib'),
+      '@deepseek-ai/dsh-client-ui-primitives': resolve(here, 'node_modules/@changfenhuang/dsh-genui/src/client/standalone/primitive-adapter.tsx'),
     },
   },
   server: {

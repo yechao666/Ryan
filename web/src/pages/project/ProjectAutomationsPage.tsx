@@ -216,7 +216,7 @@ export function ProjectAutomationsPage() {
                   <div className="vstack" style={{ gap: 2, minWidth: 0 }}>
                     <span className="ws-automation-name truncate">{automation.name}</span>
                     <span className="tiny dim truncate">
-                      {automation.instanceName ? `服务 ${automation.instanceName}` : '服务 自动分配'}
+                      {automation.instanceName ? `智能体 ${automation.instanceName}` : '智能体自动分配'}
                       {' · '}
                       创建人 {automation.createdByName || '—'}
                     </span>

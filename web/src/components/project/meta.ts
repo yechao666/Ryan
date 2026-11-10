@@ -175,7 +175,7 @@ export type ActivityFilter = 'all' | 'task' | 'instance' | 'project';
 export const ACTIVITY_FILTERS: { value: ActivityFilter; label: string }[] = [
   { value: 'all', label: '全部' },
   { value: 'task', label: '任务' },
-  { value: 'instance', label: '服务' },
+  { value: 'instance', label: '智能体' },
   { value: 'project', label: '项目' },
 ];
 

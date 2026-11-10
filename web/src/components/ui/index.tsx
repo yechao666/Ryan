@@ -263,14 +263,23 @@ export function Checkbox({
   checked,
   onChange,
   label,
+  disabled,
+  size = 'md',
+  ariaLabel,
 }: {
   checked: boolean;
   onChange: (next: boolean) => void;
   label?: ReactNode;
+  disabled?: boolean;
+  size?: 'sm' | 'md';
+  ariaLabel?: string;
 }) {
   return (
-    <label className="checkbox">
-      <input type="checkbox" checked={checked} onChange={(e) => onChange(e.target.checked)} />
+    <label
+      className={`checkbox${size === 'sm' ? ' checkbox-sm' : ''}`}
+      style={disabled ? { opacity: 0.45, pointerEvents: 'none' } : undefined}
+    >
+      <input type="checkbox" checked={checked} disabled={disabled} aria-label={ariaLabel} onChange={(e) => onChange(e.target.checked)} />
       {label}
     </label>
   );
@@ -1012,6 +1021,25 @@ export interface Column<T> {
   sortable?: boolean;
 }
 
+/**
+ * 表格默认按时间倒序：优先“更新时间/最近更新”，其次“创建时间/时间/日期”，
+ * 让任务、记忆、记录、复盘、会话等列表打开时就是“新的在最前面”。
+ */
+function defaultTimeSort<T>(columns: Column<T>[], sortable: boolean): { key: string; dir: 'asc' | 'desc' } | null {
+  if (!sortable) return null;
+  const candidates = columns.filter((column) => column.sortable !== false);
+  const headerOf = (column: Column<T>) => typeof column.header === 'string' ? column.header : '';
+  const keyOf = (column: Column<T>) => column.key.toLowerCase();
+  const preferred = [
+    candidates.find((column) => /更新时间|最近更新|最近活动|最后活动/.test(headerOf(column))),
+    candidates.find((column) => /创建时间|发生时间|加入时间|投递时间|时间|日期/.test(headerOf(column))),
+    candidates.find((column) => /(createdat|updatedat|startedat|finishedat|lastmessageat|lastactivityat|lastseenat|addedat|joinedat|created|updated|time|date)$/.test(keyOf(column))),
+    candidates.find((column) => /最后心跳|最近心跳/.test(headerOf(column))),
+  ];
+  const column = preferred.find(Boolean);
+  return column ? { key: column.key, dir: 'desc' } : null;
+}
+
 export function Table<T>({
   columns,
   rows,
@@ -1023,6 +1051,7 @@ export function Table<T>({
   onToggleKey,
   sortable = false,
   resizable = false,
+  defaultSort,
 }: {
   columns: Column<T>[];
   rows: T[];
@@ -1034,8 +1063,10 @@ export function Table<T>({
   onToggleKey?: (key: string) => void;
   sortable?: boolean;
   resizable?: boolean;
+  /** 覆盖自动时间倒序的默认排序。 */
+  defaultSort?: { key: string; dir: 'asc' | 'desc' };
 }) {
-  const [sort, setSort] = useState<{ key: string; dir: 'asc' | 'desc' } | null>(null);
+  const [sort, setSort] = useState<{ key: string; dir: 'asc' | 'desc' } | null>(() => defaultSort ?? defaultTimeSort(columns, sortable));
   const [widths, setWidths] = useState<Record<string, number>>(() => {
     const next: Record<string, number> = {};
     for (const column of columns) next[column.key] = typeof column.width === 'number' ? column.width : 150;
@@ -1065,7 +1096,7 @@ export function Table<T>({
   const toggleSort = (key: string) => {
     setSort((current) => {
       if (!current || current.key !== key) return { key, dir: 'asc' };
-      if (current.dir === 'asc') return { key, dir: 'desc' };
+      if (current.dir === 'desc') return { key, dir: 'asc' };
       return null;
     });
   };

@@ -1,6 +1,6 @@
 /**
- * Ryan 运行时 API：DSH 服务注册、心跳、领单、进展、完成与运行时事件。
- * 鉴权只用服务 token；任务的执行者固定为创建人 @Ryan。
+ * Ryan 运行时 API：智能体注册、心跳、领单、进展、完成与运行时事件。
+ * 鉴权只用智能体 token；任务的执行者固定为创建人 @Ryan。
  */
 import { execFile } from 'node:child_process';
 import { createReadStream, mkdirSync } from 'node:fs';
@@ -26,6 +26,8 @@ import type {
   WorkItem,
 } from '../../../../shared/src/types.ts';
 import {
+  autoInjectCardIds,
+  createTaskRecord,
   getTaskRow,
   getWorkItem,
   insertTaskEvent,
@@ -35,10 +37,12 @@ import {
   truncateSummary,
   type TaskRow,
 } from './tasks.ts';
-import { addMemory, buildMemoryContext, getMemoryBriefMaxChars, memoryAgentIdOf, searchMemories, taskMemoryText } from '../../memory/store.ts';
+import { addMemory, buildMemoryContext, getMemoryBriefMaxChars, memoryAgentIdOf, searchMemories } from '../../memory/store.ts';
 import { ensureMemoryBrief } from '../../memory/brief.ts';
 import { memoryWriteIssue } from '../../memory/policy.ts';
 import { buildInstance, getInstanceRow } from './identity-helpers.ts';
+import { projectContextText } from '../../projects/context.ts';
+import { createTaskNotification } from '../../lib/notifications.ts';
 
 const LEASE_MS = 3 * 60_000;
 
@@ -63,33 +67,45 @@ function leaseUntil(): string {
 function requireInstanceTask(db: Db, taskId: string, instanceId: string): TaskRow {
   const task = getTaskRow(db, taskId);
   if (!task) throw errors.notFound('任务不存在');
-  if (task.instance_id !== instanceId) throw errors.forbidden('任务不属于当前服务');
+  if (task.instance_id !== instanceId) throw errors.forbidden('任务不属于当前智能体');
   return task;
 }
 
 function writeBackTaskMemory(rc: RequestContext, task: TaskRow, input: CompleteTaskInput): void {
   if (input.status !== 'done') return;
-  const decisions = (input.decisions ?? []).filter(Boolean);
-  const lessons = (input.lessons ?? []).filter(Boolean);
-  // 普通任务结果留在任务历史；只有显式决策/经验作为候选记忆进入做梦流程。
-  if (decisions.length === 0 && lessons.length === 0) return;
   const project = getProjectRow(rc.app.db, task.project_id);
   if (!project) return;
-  const text = taskMemoryText({ decisions, lessons });
-  try {
-    addMemory(rc.app.db, {
-      projectId: project.id,
-      content: text,
-      title: `任务沉淀：${task.title}`,
-      category: lessons.length > 0 ? 'lesson' : 'decision',
-      source: 'task',
-      status: 'candidate',
-      taskId: task.id,
-      createdBy: task.created_by,
-      metadata: { aiwoTaskId: task.id, projectId: project.id, kind: 'task_candidate' },
-    });
-  } catch (error) {
-    console.warn(`[aiwo] 任务 ${task.id} 候选记忆写回失败：${error instanceof Error ? error.message : String(error)}`);
+  const buckets: Array<{ category: string; label: string; items: string[] }> = [
+    { category: 'risk', label: '风险与阻塞', items: input.risks ?? [] },
+    { category: 'change', label: '变更', items: input.changes ?? [] },
+    { category: 'acceptance', label: '验收与质量', items: input.acceptance ?? [] },
+    { category: 'assumption', label: '假设与待确认', items: input.assumptions ?? [] },
+    { category: 'dependency', label: '依赖与承诺', items: input.dependencies ?? [] },
+    { category: 'decision', label: '重要决策', items: input.decisions ?? [] },
+    { category: 'progress', label: '关键进展', items: input.progress ?? [] },
+    { category: 'lesson', label: '经验教训', items: input.lessons ?? [] },
+  ];
+  // 普通任务结果留在任务历史；只有显式过程记录作为候选进入复盘流程。
+  for (const bucket of buckets) {
+    for (const raw of bucket.items) {
+      const content = String(raw ?? '').trim();
+      if (!content) continue;
+      try {
+        addMemory(rc.app.db, {
+          projectId: project.id,
+          content,
+          title: `任务沉淀：${task.title} · ${bucket.label}`,
+          category: bucket.category,
+          source: 'task',
+          status: 'candidate',
+          taskId: task.id,
+          createdBy: task.created_by,
+          metadata: { aiwoTaskId: task.id, projectId: project.id, kind: 'task_candidate', recordType: bucket.category },
+        });
+      } catch (error) {
+        console.warn(`[aiwo] 任务 ${task.id} 候选记忆写回失败：${error instanceof Error ? error.message : String(error)}`);
+      }
+    }
   }
 }
 
@@ -145,6 +161,12 @@ const completeSchema = z.object({
   status: z.enum(['done', 'failed']),
   summary: z.string().trim().min(1).max(20_000),
   decisions: z.array(z.string().max(4_000)).max(100).optional(),
+  progress: z.array(z.string().max(4_000)).max(100).optional(),
+  risks: z.array(z.string().max(4_000)).max(100).optional(),
+  changes: z.array(z.string().max(4_000)).max(100).optional(),
+  acceptance: z.array(z.string().max(4_000)).max(100).optional(),
+  assumptions: z.array(z.string().max(4_000)).max(100).optional(),
+  dependencies: z.array(z.string().max(4_000)).max(100).optional(),
   lessons: z.array(z.string().max(4_000)).max(100).optional(),
   error: z.string().max(20_000).optional(),
   sessionId: z.string().trim().max(200).optional(),
@@ -168,7 +190,7 @@ const execFileAsync = promisify(execFile);
 const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../../../..');
 let agentPackagePromise: Promise<string> | null = null;
 
-/** 生成可下载的服务代理包；服务 token 即可拉取，方便远端主机安装。 */
+/** 生成可下载的智能体代理包；智能体 token 即可拉取，方便远端主机安装。 */
 async function buildAgentPackage(): Promise<string> {
   if (agentPackagePromise) return agentPackagePromise;
   agentPackagePromise = (async () => {
@@ -190,24 +212,26 @@ async function buildAgentPackage(): Promise<string> {
 }
 
 export function registerRuntimeRoutes(router: Router): void {
-  // DSH 插件注册：用户用自己分配的 API Key 领一个服务身份；返回一次性服务 token。
+  // DSH 插件注册：用户用自己分配的 API Key 领一个智能体身份；返回一次性智能体 token。
   router.post('/api/runtime/instances/register-key', async (rc) => {
     const person = requirePerson(rc);
     const input = await rc.body(z.object({
       instanceId: z.string().trim().max(80).optional(),
       name: z.string().trim().min(1).max(120),
+      agentType: z.enum(['dsh', 'claude']).optional().default('dsh'),
       kind: z.enum(['local', 'remote']).optional().default('remote'),
       host: z.string().trim().max(200).optional().default(''),
       workspacePath: z.string().trim().max(1_000).optional().default(''),
       workspaceRoot: z.string().trim().max(1_000).optional().default(''),
       version: z.string().trim().max(80).optional().default(''),
       pluginVersion: z.string().trim().max(80).optional().default(''),
+      capabilities: z.array(z.string().trim().min(1).max(40)).max(20).optional(),
     }));
     const now = nowIso();
     let id = input.instanceId ?? '';
     if (id) {
       const existing = getInstanceRow(rc.app.db, id);
-      if (!existing || existing.created_by !== person.id) throw errors.notFound('服务不存在');
+      if (!existing || existing.created_by !== person.id) throw errors.notFound('智能体不存在');
     } else {
       id = newId('ins');
     }
@@ -215,31 +239,31 @@ export function registerRuntimeRoutes(router: Router): void {
     if (input.instanceId) {
       rc.app.db.prepare(
         `UPDATE dsh_instances SET name = ?, kind = ?, host = ?, workspace_path = ?, workspace_root = ?,
-                version = ?, plugin_version = ?, token_hash = ?, token_prefix = ?, revoked_at = NULL,
+                version = ?, plugin_version = ?, capabilities = ?, token_hash = ?, token_prefix = ?, revoked_at = NULL,
                 status = 'unconfigured', updated_at = ? WHERE id = ?`,
       ).run(input.name, input.kind, input.host, input.workspacePath, input.workspaceRoot,
-        input.version, input.pluginVersion, sha256(token), token.slice(0, 18), now, id);
+        input.version, input.pluginVersion, JSON.stringify(input.capabilities ?? []), sha256(token), token.slice(0, 18), now, id);
     } else {
       rc.app.db.prepare(
         `INSERT INTO dsh_instances
-           (id, name, kind, host, port, base_url, workspace_path, workspace_root, version, plugin_version,
+           (id, name, agent_type, kind, host, port, base_url, workspace_path, workspace_root, version, plugin_version, capabilities,
             token_hash, token_prefix, status, registered_at, last_seen_at, revoked_at, created_by, created_at, updated_at, metadata)
-         VALUES (?, ?, ?, ?, NULL, NULL, ?, ?, ?, ?, ?, ?, 'unconfigured', ?, NULL, NULL, ?, ?, ?, '{}')`,
-      ).run(id, input.name, input.kind, input.host, input.workspacePath, input.workspaceRoot,
-        input.version, input.pluginVersion, sha256(token), token.slice(0, 18), now, person.id, now, now);
+         VALUES (?, ?, ?, ?, ?, NULL, NULL, ?, ?, ?, ?, ?, ?, ?, 'unconfigured', ?, NULL, NULL, ?, ?, ?, '{}')`,
+      ).run(id, input.name, input.agentType, input.kind, input.host, input.workspacePath, input.workspaceRoot,
+        input.version, input.pluginVersion, JSON.stringify(input.capabilities ?? []), sha256(token), token.slice(0, 18), now, person.id, now, now);
     }
     const row = getInstanceRow(rc.app.db, id);
-    if (!row) throw errors.internal('服务注册失败');
+    if (!row) throw errors.internal('智能体注册失败');
     rc.json({ instance: buildInstance(rc.app.db, row), token });
   });
 
-  // 服务注册：token 由 Ryan 管理端预先创建；插件首次上线时更新资源信息。
+  // 智能体注册：token 由 Ryan 管理端预先创建；插件首次上线时更新资源信息。
   router.post('/api/runtime/instances/register', async (rc) => {
     const instance = authenticateInstance(rc);
     const input = await rc.body(registerSchema);
     const now = nowIso();
     const current = getInstanceRow(rc.app.db, instance.id);
-    if (!current) throw errors.notFound('服务不存在');
+    if (!current) throw errors.notFound('智能体不存在');
     rc.app.db
       .prepare(
         `UPDATE dsh_instances
@@ -261,7 +285,7 @@ export function registerRuntimeRoutes(router: Router): void {
         instance.id,
       );
     const row = getInstanceRow(rc.app.db, instance.id);
-    if (!row) throw errors.internal('服务注册后读取失败');
+    if (!row) throw errors.internal('智能体注册后读取失败');
     rc.json({ instance: buildInstance(rc.app.db, row) });
   });
 
@@ -357,7 +381,7 @@ export function registerRuntimeRoutes(router: Router): void {
       projectId: task.project_id,
       instanceId: instance.id,
       type: 'task.claimed',
-      message: `服务 ${instance.name} 接单`,
+      message: `智能体 ${instance.name} 接单`,
       payload: { instanceId: instance.id },
     });
     recordActivity(db, rc.app.bus, {
@@ -365,7 +389,7 @@ export function registerRuntimeRoutes(router: Router): void {
       projectName: project.name,
       type: 'task.claimed',
       actor: item.executorLabel,
-      summary: `服务接单：${task.title}`,
+      summary: `智能体接单：${task.title}`,
       taskId: task.id,
     });
 
@@ -375,7 +399,7 @@ export function registerRuntimeRoutes(router: Router): void {
         id: project.id,
         name: project.name,
         slug: project.slug,
-        prompt: project.prompt,
+        prompt: [project.prompt, projectContextText(db, project.id)].filter(Boolean).join('\n\n'),
         repoUrl: project.repo_url ?? undefined,
         type: project.type as ClaimedTask['project']['type'],
         memoryAgentId,
@@ -385,7 +409,7 @@ export function registerRuntimeRoutes(router: Router): void {
         name: person?.name ?? '',
         label: item.executorLabel,
       },
-      promptCards: cardsContent(db, item.promptCardIds),
+      promptCards: cardsContent(db, [...new Set([...item.promptCardIds, ...autoInjectCardIds(db, item.projectId, item.createdBy)])]),
       memory: {
         agentId: memoryAgentId,
         enabled: true,
@@ -487,7 +511,7 @@ export function registerRuntimeRoutes(router: Router): void {
       instanceId: instance.id,
       type: input.status === 'done' ? 'task.completed' : 'task.failed',
       message: input.status === 'done' ? '任务完成' : (input.error ?? '任务失败'),
-      payload: { decisions: input.decisions ?? [], lessons: input.lessons ?? [] },
+      payload: { decisions: input.decisions ?? [], progress: input.progress ?? [], lessons: input.lessons ?? [], risks: input.risks ?? [], changes: input.changes ?? [], acceptance: input.acceptance ?? [], assumptions: input.assumptions ?? [], dependencies: input.dependencies ?? [] },
     });
     recordActivity(db, rc.app.bus, {
       projectId: task.project_id,
@@ -497,6 +521,152 @@ export function registerRuntimeRoutes(router: Router): void {
       summary: truncateSummary(input.summary),
       taskId: task.id,
     });
+    if (input.status === 'done') {
+      const meta = parseJsonObject(task.metadata);
+      const mentions = Array.isArray(meta.mentions)
+        ? meta.mentions.filter((item): item is { kind: string; id: string; name: string; when: string } =>
+            Boolean(item) && typeof item === 'object' && typeof (item as Record<string, unknown>).id === 'string' && typeof (item as Record<string, unknown>).kind === 'string')
+        : [];
+      for (const mention of mentions) {
+        if (mention.kind === 'person' && mention.when === 'completion') {
+          createTaskNotification(db, {
+            personId: mention.id,
+            taskId: task.id,
+            projectId: task.project_id,
+            type: 'task.mention.completed',
+            title: `任务已完成：${task.title}`,
+            body: `任务「${task.title}」已完成，原任务中提到了你。\n${truncateSummary(input.summary)}`,
+          });
+        }
+        if (mention.kind === 'agent' && mention.when === 'completion') {
+          const owner = db.prepare('SELECT owner_person_id FROM projects WHERE id = ?').get(task.project_id) as unknown as { owner_person_id: string } | undefined;
+          const createdBy = task.created_by ?? owner?.owner_person_id;
+          if (!createdBy) continue;
+          try {
+            const followup = createTaskRecord(db, rc.app.bus, {
+              projectId: task.project_id,
+              source: 'api',
+              type: task.type as never,
+              title: `@${mention.name} 接力：${task.title}`,
+              prompt: [
+                `[自然语言接力，交给 ${mention.name}]`,
+                `上一任务 #${task.id}「${task.title}」已完成。`,
+                '',
+                '上一任务要求：',
+                task.prompt.replace(/^\/goal\s*/i, ''),
+                '',
+                '上一任务执行结果：',
+                input.summary,
+                '',
+                '请根据以上上下文完成后续工作。',
+              ].join('\n'),
+              instanceId: mention.id,
+              createdBy,
+              priority: task.priority,
+              metadata: { naturalHandoffFromTaskId: task.id, naturalHandoffAgentId: mention.id, skipMentions: true },
+              skipMentions: true,
+              activitySummary: `任务接力给 ${mention.name}：${task.title}`,
+              eventMessage: `创建接力任务：${task.title}`,
+            });
+            insertTaskEvent(db, {
+              taskId: task.id,
+              projectId: task.project_id,
+              type: 'task.handoff',
+              message: `已按自然语言接力给 ${mention.name}`,
+              payload: { handoffTaskId: followup.id, handoffAgentId: mention.id },
+            });
+            recordActivity(db, rc.app.bus, {
+              projectId: task.project_id,
+              projectName: task.project_name ?? undefined,
+              type: 'task.created',
+              actor: (task.executor_name ?? '') + '@Ryan',
+              summary: `任务接力给 ${mention.name}：${task.title}`,
+              taskId: followup.id,
+            });
+          } catch (error) {
+            insertTaskEvent(db, {
+              taskId: task.id,
+              projectId: task.project_id,
+              type: 'task.handoff_failed',
+              message: `接力给 ${mention.name} 失败：${error instanceof Error ? error.message : String(error)}`,
+            });
+          }
+        }
+      }
+    }
+    if (input.status === 'done' && task.handoff_person_id) {
+      try {
+        const handoffTask = createTaskRecord(db, rc.app.bus, {
+          projectId: task.project_id,
+          source: 'api',
+          type: task.type as never,
+          title: `接力：${task.title}`,
+          prompt: [
+            '[接力任务]',
+            `上一任务 #${task.id}「${task.title}」已完成。`,
+            task.handoff_note ? `交接说明：${task.handoff_note}` : '',
+            '',
+            '上一任务执行结果：',
+            input.summary,
+          ].filter(Boolean).join('\n'),
+          promptCardIds: parseStringArray(task.handoff_prompt_card_ids),
+          createdBy: task.handoff_person_id,
+          priority: task.priority,
+          metadata: {
+            handoffFromTaskId: task.id,
+            handoffFromTitle: task.title,
+            handoffNotifyPersonIds: parseStringArray(task.notify_person_ids),
+          },
+          activitySummary: `任务接力：${task.title}`,
+          eventMessage: `创建接力任务：${task.title}`,
+        });
+        insertTaskEvent(db, {
+          taskId: task.id,
+          projectId: task.project_id,
+          type: 'task.handoff',
+          message: `已转交给 ${task.handoff_person_name ?? task.handoff_person_id}`,
+          payload: {
+            handoffTaskId: handoffTask.id,
+            handoffPersonId: task.handoff_person_id,
+            notifyPersonIds: parseStringArray(task.notify_person_ids),
+          },
+        });
+        recordActivity(db, rc.app.bus, {
+          projectId: task.project_id,
+          projectName: task.project_name ?? undefined,
+          type: 'task.created',
+          actor: (task.executor_name ?? '') + '@Ryan',
+          summary: `任务接力：${task.title} → ${task.handoff_person_name ?? task.handoff_person_id}`,
+          taskId: handoffTask.id,
+        });
+      } catch (error) {
+        insertTaskEvent(db, {
+          taskId: task.id,
+          projectId: task.project_id,
+          type: 'task.handoff_failed',
+          message: `接力任务创建失败：${error instanceof Error ? error.message : String(error)}`,
+        });
+      }
+    }
+    if (input.status === 'done') {
+      const notifyIds = parseStringArray(task.notify_person_ids);
+      for (const notifyPersonId of notifyIds) {
+        db.prepare(
+          `INSERT INTO task_notifications (id, person_id, task_id, project_id, type, title, body, read_at, created_at)
+           VALUES (?, ?, ?, ?, 'task.completed', ?, ?, NULL, ?)`,
+        ).run(
+          newId('ntf'),
+          notifyPersonId,
+          task.id,
+          task.project_id,
+          task.handoff_person_id ? `任务完成，已接力：${task.title}` : `任务完成：${task.title}`,
+          task.handoff_person_id
+            ? `任务「${task.title}」已完成，接力给 ${task.handoff_person_name ?? task.handoff_person_id}。`
+            : `任务「${task.title}」已完成。\n${truncateSummary(input.summary)}`,
+          nowIso(),
+        );
+      }
+    }
     writeBackTaskMemory(rc, task, input);
     const updated = getWorkItem(db, task.id);
     rc.json(updated);

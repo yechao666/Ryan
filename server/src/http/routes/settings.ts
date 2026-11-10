@@ -38,7 +38,7 @@ export function registerSettingsRoutes(router: Router): void {
       const service = rc.app.db
         .prepare('SELECT id FROM dsh_instances WHERE id = ? AND revoked_at IS NULL')
         .get(input.serviceId) as unknown as { id: string } | undefined;
-      if (!service) throw errors.badRequest('默认 DSH 服务不存在或已吊销');
+      if (!service) throw errors.badRequest('默认 智能体不存在或已吊销');
     }
     const defaultServiceId = setDefaultServiceId(rc.app.db, input.serviceId, person.id);
     rc.json({ defaultServiceId });

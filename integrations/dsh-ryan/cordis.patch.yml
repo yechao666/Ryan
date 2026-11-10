@@ -1,4 +1,4 @@
-# dsh-ryan bundle patch：把 Ryan DSH 服务运行时插入 profile。
+# dsh-ryan bundle patch：把 Ryan 智能体运行时插入 profile。
 #   dsh plugin --profile <name> add link:<本目录>
 # 行 id 同时是设置命名空间：dsh-ryan。
 - insert:

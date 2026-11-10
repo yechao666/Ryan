@@ -1195,3 +1195,120 @@
 .cx-assistant-msg-actions .btn-icon { width: 24px; height: 24px; }
 .cx-assistant-edit { display: flex; flex-direction: column; gap: 7px; min-width: 260px; }
 .cx-assistant-edit .textarea { min-height: 64px; font-size: 12px; }
+
+/* DeepSeek Harness 风格：文本、思考、工具按事件顺序穿插 */
+.cx-timeline {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+
+.cx-timeline__text {
+  min-width: 0;
+}
+
+.cx-timeline__text + .cx-inline-process,
+.cx-inline-process + .cx-timeline__text {
+  margin-top: 1px;
+}
+
+.cx-inline-process {
+  border: 1px solid var(--border-faint);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.014);
+  overflow: hidden;
+}
+
+.cx-inline-process.is-live {
+  border-color: rgba(167, 139, 250, 0.25);
+}
+
+.cx-inline-process__head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 26px;
+  padding: 4px 8px;
+  color: var(--text-muted);
+  font-size: 10px;
+  cursor: pointer;
+  list-style: none;
+}
+
+.cx-inline-process__head::-webkit-details-marker {
+  display: none;
+}
+
+.cx-inline-process__head:hover {
+  background: rgba(255, 255, 255, 0.025);
+}
+
+.cx-inline-process__icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 17px;
+  height: 17px;
+  flex: none;
+  border-radius: 5px;
+}
+
+.cx-inline-process__icon.tone-violet {
+  color: #a78bfa;
+  background: rgba(167, 139, 250, 0.14);
+}
+
+.cx-inline-process__icon.tone-amber {
+  color: #fbbf24;
+  background: rgba(251, 191, 36, 0.12);
+}
+
+.cx-inline-process__name {
+  color: var(--text-secondary, var(--text-muted));
+  font-weight: 600;
+}
+
+.cx-inline-process__meta {
+  margin-left: auto;
+  color: var(--text-dim);
+  white-space: nowrap;
+}
+
+.cx-inline-process__body {
+  padding: 2px 8px 8px;
+  border-top: 1px solid var(--border-faint);
+}
+
+/* dsh-genui 使用 DSH 的 --dsw-alias-* token；映射到 Ryan 的暗色主题。 */
+.cx-assistant-bubble,
+.ws-md {
+  --dsw-alias-label-primary: var(--text);
+  --dsw-alias-label-secondary: var(--text-muted);
+  --dsw-alias-label-tertiary: var(--text-dim);
+  --dsw-alias-bg-layer-1: var(--surface-strong);
+  --dsw-alias-bg-layer-2: var(--surface-inset);
+  --dsw-alias-bg-layer-3: var(--surface-strong);
+  --dsw-alias-border-l1: var(--border);
+  --dsw-alias-border-l2: var(--border-strong);
+  --dsw-alias-markdown-code-block: var(--surface-inset);
+  --dsw-alias-markdown-hr: var(--border-faint);
+  --dsw-alias-state-business-primary: #8b7cff;
+  --dsw-alias-state-success-primary: #34d399;
+  --dsw-alias-state-warning-primary: #fbbf24;
+  --dsw-alias-state-error-primary: #fb7185;
+  --dsh-genui-surface: var(--surface-strong);
+  --dsh-genui-surface-flat: var(--surface);
+  --dsh-genui-surface-table: transparent;
+}
+
+/* GenUI 表单在窄侧栏中的可用性 */
+.cx-assistant-bubble [class*="submitRow"] {
+  flex-wrap: wrap;
+}
+
+.cx-assistant-bubble [class*="_submit_"],
+.cx-assistant-bubble [class*="submit"] {
+  min-width: 96px;
+  justify-content: center;
+}

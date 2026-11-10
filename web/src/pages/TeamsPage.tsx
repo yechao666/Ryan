@@ -21,7 +21,7 @@ import { apiErrorMessage, CardGridSkeleton, errorText, useResource } from '../co
 import { TeamCard } from '../components/teams/index.tsx';
 
 /** 团队列表页：团队卡片与新建团队（仅管理员）。 */
-export function TeamsPage() {
+export function TeamsPage({ embedded = false }: { embedded?: boolean } = {}) {
   const { person } = useAuth();
   const navigate = useNavigate();
   const toast = useToast();
@@ -73,21 +73,8 @@ export function TeamsPage() {
 
   const memberTotal = (teams ?? []).reduce((sum, team) => sum + team.memberCount, 0);
 
-  return (
-    <div className="page">
-      <PageHead
-        eyebrow="团队 · Teams"
-        title="团队"
-        desc="人员可属于多个团队；团队负责人可以创建项目，并把项目开放给团队成员。"
-        actions={
-          isAdmin ? (
-            <Button variant="primary" icon="plus" onClick={() => setCreateOpen(true)}>
-              新建团队
-            </Button>
-          ) : undefined
-        }
-      />
-
+  const body = (
+    <>
       <div className="row-between">
         <span className="tiny dim">
           共 {teams?.length ?? 0} 个团队 · {memberTotal} 人次成员关系
@@ -185,6 +172,25 @@ export function TeamsPage() {
           ) : null}
         </form>
       </Modal>
+    </>
+  );
+
+  if (embedded) return body;
+  return (
+    <div className="page">
+      <PageHead
+        eyebrow="团队 · Teams"
+        title="团队"
+        desc="人员可属于多个团队；团队负责人可以创建项目，并把项目开放给团队成员。"
+        actions={
+          isAdmin ? (
+            <Button variant="primary" icon="plus" onClick={() => setCreateOpen(true)}>
+              新建团队
+            </Button>
+          ) : undefined
+        }
+      />
+      {body}
     </div>
   );
 }

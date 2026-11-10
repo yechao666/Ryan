@@ -1,7 +1,7 @@
-import { useState, type FormEvent } from 'react';
+import { useEffect, useState, type FormEvent } from 'react';
 import { Navigate, useNavigate } from 'react-router-dom';
 import { APP_NAME, APP_TAGLINE, APP_VERSION } from '@shared';
-import { Avatar, Badge, Button, Callout, Card, Field, Icon, Input, Skeleton, useToast, type IconName } from '@ui';
+import { Avatar, Badge, Button, Callout, Card, Field, Icon, Input, Modal, Skeleton, useToast, type IconName } from '@ui';
 import { useAuth } from '../lib/auth.tsx';
 import { useAsync } from '../lib/hooks.ts';
 import { api } from '../lib/api.ts';
@@ -15,11 +15,11 @@ import { toneFor } from '../components/projects/helpers.tsx';
 const VALUE_POINTS: { icon: IconName; title: string; desc: string }[] = [
   { icon: 'users', title: '人员与团队', desc: '人员组队、管理项目，按可见性与角色协作。' },
   { icon: 'brain', title: '项目记忆', desc: '每个项目独立记忆身份，任务结论自动沉淀。' },
-  { icon: 'server', title: '服务执行', desc: 'DSH 服务注册、领取任务，进展实时回流控制台。' },
+  { icon: 'server', title: '智能体执行', desc: '智能体注册、领取任务，进展实时回流控制台。' },
 ];
 
 export function LoginPage() {
-  const { person, login } = useAuth();
+  const { person, login, loginWithToken } = useAuth();
   const navigate = useNavigate();
   const toast = useToast();
   const meta = useAsync(() => api.meta(), []);
@@ -29,6 +29,9 @@ export function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(() => new URLSearchParams(window.location.search).get('sso_error'));
+  const [qrProvider, setQrProvider] = useState<{ id: string; slug: string; name: string } | null>(null);
+  const [qrConfig, setQrConfig] = useState<{ appid: string; agentid: string; redirectUri: string; state: string; authorizeUrl: string; qrUrl: string } | null>(null);
+  const [qrError, setQrError] = useState<string | null>(null);
 
   if (person) return <Navigate to="/" replace />;
 
@@ -55,6 +58,38 @@ export function LoginPage() {
     }
   };
 
+  const openQr = async (provider: { id: string; slug: string; name: string }): Promise<void> => {
+    setQrProvider(provider);
+    setQrConfig(null);
+    setQrError(null);
+    try {
+      setQrConfig(await api.wecomQr(provider.slug));
+    } catch (cause) {
+      setQrError(cause instanceof Error ? cause.message : '无法获取企业微信二维码配置');
+    }
+  };
+
+  const closeQr = (): void => {
+    setQrProvider(null);
+    setQrConfig(null);
+    setQrError(null);
+  };
+
+  useEffect(() => {
+    if (!qrProvider) return;
+    const onMessage = (event: MessageEvent): void => {
+      if (event.origin !== window.location.origin) return;
+      const data = event.data as { type?: unknown; token?: unknown };
+      if (data?.type !== 'ryan-wecom-login' || typeof data.token !== 'string') return;
+      setQrProvider(null);
+      setQrConfig(null);
+      setQrError(null);
+      void loginWithToken(data.token).then(() => navigate('/', { replace: true }));
+    };
+    window.addEventListener('message', onMessage);
+    return () => window.removeEventListener('message', onMessage);
+  }, [qrProvider, loginWithToken, navigate]);
+
   return (
     <div className="login-page">
       <section className="login-hero">
@@ -73,8 +108,8 @@ export function LoginPage() {
             都拥有自己的 DSH 执行网络
           </h1>
           <p>
-            人员创建任务，DSH 服务执行，提示卡沉淀工作方式，项目记忆保留上下文。
-            一个控制台管理众多服务的即时、周期与响应式任务。
+            人员创建任务，智能体执行，提示卡沉淀工作方式，项目记忆保留上下文。
+            一个控制台管理众多智能体的即时、周期与响应式任务。
           </p>
 
           <div className="login-points cx-login-points">
@@ -173,10 +208,19 @@ export function LoginPage() {
               <div className="stack" style={{ gap: 10, marginTop: 16 }}>
                 <div className="hstack gap-8">
                   <span className="divider" style={{ flex: 1 }} />
-                  <span className="tiny dim">或使用统一认证</span>
+                  <span className="tiny dim">或使用组织认证</span>
                   <span className="divider" style={{ flex: 1 }} />
                 </div>
-                {providers.data.map((provider) => (
+                {providers.data.map((provider) => provider.type === 'wecom' ? (
+                  <div className="vstack gap-5" key={provider.id}>
+                    <Button variant="outline" size="lg" block icon="wechat" onClick={() => void openQr(provider)}>
+                      企业微信扫码登录 · {provider.name}
+                    </Button>
+                    <a className="tiny dim center" href={`/api/auth/sso/${encodeURIComponent(provider.slug)}/start`}>
+                      在企业微信客户端内直接打开
+                    </a>
+                  </div>
+                ) : (
                   <a
                     key={provider.id}
                     className="btn btn-outline btn-lg btn-block"
@@ -245,6 +289,35 @@ export function LoginPage() {
           </div>
         </div>
       </section>
+      <Modal
+        open={Boolean(qrProvider)}
+        onClose={closeQr}
+        title={`企业微信扫码登录${qrProvider ? ` · ${qrProvider.name}` : ''}`}
+        description="使用企业微信扫描二维码，授权后自动登录 Ryan。"
+        size="sm"
+        footer={<Button variant="ghost" onClick={closeQr}>取消</Button>}
+      >
+        {qrError ? (
+          <Callout tone="red" icon="xCircle">
+            {qrError}
+            {qrConfig ? <div className="mt-8"><a href={qrConfig.qrUrl || qrConfig.authorizeUrl} target="_blank" rel="noreferrer">在企业微信中打开登录面板</a></div> : null}
+          </Callout>
+        ) : !qrConfig ? (
+          <div className="vstack gap-8"><Skeleton h={180} /><span className="tiny dim">正在准备二维码…</span></div>
+        ) : (
+          <div className="wecom-qr-wrap">
+            <iframe
+              title="企业微信扫码登录"
+              src={qrConfig.qrUrl}
+              width="320"
+              height="360"
+              frameBorder={0}
+              sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
+            />
+          </div>
+        )}
+        <div className="tiny dim center">二维码由企业微信提供，使用企业微信扫码授权。</div>
+      </Modal>
     </div>
   );
 }

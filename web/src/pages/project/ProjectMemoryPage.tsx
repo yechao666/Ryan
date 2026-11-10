@@ -44,18 +44,30 @@ const PAGE_SIZE_OPTIONS = [
 
 const CATEGORY_META: Record<string, { label: string; tone: Tone }> = {
   fact: { label: '事实', tone: 'cyan' },
-  decision: { label: '决策', tone: 'violet' },
+  decision: { label: '重要决策', tone: 'violet' },
+  progress: { label: '关键进展', tone: 'green' },
+  lesson: { label: '经验教训', tone: 'cyan' },
+  risk: { label: '风险与阻塞', tone: 'red' },
+  change: { label: '变更', tone: 'amber' },
+  acceptance: { label: '验收与质量', tone: 'lime' },
+  assumption: { label: '假设与待确认', tone: 'pink' },
+  dependency: { label: '依赖与承诺', tone: 'blue' },
   note: { label: '笔记', tone: 'slate' },
   task_result: { label: '任务结果', tone: 'green' },
-  lesson: { label: '经验', tone: 'cyan' },
   insight: { label: '洞见', tone: 'amber' },
 };
 
 const CATEGORY_OPTIONS = [
   { value: 'all', label: '全部类型' },
-  { value: 'decision', label: '决策' },
+  { value: 'decision', label: '重要决策' },
+  { value: 'progress', label: '关键进展' },
   { value: 'task_result', label: '任务结果' },
-  { value: 'lesson', label: '经验' },
+  { value: 'lesson', label: '经验教训' },
+  { value: 'risk', label: '风险与阻塞' },
+  { value: 'change', label: '变更' },
+  { value: 'acceptance', label: '验收与质量' },
+  { value: 'assumption', label: '假设与待确认' },
+  { value: 'dependency', label: '依赖与承诺' },
   { value: 'insight', label: '洞见' },
   { value: 'fact', label: '事实' },
   { value: 'note', label: '笔记' },
@@ -66,7 +78,7 @@ const SOURCE_OPTIONS = [
   { value: 'manual', label: '手动' },
   { value: 'task', label: '任务写回' },
   { value: 'agent', label: 'DSH 工具' },
-  { value: 'dream', label: '做梦整理' },
+  { value: 'dream', label: '复盘总结' },
 ];
 
 const STATUS_OPTIONS = [
@@ -89,7 +101,7 @@ function statusMeta(status?: string) {
 function sourceLabel(source?: string): string {
   if (source === 'task') return '任务沉淀';
   if (source === 'agent') return 'DSH 工具';
-  if (source === 'dream') return '做梦整理';
+  if (source === 'dream') return '复盘总结';
   if (source === 'manual') return '手动';
   return source || '未知';
 }
@@ -295,7 +307,7 @@ export function ProjectMemoryPage() {
     const value = Number(dreamInterval);
     const briefChars = Number(briefMax);
     if (!Number.isFinite(value) || value <= 0) {
-      toast.error('请输入有效的做梦间隔');
+      toast.error('请输入有效的复盘总结间隔');
       return;
     }
     if (!Number.isFinite(briefChars) || briefChars < 100 || briefChars > 5000) {
@@ -326,11 +338,11 @@ export function ProjectMemoryPage() {
       const result = await api.runMemoryDream(projectId);
       const run = result.run;
       if (run.status === 'skipped') toast.info('没有需要整理的新记忆');
-      else toast.success(`做梦完成：${run.inputCount} 条新记忆 → ${run.insightCount} 条洞见`);
+      else toast.success(`复盘总结完成：${run.inputCount} 条新记忆 → ${run.insightCount} 条洞见`);
       await Promise.all([memories.refresh(), dream.refresh()]);
       await brief.refresh();
     } catch (cause) {
-      toast.error(cause instanceof Error ? cause.message : '做梦失败');
+      toast.error(cause instanceof Error ? cause.message : '复盘总结失败');
     } finally {
       setDreaming(false);
     }
@@ -439,7 +451,7 @@ export function ProjectMemoryPage() {
             <div>
               <div className="hstack gap-6">
                 <strong>记忆简报</strong>
-                <Badge size="sm" tone="cyan">本机 DSH</Badge>
+                <Badge size="sm" tone="cyan">本机</Badge>
               </div>
               <div className="tiny dim mt-2">只取最近持久记忆/洞见，任务领取时注入 DSH 上下文。</div>
             </div>
@@ -483,11 +495,11 @@ export function ProjectMemoryPage() {
         </div>
         <div className="ws-memory-dream-inline">
           <Badge tone={dream.data?.settings.enabled ? 'green' : 'slate'} dot>
-            {dream.data?.settings.enabled ? '做梦已启用' : '做梦已停用'}
+            {dream.data?.settings.enabled ? '复盘总结已启用' : '复盘总结已停用'}
           </Badge>
           <span className="tiny dim">每 {dream.data?.settings.enabled ? intervalLabel(dream.data.settings.intervalMinutes) : '—'} · 上次 {dream.data?.settings.lastAt ? fmtRelative(dream.data.settings.lastAt) : '尚未'}</span>
           <Button size="sm" variant="ghost" icon="settings" onClick={openSettings}>设置</Button>
-          <Button size="sm" variant="primary" icon="sparkles" loading={dreaming} onClick={() => void runDreamNow()}>立即做梦</Button>
+          <Button size="sm" variant="primary" icon="sparkles" loading={dreaming} onClick={() => void runDreamNow()}>立即复盘</Button>
         </div>
         {dream.error ? <Callout tone="red" icon="alert">{dream.error}</Callout> : null}
       </Card>
@@ -577,7 +589,7 @@ export function ProjectMemoryPage() {
                 <EmptyState
                   icon="brain"
                   title="还没有项目记忆"
-                  description="普通任务结果留在任务历史；只有决策/经验候选会进入做梦流程，也可以手动新增。"
+                  description="普通任务结果留在任务历史；只有决策/进展/经验候选会进入复盘总结流程，也可以手动新增。"
                   action={<Button size="sm" variant="primary" icon="plus" onClick={() => setAddOpen(true)}>新增记忆</Button>}
                 />
               )
@@ -640,7 +652,7 @@ export function ProjectMemoryPage() {
         open={settingsOpen}
         onClose={() => setSettingsOpen(false)}
         title="记忆整理设置"
-        description="配置定时做梦和任务记忆简报。"
+        description="配置定时复盘总结和任务记忆简报。"
         footer={
           <>
             <Button variant="ghost" onClick={() => setSettingsOpen(false)}>取消</Button>
@@ -653,12 +665,12 @@ export function ProjectMemoryPage() {
         <div className="vstack gap-16">
           <div className="ws-settings-row">
             <div>
-              <div className="strong">启用定时做梦</div>
+              <div className="strong">启用定时复盘总结</div>
               <div className="tiny dim">后台按周期整理候选记忆，只处理新增内容。</div>
             </div>
             <Switch checked={dreamEnabled} onChange={setDreamEnabled} />
           </div>
-          <Field label="做梦周期" hint="最短 1 分钟，最长 30 天。">
+          <Field label="复盘总结周期" hint="最短 1 分钟，最长 30 天。">
             <div className="ws-dream-cycle">
               <Input
                 value={dreamInterval}

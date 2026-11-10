@@ -73,7 +73,7 @@ export function ProjectOverviewPage() {
             <Icon name="dashboard" size={15} />
             项目概览
           </div>
-          <div className="card-sub">实时掌握任务进展、DSH 服务与项目记忆状态。</div>
+          <div className="card-sub">实时掌握任务进展、智能体与项目记忆状态。</div>
         </div>
         <div className="hstack gap-8">
           <Link className="ws-link small" to={`${base}/tasks`}>
@@ -106,13 +106,42 @@ export function ProjectOverviewPage() {
           hint="项目级提示卡"
         />
         <Stat
-          label="DSH 服务"
+          label="智能体"
           value={fmtInt(counts.instances)}
           icon="server"
           tone="green"
-          hint="项目绑定、参与公平调度的服务"
+          hint="项目绑定、参与公平调度的智能体"
         />
       </div>
+
+      <Card className="card-pad mt-12">
+        <SectionHead
+          title={<><Icon name="layers" size={14} />项目共享信息区</>}
+          desc="项目是所有智能体共享的信息区：智能体可以运行在不同主机和工作区，但项目背景、记忆、记录与提示卡保持共享。"
+        />
+        <div className="grid grid-2 mt-12" style={{ gap: 10 }}>
+          <Link className="ws-shared-link" to={`${base}/context`}>
+            <Icon name="book" size={14} />
+            <span><strong>项目背景</strong><em>仓库、环境、基本要求与约定</em></span>
+            <Icon name="chevronRight" size={13} />
+          </Link>
+          <Link className="ws-shared-link" to={`${base}/memory`}>
+            <Icon name="brain" size={14} />
+            <span><strong>项目记忆</strong><em>跨任务沉淀的知识与洞见</em></span>
+            <Icon name="chevronRight" size={13} />
+          </Link>
+          <Link className="ws-shared-link" to={`${base}/records`}>
+            <Icon name="list" size={14} />
+            <span><strong>项目记录</strong><em>决策、风险、验收与依赖</em></span>
+            <Icon name="chevronRight" size={13} />
+          </Link>
+          <Link className="ws-shared-link" to={`${base}/services`}>
+            <Icon name="server" size={14} />
+            <span><strong>智能体与工作区</strong><em>查看执行资源及各自工作目录</em></span>
+            <Icon name="chevronRight" size={13} />
+          </Link>
+        </div>
+      </Card>
 
       <div className="ws-overview-grid">
         <div className="ws-stack">
@@ -145,7 +174,7 @@ export function ProjectOverviewPage() {
                 <EmptyState
                   icon="list"
                   title="当前没有正在执行的任务"
-                  description="创建任务后，在线 DSH 服务会从共享调度池领取并交给 Ryan 执行。"
+                  description="创建任务后，在线智能体会从共享调度池领取并交给 Ryan 执行。"
                   action={
                     <Link className="btn btn-sm btn-outline" to={`${base}/tasks?new=1`}>
                       <Icon name="plus" size={13} />
@@ -199,7 +228,7 @@ export function ProjectOverviewPage() {
                   最近活动
                 </>
               }
-              desc="项目内任务与服务的最新动态"
+              desc="项目内任务与智能体的最新动态"
               actions={
                 <Link className="ws-link small" to={`${base}/activity`}>
                   实时活动
@@ -251,7 +280,7 @@ export function ProjectOverviewPage() {
                 <EmptyState
                   icon="list"
                   title="还没有任务"
-                  description="创建第一个任务，由 DSH 服务交给 Ryan 执行。"
+                  description="创建第一个任务，由智能体交给 Ryan 执行。"
                   action={
                     <Link className="btn btn-sm btn-outline" to={`${base}/tasks?new=1`}>
                       <Icon name="plus" size={13} />

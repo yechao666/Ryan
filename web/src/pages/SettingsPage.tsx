@@ -40,7 +40,7 @@ function errorMessage(cause: unknown, fallback: string): string {
 }
 
 /**
- * 系统设置：安全检查组与助手运行服务。
+ * 系统设置：安全检查组与助手运行智能体。
  * API Key 只显示「已配置」，服务端不回显明文；留空保存表示保持原值。
  */
 export function SettingsPage() {
@@ -169,7 +169,7 @@ export function SettingsPage() {
       <PageHead
         eyebrow="系统设置 · Settings"
         title="系统设置"
-        desc="配置输入安全检查与助手运行服务。敏感配置只保存在服务端，接口不会回显明文。"
+        desc="配置输入安全检查与助手运行环境。敏感配置只保存在服务端，接口不会回显明文。"
         actions={
           <Button variant="ghost" icon="refresh" onClick={() => void settings.refresh()}>
             刷新
@@ -368,7 +368,7 @@ export function SettingsPage() {
               <Card className="card-pad">
                 <SectionHead
                   title="助手配置"
-                  desc="助手运行在服务端本地 DSH 服务中，可调用 Ryan 开放 API。"
+                  desc="助手运行在服务端本地智能体中，可调用 Ryan 开放 API。"
                   actions={
                     <Badge size="sm" tone={settings.data.assistant.enabled ? 'green' : 'slate'} dot>
                       {settings.data.assistant.enabled ? '已启用' : '已停用'}
@@ -383,7 +383,7 @@ export function SettingsPage() {
                     label={assistant.enabled ? '启用系统助手' : '停用系统助手'}
                   />
                   <Callout tone="slate" icon="info">
-                    当前版本助手固定使用服务端本地 DSH（headless）；远端服务助手路由将在后续版本开放。
+                    当前版本助手固定使用服务端本地 DSH（headless）；远端智能体助手路由将在后续版本开放。
                   </Callout>
                   {assistantError ? (
                     <Callout tone="red" icon="xCircle">

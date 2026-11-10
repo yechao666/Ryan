@@ -96,7 +96,7 @@ export function updateDreamSettings(
   const enabled = input.enabled ?? current.enabled;
   const interval = input.intervalMinutes ?? current.intervalMinutes;
   if (!Number.isFinite(interval) || interval < MIN_INTERVAL_MINUTES || interval > MAX_INTERVAL_MINUTES) {
-    throw new Error(`做梦间隔必须在 ${MIN_INTERVAL_MINUTES} 到 ${MAX_INTERVAL_MINUTES} 分钟之间`);
+    throw new Error(`复盘总结间隔必须在 ${MIN_INTERVAL_MINUTES} 到 ${MAX_INTERVAL_MINUTES} 分钟之间`);
   }
   db.prepare('UPDATE projects SET memory_dream_enabled = ?, memory_dream_interval_minutes = ?, updated_at = ? WHERE id = ?')
     .run(enabled ? 1 : 0, Math.floor(interval), nowIso(), projectId);

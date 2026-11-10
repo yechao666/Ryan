@@ -234,7 +234,7 @@ export function ProjectTasksPage() {
     },
     {
       key: 'instance',
-      header: '服务',
+      header: '智能体',
       width: 150,
       render: (row) => (
         <span className={row.instanceName ? 'truncate' : 'dim truncate'} title={row.instanceName || '自动分配'}>
@@ -307,7 +307,7 @@ export function ProjectTasksPage() {
     <div className="ws-page">
       <PageHead
         title="任务"
-        desc="新建任务后由共享调度池中的 DSH 服务领取并交给 Ryan 执行；支持按类型、状态与关键词筛选，点击行查看执行详情。"
+        desc="新建任务后由共享调度池中的智能体领取并交给 Ryan 执行；支持按类型、状态与关键词筛选，点击行查看执行详情。"
       />
 
       <div className="toolbar">
@@ -347,7 +347,7 @@ export function ProjectTasksPage() {
           <SearchInput
             value={keyword}
             onChange={setKeyword}
-            placeholder="搜索标题 / 短 ID / 执行人 / 服务"
+            placeholder="搜索标题 / 短 ID / 执行人 /智能体"
             className="ws-search"
             onSubmit={applySearch}
           />
@@ -410,7 +410,7 @@ export function ProjectTasksPage() {
                 <EmptyState
                   icon="list"
                   title="还没有任务"
-                  description="创建第一个任务，由共享调度池中的 DSH 服务交给 Ryan 执行。"
+                  description="创建第一个任务，由共享调度池中的智能体交给 Ryan 执行。"
                   action={
                     <Button
                       size="sm"

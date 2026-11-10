@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import type { Automation, AutomationTrigger, CreateAutomationInput } from '@shared';
 import { AUTOMATION_TRIGGERS } from '@shared';
 import { api } from '@lib/api.ts';
+import { MentionTextarea } from './MentionTextarea.tsx';
 import {
   Button,
   Callout,
@@ -11,7 +12,6 @@ import {
   Modal,
   Select,
   Switch,
-  Textarea,
   useToast,
 } from '@ui';
 import { useProject } from './context.ts';
@@ -35,7 +35,7 @@ interface FormErrors {
 
 const TRIGGER_OPTIONS = AUTOMATION_TRIGGERS.map((item) => ({ value: item.value, label: item.label }));
 
-/** 新建 / 编辑自动化弹窗：触发规则 + 提示卡 + 可选 DSH 服务。 */
+/** 新建 / 编辑自动化弹窗：触发规则 + 提示卡 + 可选智能体。 */
 export function AutomationForm({ open, automation, onClose, onSaved }: AutomationFormProps) {
   const { detail } = useProject();
   const projectId = detail.project.id;
@@ -214,11 +214,11 @@ export function AutomationForm({ open, automation, onClose, onSaved }: Automatio
         error={errors.promptTemplate}
         hint="支持占位符，运行时会替换为实际上下文。"
       >
-        <Textarea
+        <MentionTextarea
           rows={7}
           value={promptTemplate}
           placeholder={'例如：检查 {{project}} 的分支 {{branch}} 上的变更，事件 {{event}}，标题 {{title}}，链接 {{url}}。'}
-          onChange={(event) => setPromptTemplate(event.target.value)}
+          onChange={setPromptTemplate}
         />
       </Field>
 

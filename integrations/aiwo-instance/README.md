@@ -1,4 +1,4 @@
-# aiwo-instance — Ryan DSH 服务代理
+# aiwo-instance — Ryan 智能体代理
 
 把一台安装了 **DSH** 的机器接入 **Ryan**：代理 outbound 连接 Ryan 运行时，领取任务后用
 DSH 的 **ACP** 模式执行；ACP 不可用时自动回退 **headless**。适合本地与远端（远端无需暴露端口）。

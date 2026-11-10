@@ -23,7 +23,10 @@ interface ToolBlock {
   done: boolean;
 }
 
+interface TextBlock { id: string; kind: 'text'; text: string; }
+
 type ProcessBlock = ThinkingBlock | ToolBlock;
+type MessageSegment = ProcessBlock | TextBlock;
 
 interface ChatMessage {
   id: string;
@@ -34,6 +37,8 @@ interface ChatMessage {
   streaming?: boolean;
   status?: string;
   process?: ProcessBlock[];
+  /** 按真实事件顺序交错的文本/思考/工具片段。 */
+  segments?: MessageSegment[];
   processOpen?: boolean;
 }
 
@@ -45,7 +50,7 @@ interface Conversation {
 }
 
 const WELCOME =
-  '我是 Ryan 系统助手，运行在 DSH 服务中。可以读取项目、任务、服务与提示卡，并通过 Ryan API 直接创建任务、配置服务或查询状态。';
+  '我是 Ryan 系统助手，运行在智能体中。可以读取项目、任务、智能体与提示卡，并通过 Ryan API 直接创建任务、配置智能体或查询状态。';
 const STORAGE_CONVERSATIONS = 'aiwo.assistant.conversations.v1';
 const STORAGE_ACTIVE = 'aiwo.assistant.activeConversation.v1';
 
@@ -93,6 +98,7 @@ function sanitizeMessages(input: unknown): ChatMessage[] {
       process: Array.isArray(message.process)
         ? message.process.map((block) => ({ ...block, done: true }))
         : undefined,
+      segments: Array.isArray(message.segments) ? message.segments : undefined,
       processOpen: false,
     }));
   return messages.length ? messages : [welcomeMessage()];
@@ -139,62 +145,49 @@ function inputText(input: unknown): string {
   }
 }
 
-function ProcessPanel({ message, onToggle }: { message: ChatMessage; onToggle: () => void }) {
-  const blocks = message.process ?? [];
-  if (blocks.length === 0) return null;
-  const toolCount = blocks.filter((block) => block.kind === 'tool').length;
-  const showBody = Boolean(message.processOpen);
+function fallbackSegments(message: ChatMessage): MessageSegment[] {
+  if (message.segments?.length) return message.segments;
+  const segments: MessageSegment[] = [...(message.process ?? [])];
+  if (message.text) segments.push({ id: `${message.id}-text`, kind: 'text', text: message.text });
+  return segments;
+}
+
+function InlineProcess({ block, streaming }: { block: ProcessBlock; streaming?: boolean }) {
+  const label = block.kind === 'thinking' ? '思考' : block.tool;
+  const meta = block.kind === 'thinking'
+    ? `${block.text.length} 字`
+    : block.done ? '完成' : block.status === 'completed' ? '完成' : '执行中…';
   return (
-    <div className={`cx-process ${message.streaming ? 'is-live' : ''}`}>
-      <button type="button" className="cx-process-head" onClick={onToggle} aria-expanded={showBody}>
-        <span className="cx-process-title">
-          <Icon name="brain" size={12} />
-          过程
+    <details className={`cx-inline-process${streaming ? ' is-live' : ''}`} open={streaming || undefined}>
+      <summary className="cx-inline-process__head">
+        <span className={`cx-inline-process__icon tone-${block.kind === 'thinking' ? 'violet' : 'amber'}`}>
+          <Icon name={block.kind === 'thinking' ? 'brain' : 'terminal'} size={11} />
         </span>
-        <span className="cx-process-count">
-          {blocks.length} 段{toolCount ? ` · ${toolCount} 个工具` : ''}
-        </span>
-        <span className="cx-process-toggle">{message.streaming ? '实时' : message.processOpen ? '收起' : '展开'}</span>
-      </button>
-      {showBody ? (
-        <div className="cx-process-body">
-          {blocks.map((block, index) => {
-            const active = message.streaming && index === blocks.length - 1;
-            const bodyVisible = message.streaming ? active : Boolean(message.processOpen);
-            return (
-              <div className={`cx-process-step${active ? ' is-active' : ''}`} key={block.id}>
-                <div className="cx-process-step__head">
-                  <span className={`cx-process-step__icon tone-${block.kind === 'thinking' ? 'violet' : 'amber'}`}>
-                    <Icon name={block.kind === 'thinking' ? 'brain' : 'terminal'} size={11} />
-                  </span>
-                  <span className="cx-process-step__name">
-                    {block.kind === 'thinking' ? '思考' : block.tool}
-                  </span>
-                  {block.kind === 'thinking' ? (
-                    <span className="cx-process-step__meta">{block.text.length} 字</span>
-                  ) : (
-                    <span className="cx-process-step__meta">
-                      {block.done ? block.result?.trim().slice(0, 24) || '完成' : block.status === 'completed' ? '完成' : '执行中…'}
-                    </span>
-                  )}
-                </div>
-                {bodyVisible ? (
-                  <div className="cx-process-step__body">
-                    {block.kind === 'thinking' ? (
-                      <div className="cx-process-thinking"><Markdown text={block.text} /></div>
-                    ) : (
-                      <>
-                        {inputText(block.input) ? <pre className="cx-process-code">{inputText(block.input)}</pre> : null}
-                        {block.result?.trim() ? <pre className="cx-process-result">{block.result.trim().slice(0, 4_000)}</pre> : null}
-                      </>
-                    )}
-                  </div>
-                ) : null}
-              </div>
-            );
-          })}
-        </div>
-      ) : null}
+        <span className="cx-inline-process__name">{label}</span>
+        <span className="cx-inline-process__meta">{meta}</span>
+      </summary>
+      <div className="cx-inline-process__body">
+        {block.kind === 'thinking' ? (
+          <div className="cx-process-thinking"><Markdown text={block.text} /></div>
+        ) : (
+          <>
+            {inputText(block.input) ? <pre className="cx-process-code">{inputText(block.input)}</pre> : null}
+            {block.result?.trim() ? <pre className="cx-process-result">{block.result.trim().slice(0, 4_000)}</pre> : null}
+          </>
+        )}
+      </div>
+    </details>
+  );
+}
+
+/** DeepSeek Harness 风格：文本、思考、工具按事件顺序穿插渲染。 */
+function MessageTimeline({ message }: { message: ChatMessage }) {
+  const segments = fallbackSegments(message);
+  return (
+    <div className="cx-timeline">
+      {segments.map((segment) => segment.kind === 'text'
+        ? <div className="cx-timeline__text" key={segment.id}><Markdown text={segment.text} /></div>
+        : <InlineProcess key={segment.id} block={segment} streaming={message.streaming && !segment.done} />)}
     </div>
   );
 }
@@ -209,7 +202,7 @@ export function Assistant() {
   const pageTitle =
     (pathname.startsWith('/prompt-cards') && '提示卡') ||
     (pathname.startsWith('/settings') && '系统设置') ||
-    (pathname.startsWith('/instances') && 'DSH 服务') ||
+    (pathname.startsWith('/instances') && '智能体') ||
     (pathname.startsWith('/tasks') && '全局任务') ||
     (pathname.includes('/tasks') && '项目任务') ||
     (pathname.startsWith('/projects') && '项目') ||
@@ -233,6 +226,7 @@ export function Assistant() {
   const suggestionSeq = useRef(0);
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const abortRef = useRef<AbortController | null>(null);
+  const sendRef = useRef<((text: string) => Promise<void>) | null>(null);
 
   const active = conversations.find((conversation) => conversation.id === activeId) ?? conversations[0];
   const messages = active?.messages ?? [];
@@ -291,6 +285,12 @@ export function Assistant() {
             process: message.process.map((block): ProcessBlock => block.kind === 'thinking'
               ? { id: block.id, kind: 'thinking', text: block.text ?? '', done: true }
               : { id: block.id, kind: 'tool', callId: block.callId, tool: block.tool ?? 'tool', input: block.input, result: block.result, status: block.status, done: true }),
+            segments: [
+              ...message.process.map((block): MessageSegment => block.kind === 'thinking'
+                ? { id: block.id, kind: 'thinking', text: block.text ?? '', done: true }
+                : { id: block.id, kind: 'tool', callId: block.callId, tool: block.tool ?? 'tool', input: block.input, result: block.result, status: block.status, done: true }),
+              ...(message.content ? [{ id: `${message.id}-text`, kind: 'text' as const, text: message.content }] : []),
+            ],
             processOpen: true,
           })),
         };
@@ -373,6 +373,15 @@ export function Assistant() {
 
   const finishProcess = (conversationId: string, id: string): void => {
     updateProcess(conversationId, id, (blocks) => blocks.map((block) => ({ ...block, done: true })));
+  };
+  const updateSegments = (conversationId: string, id: string, updater: (segments: MessageSegment[]) => MessageSegment[]): void => {
+    updateMessages(conversationId, (current) => current.map((message) => (
+      message.id === id ? { ...message, segments: updater(message.segments ?? []) } : message
+    )));
+  };
+
+  const finishSegments = (conversationId: string, id: string): void => {
+    updateSegments(conversationId, id, (segments) => segments.map((segment) => ({ ...segment, done: true })));
   };
 
   const stop = (): void => {
@@ -468,6 +477,7 @@ export function Assistant() {
           streaming: true,
           status: '正在连接 DSH 助手…',
           process: [],
+          segments: [],
           processOpen: true,
         },
       ];
@@ -494,72 +504,74 @@ export function Assistant() {
           },
           onThinking: (delta, start) => {
             if (!delta) return;
-            updateProcess(conversationId, assistantId, (blocks) => {
+            const blockId = uid('t');
+            updateMessages(conversationId, (current) => current.map((message) => {
+              if (message.id !== assistantId) return message;
+              const blocks = message.process ?? [];
               const last = blocks[blocks.length - 1];
-              if (!start && last?.kind === 'thinking' && !last.done) {
-                return [...blocks.slice(0, -1), { ...last, text: last.text + delta }];
-              }
-              return [...blocks, { id: uid('t'), kind: 'thinking', text: delta, done: false }];
-            });
-            patchMessage(conversationId, assistantId, () => ({ status: '正在思考…', processOpen: true }));
+              const nextBlock: ThinkingBlock = !start && last?.kind === 'thinking' && !last.done
+                ? { ...last, text: last.text + delta }
+                : { id: blockId, kind: 'thinking', text: delta, done: false };
+              const nextProcess = !start && last?.kind === 'thinking' && !last.done
+                ? [...blocks.slice(0, -1), nextBlock]
+                : [...blocks, nextBlock];
+              const segments = message.segments ?? [];
+              const lastSegment = segments[segments.length - 1];
+              const nextSegments = !start && lastSegment?.kind === 'thinking' && !lastSegment.done
+                ? [...segments.slice(0, -1), { ...lastSegment, text: lastSegment.text + delta }]
+                : [...segments, { id: blockId, kind: 'thinking' as const, text: delta, done: false }];
+              return { ...message, process: nextProcess, segments: nextSegments, status: '正在思考…' };
+            }));
           },
           onTool: (data) => {
-            updateProcess(conversationId, assistantId, (blocks) => {
-              const next = blocks.map((block) => (block.kind === 'thinking' ? { ...block, done: true } : block));
+            const fallbackId = uid('tool');
+            updateMessages(conversationId, (current) => current.map((message) => {
+              if (message.id !== assistantId) return message;
+              const finishThinking = <T extends MessageSegment>(segment: T): T => segment.kind === 'thinking' ? { ...segment, done: true } : segment;
+              const blocks: ProcessBlock[] = (message.process ?? []).map((block) => block.kind === 'thinking' ? { ...block, done: true } : block);
+              const segments = (message.segments ?? []).map(finishThinking);
+              const id = data.callId || fallbackId;
               if (data.kind === 'tool_call') {
-                const index = data.callId ? next.findIndex((block) => block.kind === 'tool' && block.callId === data.callId) : -1;
-                const toolBlock: ToolBlock = {
-                  id: data.callId || uid('tool'),
-                  kind: 'tool',
-                  callId: data.callId,
-                  tool: data.tool || 'tool',
-                  input: data.input,
-                  status: data.status,
-                  done: false,
-                };
-                if (index >= 0) {
-                  return next.map((block, position) => (position === index ? { ...toolBlock } : block));
-                }
-                return [...next, toolBlock];
+                const toolBlock: ToolBlock = { id, kind: 'tool', callId: data.callId, tool: data.tool || 'tool', input: data.input, status: data.status, done: false };
+                const index = blocks.findIndex((block) => block.kind === 'tool' && block.callId === data.callId);
+                const nextProcess = index >= 0 ? blocks.map((block, position) => position === index ? toolBlock : block) : [...blocks, toolBlock];
+                const segIndex = segments.findIndex((segment) => segment.kind === 'tool' && segment.callId === data.callId);
+                const nextSegments = segIndex >= 0 ? segments.map((segment, position) => position === segIndex ? toolBlock : segment) : [...segments, toolBlock];
+                return { ...message, process: nextProcess, segments: nextSegments, status: `正在调用 ${data.tool || '工具'}…` };
               }
-              const index = data.callId ? next.findIndex((block) => block.kind === 'tool' && block.callId === data.callId) : -1;
-              if (index >= 0) {
-                return next.map((block, position) => (
-                  position === index && block.kind === 'tool'
-                    ? { ...block, result: data.result, status: data.status, done: true }
-                    : block
-                ));
-              }
-              return [...next, {
-                id: data.callId || uid('tool'),
-                kind: 'tool',
-                callId: data.callId,
-                tool: data.tool || 'tool',
-                result: data.result,
-                status: data.status,
-                done: true,
-              }];
-            });
-            patchMessage(conversationId, assistantId, () => ({
-              status: data.kind === 'tool_call' ? `正在调用 ${data.tool || '工具'}…` : undefined,
-              processOpen: true,
+              const doneBlock = (block: ToolBlock): ToolBlock => ({ ...block, result: data.result, status: data.status, done: true });
+              const index = blocks.findIndex((block) => block.kind === 'tool' && block.callId === data.callId);
+              const nextProcess = index >= 0
+                ? blocks.map((block, position) => position === index && block.kind === 'tool' ? doneBlock(block) : block)
+                : [...blocks, { id, kind: 'tool' as const, callId: data.callId, tool: data.tool || 'tool', result: data.result, status: data.status, done: true }];
+              const segIndex = segments.findIndex((segment) => segment.kind === 'tool' && segment.callId === data.callId);
+              const nextSegments = segIndex >= 0
+                ? segments.map((segment, position) => position === segIndex && segment.kind === 'tool' ? doneBlock(segment) : segment)
+                : [...segments, { id, kind: 'tool' as const, callId: data.callId, tool: data.tool || 'tool', result: data.result, status: data.status, done: true } as ToolBlock];
+              return { ...message, process: nextProcess, segments: nextSegments, status: undefined };
             }));
           },
           onText: (delta) => {
-            finishProcess(conversationId, assistantId);
-            patchMessage(conversationId, assistantId, (current) => ({
-              text: current.text + delta,
-              status: undefined,
-              processOpen: false,
+            updateMessages(conversationId, (current) => current.map((message) => {
+              if (message.id !== assistantId) return message;
+              const segments = message.segments ?? [];
+              const last = segments[segments.length - 1];
+              const nextSegments = last?.kind === 'text'
+                ? [...segments.slice(0, -1), { ...last, text: last.text + delta }]
+                : [...segments, { id: uid('text'), kind: 'text' as const, text: delta }];
+              return { ...message, text: message.text + delta, segments: nextSegments, status: undefined };
             }));
           },
           onDone: (result) => {
-            finishProcess(conversationId, assistantId);
-            patchMessage(conversationId, assistantId, (current) => ({
-              text: result.reply || current.text || '已完成。',
-              streaming: false,
-              status: undefined,
-              processOpen: false,
+            updateMessages(conversationId, (current) => current.map((message) => {
+              if (message.id !== assistantId) return message;
+              const text = result.reply || message.text || '已完成。';
+              const segments: MessageSegment[] = (message.segments ?? []).map((segment) => ({ ...segment, done: true }));
+              const lastTextIndex = segments.map((segment) => segment.kind).lastIndexOf('text');
+              const nextSegments = lastTextIndex >= 0
+                ? segments.map((segment, index) => index === lastTextIndex ? { ...segment, kind: 'text' as const, text } : segment)
+                : [...segments, { id: `${message.id}-text`, kind: 'text' as const, text }];
+              return { ...message, text, segments: nextSegments, streaming: false, status: undefined };
             }));
             window.dispatchEvent(new CustomEvent('aiwo:assistant-refresh'));
             void loadSuggestions(`${message}\n${result.reply}`.slice(-1_800));
@@ -608,6 +620,20 @@ export function Assistant() {
       setBusy(false);
     }
   };
+
+  sendRef.current = send;
+
+  useEffect(() => {
+    const onGenuiAction = (event: Event) => {
+      const detail = (event as CustomEvent<{ action?: string; payload?: Record<string, unknown> }>).detail;
+      if (!detail?.action) return;
+      const payload = detail.payload ?? {};
+      const summary = JSON.stringify({ action: detail.action, payload }).slice(0, 4_000);
+      void sendRef.current?.(`[genui-action] ${summary}`);
+    };
+    window.addEventListener('aiwo:genui-action', onGenuiAction);
+    return () => window.removeEventListener('aiwo:genui-action', onGenuiAction);
+  }, []);
 
   const beginResize = (event: ReactPointerEvent<HTMLElement>) => {
     event.preventDefault();
@@ -665,7 +691,7 @@ export function Assistant() {
               <div style={{ minWidth: 0 }}>
                 <div className="cx-assistant-brand__title">
                   Ryan 助手
-                  <Badge size="sm" tone="cyan">DSH 服务</Badge>
+                  <Badge size="sm" tone="cyan">智能体</Badge>
                 </div>
                 <div className="cx-assistant-brand__sub">{active?.title && active.title !== '新会话' ? active.title : '人员 @Ryan · 可直接调用 Ryan API'}</div>
               </div>
@@ -720,12 +746,6 @@ export function Assistant() {
               <div key={message.id} className={`cx-assistant-msg cx-assistant-msg--${message.role}`}>
                 {message.role === 'assistant' ? <span className="cx-assistant-avatar">A</span> : null}
                 <div className="cx-assistant-bubble">
-                  {message.role === 'assistant' ? (
-                    <ProcessPanel
-                      message={message}
-                      onToggle={() => patchMessage(active.id, message.id, (current) => ({ processOpen: !current.processOpen }))}
-                    />
-                  ) : null}
                   {editing?.id === message.id ? (
                     <div className="cx-assistant-edit">
                       <Textarea
@@ -755,12 +775,14 @@ export function Assistant() {
                         <Button size="sm" variant="ghost" onClick={() => setEditing(null)}>取消</Button>
                       </div>
                     </div>
-                  ) : (
-                    <div className={`cx-assistant-text${message.tone ? ' cx-assistant-text--error' : ''}`}>
-                      {message.role === 'assistant' ? <Markdown text={message.text} /> : message.text}
+                  ) : message.role === 'assistant' ? (
+                    <div className={message.tone ? 'cx-assistant-text--error' : undefined}>
+                      <MessageTimeline message={message} />
                     </div>
+                  ) : (
+                    <div className="cx-assistant-text">{message.text}</div>
                   )}
-                  {message.streaming && !message.text && (!message.process || message.process.length === 0) ? (
+                  {message.streaming && !message.text && (!message.segments || message.segments.length === 0) ? (
                     <div className="cx-assistant-streaming">
                       <span className="cx-assistant-typing"><span /><span /><span /></span>
                       <span className="cx-assistant-stream-status">{message.status ?? '正在思考…'}</span>
@@ -794,14 +816,6 @@ export function Assistant() {
                       ) : null}
                       {message.role === 'assistant' && editing?.id !== message.id ? (
                         <>
-                          {message.process?.length ? (
-                            <IconButton
-                              icon="terminal"
-                              label={message.processOpen ? '收起过程' : '查看过程'}
-                              size="sm"
-                              onClick={() => patchMessage(active.id, message.id, (current) => ({ processOpen: !current.processOpen }))}
-                            />
-                          ) : null}
                           <IconButton icon="copy" label="复制" size="sm" onClick={() => void copyMessage(message.text)} />
                           {messages.slice(0, messages.indexOf(message)).some((item) => item.role === 'user') && !message.streaming ? (
                             <IconButton icon="refresh" label="重新生成" size="sm" disabled={busy} onClick={() => regenerate(message)} />
@@ -837,7 +851,7 @@ export function Assistant() {
             <Textarea
               rows={2}
               value={input}
-              placeholder="描述你想让 Ryan 做的事，例如：创建任务、查看服务、生成自动化…"
+              placeholder="描述你想让 Ryan 做的事，例如：创建任务、查看智能体、生成自动化…"
               onChange={(event) => setInput(event.target.value)}
               onKeyDown={(event) => {
                 if (event.key === 'Enter' && !event.shiftKey) {
@@ -850,7 +864,7 @@ export function Assistant() {
               <div className="cx-assistant-composer-meta">
                 <span className="cx-assistant-composer-tag">
                   <Icon name="server" size={11} />
-                  DSH 服务
+                 智能体
                 </span>
                 <span className="cx-assistant-composer-hint">Enter 发送 · Shift+Enter 换行</span>
               </div>

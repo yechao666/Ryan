@@ -86,19 +86,19 @@ export function ProjectWorkspaceBrowser({
       open={open}
       onClose={onClose}
       title={service ? `${service.name} · 工作区` : '项目工作区'}
-      description="当前项目在该 DSH 服务上的工作目录与产物。只读浏览，不修改文件。"
+      description="当前项目在该智能体上的工作目录与产物。只读浏览，不修改文件。"
       size="lg"
       footer={<button type="button" className="btn btn-ghost" onClick={onClose}>关闭</button>}
     >
       {data ? (
         <div className="ws-workspace-meta">
-          <Badge size="sm" tone={data.available ? 'green' : 'amber'} dot>{data.available ? '可浏览' : '远端服务'}</Badge>
+          <Badge size="sm" tone={data.available ? 'green' : 'amber'} dot>{data.available ? '可浏览' : '远端智能体'}</Badge>
           <code className="ws-workspace-path" title={data.workspaceRoot}>{data.workspaceRoot || '未注册工作区根目录'}</code>
         </div>
       ) : null}
       {error ? <Callout tone="red" icon="alert">{error}</Callout> : null}
       {data && !data.available ? (
-        <Callout tone="amber" icon="info">{data.reason ?? '该服务暂不支持在线浏览工作区。'}</Callout>
+        <Callout tone="amber" icon="info">{data.reason ?? '该智能体暂不支持在线浏览工作区。'}</Callout>
       ) : null}
       {data?.available ? (
         <div className="ws-workspace-layout">

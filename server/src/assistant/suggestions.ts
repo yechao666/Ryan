@@ -20,12 +20,12 @@ export interface SuggestionResult {
 
 function fallback(input: SuggestionInput): string[] {
   if (input.taskId) {
-    return ['总结这个任务的执行结果', '基于这个任务创建后续任务', '检查相关服务是否在线'];
+    return ['总结这个任务的执行结果', '基于这个任务创建后续任务', '检查相关智能体是否在线'];
   }
   if (input.projectId) {
     return ['查看这个项目的任务进度', '为这个项目创建一个新任务', '整理项目记忆与决策'];
   }
-  return ['创建一个新任务', '列出当前项目的 DSH 服务', '查看最近的任务执行情况'];
+  return ['创建一个新任务', '列出当前项目的 智能体', '查看最近的任务执行情况'];
 }
 
 function cleanItems(raw: unknown): string[] {

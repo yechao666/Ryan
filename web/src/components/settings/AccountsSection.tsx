@@ -27,7 +27,7 @@ import {
 } from '@ui';
 import { toneFor } from '../projects/helpers.tsx';
 
-type AccountRow = Person & { identityCount: number };
+type AccountRow = Person & { identityCount: number; wecomUserId?: string; wecomBoundAt?: string };
 
 const PAGE_SIZE_OPTIONS = [
   { value: '10', label: '每页 10 行' },
@@ -47,6 +47,12 @@ const PASSWORD_OPTIONS = [
   { value: 'unset', label: '仅统一认证' },
 ];
 
+const WECOM_OPTIONS = [
+  { value: 'all', label: '全部企业微信状态' },
+  { value: 'bound', label: '已绑定企业微信' },
+  { value: 'unbound', label: '未绑定企业微信' },
+];
+
 const SSO_OPTIONS = [
   { value: 'all', label: '全部绑定状态' },
   { value: 'bound', label: '已绑定统一认证' },
@@ -61,6 +67,7 @@ export function AccountsSection() {
   const [role, setRole] = useState('all');
   const [password, setPassword] = useState('all');
   const [sso, setSso] = useState('all');
+  const [wecom, setWecom] = useState('all');
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(20);
 
@@ -76,7 +83,7 @@ export function AccountsSection() {
   const [removeTarget, setRemoveTarget] = useState<AccountRow | null>(null);
   const [removing, setRemoving] = useState(false);
 
-  useEffect(() => { setPage(1); }, [keyword, role, password, sso, pageSize]);
+  useEffect(() => { setPage(1); }, [keyword, role, password, sso, wecom, pageSize]);
 
   const filtered = useMemo(() => {
     const needle = keyword.trim().toLowerCase();
@@ -87,10 +94,12 @@ export function AccountsSection() {
       if (password === 'unset' && account.hasPassword !== false) return false;
       if (sso === 'bound' && account.identityCount === 0) return false;
       if (sso === 'unbound' && account.identityCount > 0) return false;
+      if (wecom === 'bound' && !account.wecomUserId) return false;
+      if (wecom === 'unbound' && account.wecomUserId) return false;
       if (!needle) return true;
       return `${account.name} ${account.email} ${account.title}`.toLowerCase().includes(needle);
     });
-  }, [accounts.data, keyword, role, password, sso]);
+  }, [accounts.data, keyword, role, password, sso, wecom]);
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
   const currentPage = Math.min(page, totalPages);
@@ -98,7 +107,7 @@ export function AccountsSection() {
     () => filtered.slice((currentPage - 1) * pageSize, currentPage * pageSize),
     [filtered, currentPage, pageSize],
   );
-  const hasFilters = Boolean(keyword.trim()) || role !== 'all' || password !== 'all' || sso !== 'all';
+  const hasFilters = Boolean(keyword.trim()) || role !== 'all' || password !== 'all' || sso !== 'all' || wecom !== 'all';
 
   const create = async () => {
     if (!form.name.trim() || !form.email.trim() || form.password.length < 8) {
@@ -188,6 +197,18 @@ export function AccountsSection() {
       sortValue: (account) => account.isAdmin ? 1 : 0,
     },
     {
+      key: 'wecom',
+      header: '企业微信',
+      width: 170,
+      render: (account) => account.wecomUserId ? (
+        <div className="vstack gap-2" style={{ minWidth: 0 }}>
+          <Badge size="sm" tone="green">已绑定</Badge>
+          <span className="tiny dim mono truncate" title={account.wecomUserId}>{account.wecomUserId}</span>
+        </div>
+      ) : <Badge size="sm" tone="amber">未绑定</Badge>,
+      sortValue: (account) => account.wecomUserId ? 1 : 0,
+    },
+    {
       key: 'auth',
       header: '登录方式',
       width: 190,
@@ -240,8 +261,8 @@ export function AccountsSection() {
       <Card>
         <div className="card-pad" style={{ paddingBottom: 8 }}>
           <SectionHead
-            title={<><Icon name="users" size={14} />人员账号</>}
-            desc="人员即账号；支持本地密码、统一认证绑定与管理员权限管理。"
+            title={<><Icon name="users" size={14} />员工账号</>}
+            desc="员工账号：人员即账号；企业微信绑定决定员工身份，支持本地密码、组织认证与管理员权限管理。"
             actions={<Button size="sm" variant="primary" icon="plus" onClick={() => setCreateOpen(true)}>新建账号</Button>}
           />
         </div>
@@ -250,11 +271,12 @@ export function AccountsSection() {
             <Select className="ws-filter-select" value={role} options={ROLE_OPTIONS} onChange={(event) => setRole(event.target.value)} />
             <Select className="ws-filter-select" value={password} options={PASSWORD_OPTIONS} onChange={(event) => setPassword(event.target.value)} />
             <Select className="ws-filter-select" value={sso} options={SSO_OPTIONS} onChange={(event) => setSso(event.target.value)} />
+            <Select className="ws-filter-select" value={wecom} options={WECOM_OPTIONS} onChange={(event) => setWecom(event.target.value)} />
             <SearchInput value={keyword} onChange={setKeyword} placeholder="搜索姓名 / 邮箱 / 职位" className="ws-search" />
             <span className="tiny dim">共 {filtered.length} 个账号</span>
           </div>
           <div className="toolbar-right">
-            {hasFilters ? <Button size="sm" variant="ghost" onClick={() => { setKeyword(''); setRole('all'); setPassword('all'); setSso('all'); }}>清除筛选</Button> : null}
+            {hasFilters ? <Button size="sm" variant="ghost" onClick={() => { setKeyword(''); setRole('all'); setPassword('all'); setSso('all'); setWecom('all'); }}>清除筛选</Button> : null}
             <Button size="sm" variant="ghost" icon="refresh" onClick={() => void accounts.refresh()}>刷新</Button>
           </div>
         </div>

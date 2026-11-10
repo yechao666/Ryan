@@ -8,6 +8,7 @@ import { registerRoutes } from './http/routes/index.ts';
 import { seedIfEmpty } from './seed/seed.ts';
 import { startAutomationScheduler } from './runtime/scheduler.ts';
 import { startMemoryDreamScheduler } from './memory/dream-scheduler.ts';
+import { closeProjectWecomBots, initializeProjectWecomBots } from './wecom/project-bots.ts';
 
 const env = loadEnv();
 ensureDir(env.dataDir);
@@ -25,6 +26,7 @@ const router = new Router();
 registerRoutes(router, app);
 const stopScheduler = startAutomationScheduler(app);
 const stopDreamScheduler = startMemoryDreamScheduler(app);
+void initializeProjectWecomBots(db, bus, process.env.AIWO_PUBLIC_URL || `http://${env.host === '0.0.0.0' ? '127.0.0.1' : env.host}:${env.port}`);
 const server = createHttpServer(app, router);
 server.listen(env.port, env.host, () => {
   console.log(`[aiwo] listening http://${env.host}:${env.port} (demo=${env.demoMode})`);
@@ -37,6 +39,7 @@ function shutdown(signal: string): void {
   console.log(`[aiwo] ${signal} received, shutting down`);
   stopScheduler();
   stopDreamScheduler();
+  void closeProjectWecomBots();
   server.close(() => {
     closeDatabase(db);
     process.exit(0);

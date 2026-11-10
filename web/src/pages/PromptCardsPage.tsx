@@ -7,6 +7,7 @@ import {
   Button,
   Callout,
   Card,
+  Checkbox,
   ConfirmDialog,
   EmptyState,
   ErrorState,
@@ -21,14 +22,11 @@ import {
   Segmented,
   Select,
   Skeleton,
-  Switch,
-  Table,
-  Textarea,
   useToast,
-  type Column,
   type Tone,
 } from '@ui';
 import { api } from '../lib/api.ts';
+import { MentionTextarea } from '../components/project/MentionTextarea.tsx';
 import { useAuth } from '../lib/auth.tsx';
 import { fmtRelative } from '../lib/format.ts';
 import { useAsync } from '../lib/hooks.ts';
@@ -44,18 +42,20 @@ interface CardFormState {
   projectId: string;
   teamId: string;
   enabled: boolean;
+  autoInject: boolean;
 }
 
-function emptyForm(isAdmin: boolean): CardFormState {
+function emptyForm(isAdmin: boolean, projectId = ''): CardFormState {
   return {
     name: '',
     category: 'workflow',
     description: '',
     content: '',
-    scope: isAdmin ? 'org' : 'project',
-    projectId: '',
+    scope: projectId ? 'project' : isAdmin ? 'org' : 'project',
+    projectId,
     teamId: '',
     enabled: true,
+    autoInject: false,
   };
 }
 
@@ -67,14 +67,6 @@ function scopeMeta(scope: string) {
   return PROMPT_CARD_SCOPES.find((item) => item.value === scope) ?? { label: scope, desc: '' };
 }
 
-function cardTarget(card: PromptCard): string | undefined {
-  if (card.scope === 'org') return '全员';
-  if (card.scope === 'project') return card.projectName;
-  if (card.scope === 'team') return card.teamName;
-  if (card.scope === 'person') return card.personName;
-  return undefined;
-}
-
 function errorMessage(cause: unknown, fallback: string): string {
   return cause instanceof Error && cause.message ? cause.message : fallback;
 }
@@ -83,11 +75,11 @@ function errorMessage(cause: unknown, fallback: string): string {
  * 提示卡：工作流 / 风格 / 标准 / 角色等可复用上下文。
  * 卡片可由任务引用，实际内容会注入 DSH 的任务提示词。
  */
-export function PromptCardsPage() {
+export function PromptCardsPage({ projectId: scopedProjectId }: { projectId?: string } = {}) {
   const { person } = useAuth();
   const toast = useToast();
   const isAdmin = Boolean(person?.isAdmin);
-  const cards = useAsync(() => api.promptCards(), []);
+  const cards = useAsync(() => api.promptCards(scopedProjectId ? { projectId: scopedProjectId } : {}), [scopedProjectId]);
   const projects = useAsync(() => api.projects(), []);
   const teams = useAsync(() => api.teams(), []);
   const [params, setParams] = useSearchParams();
@@ -95,16 +87,19 @@ export function PromptCardsPage() {
   const [search, setSearch] = useState('');
   const [category, setCategory] = useState<'all' | PromptCardCategory>('all');
   const [scope, setScope] = useState<'all' | PromptCardScope>('all');
+  const [target, setTarget] = useState('all');
   const [enabledFilter, setEnabledFilter] = useState<EnabledFilter>('all');
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(20);
+  const [sort, setSort] = useState('created-desc');
 
   const [formOpen, setFormOpen] = useState(() => params.get('new') === '1');
   const [editing, setEditing] = useState<PromptCard | null>(null);
-  const [form, setForm] = useState<CardFormState>(() => emptyForm(isAdmin));
+  const [form, setForm] = useState<CardFormState>(() => emptyForm(isAdmin, scopedProjectId));
   const [formError, setFormError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [togglingId, setTogglingId] = useState<string | null>(null);
+  const [togglingAutoId, setTogglingAutoId] = useState<string | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<PromptCard | null>(null);
   const [deleting, setDeleting] = useState(false);
 
@@ -115,11 +110,23 @@ export function PromptCardsPage() {
     }
   }, [params, setParams]);
 
+  const targetOptions = useMemo(() => [
+    { value: 'all', label: '全部归属' },
+    { value: 'org', label: '组织级（全员）' },
+    { value: 'person', label: '个人级' },
+    ...(projects.data ?? []).map((project) => ({ value: `project:${project.id}`, label: `项目 · ${project.name}` })),
+    ...(teams.data ?? []).map((team) => ({ value: `team:${team.id}`, label: `团队 · ${team.name}` })),
+  ], [projects.data, teams.data]);
+
   const list = useMemo(() => {
     const keyword = search.trim().toLowerCase();
     return (cards.data ?? []).filter((card) => {
       if (category !== 'all' && card.category !== category) return false;
       if (scope !== 'all' && card.scope !== scope) return false;
+      if (target === 'org' && card.scope !== 'org') return false;
+      if (target === 'person' && card.scope !== 'person') return false;
+      if (target.startsWith('project:') && card.projectId !== target.slice('project:'.length)) return false;
+      if (target.startsWith('team:') && card.teamId !== target.slice('team:'.length)) return false;
       if (enabledFilter === 'on' && !card.enabled) return false;
       if (enabledFilter === 'off' && card.enabled) return false;
       if (!keyword) return true;
@@ -128,15 +135,33 @@ export function PromptCardsPage() {
         .toLowerCase()
         .includes(keyword);
     });
-  }, [cards.data, search, category, scope, enabledFilter]);
+  }, [cards.data, search, category, scope, target, enabledFilter]);
 
-  const totalPages = Math.max(1, Math.ceil(list.length / pageSize));
+  const sortedList = useMemo(() => {
+    const items = [...list];
+    // 创建时间相同的卡片用稳定 ID 作为次序，避免编辑后 updatedAt 变化影响顺序。
+    const byCreated = (left: PromptCard, right: PromptCard) =>
+      left.createdAt.localeCompare(right.createdAt) || left.id.localeCompare(right.id);
+    switch (sort) {
+      case 'created-asc':
+        return items.sort(byCreated);
+      case 'updated-desc':
+        return items.sort((left, right) => right.updatedAt.localeCompare(left.updatedAt) || left.id.localeCompare(right.id));
+      case 'name-asc':
+        return items.sort((left, right) => left.name.localeCompare(right.name, 'zh-CN') || left.id.localeCompare(right.id));
+      case 'category-asc':
+        return items.sort((left, right) => left.category.localeCompare(right.category, 'zh-CN') || left.id.localeCompare(right.id));
+      default:
+        return items.sort((left, right) => byCreated(right, left));
+    }
+  }, [list, sort]);
+  const totalPages = Math.max(1, Math.ceil(sortedList.length / pageSize));
   const currentPage = Math.min(page, totalPages);
   const pagedList = useMemo(
-    () => list.slice((currentPage - 1) * pageSize, currentPage * pageSize),
-    [list, currentPage, pageSize],
+    () => sortedList.slice((currentPage - 1) * pageSize, currentPage * pageSize),
+    [sortedList, currentPage, pageSize],
   );
-  useEffect(() => { setPage(1); }, [search, category, scope, enabledFilter, pageSize]);
+  useEffect(() => { setPage(1); }, [search, category, scope, target, enabledFilter, pageSize, sort]);
 
   const scopeOptions = useMemo(
     () =>
@@ -153,12 +178,15 @@ export function PromptCardsPage() {
 
   const openCreate = () => {
     setEditing(null);
-    setForm(emptyForm(isAdmin));
+    setForm(emptyForm(isAdmin, scopedProjectId));
     setFormError(null);
     setFormOpen(true);
   };
 
+  const canManageCard = (card: PromptCard) => !scopedProjectId || card.scope === 'project';
+
   const openEdit = (card: PromptCard) => {
+    if (!canManageCard(card)) return;
     setEditing(card);
     setForm({
       name: card.name,
@@ -169,6 +197,7 @@ export function PromptCardsPage() {
       projectId: card.projectId ?? '',
       teamId: card.teamId ?? '',
       enabled: card.enabled,
+      autoInject: card.autoInject,
     });
     setFormError(null);
     setFormOpen(true);
@@ -206,6 +235,7 @@ export function PromptCardsPage() {
       description: form.description.trim(),
       content: form.content.trim(),
       enabled: form.enabled,
+      autoInject: form.autoInject,
     };
 
     setSubmitting(true);
@@ -219,6 +249,7 @@ export function PromptCardsPage() {
           description: base.description,
           content: base.content,
           enabled: base.enabled,
+          autoInject: base.autoInject,
         });
         toast.success(`提示卡「${base.name}」已更新`);
       } else {
@@ -254,6 +285,19 @@ export function PromptCardsPage() {
     }
   };
 
+  const handleAutoToggle = async (card: PromptCard) => {
+    setTogglingAutoId(card.id);
+    try {
+      await api.updatePromptCard(card.id, { autoInject: !card.autoInject });
+      toast.success(card.autoInject ? `已关闭「${card.name}」的自动注入` : `已开启「${card.name}」的自动注入`);
+      await cards.refresh();
+    } catch (cause) {
+      toast.error(errorMessage(cause, '切换自动注入失败'));
+    } finally {
+      setTogglingAutoId(null);
+    }
+  };
+
   const handleDelete = async () => {
     if (!deleteTarget) return;
     setDeleting(true);
@@ -270,100 +314,81 @@ export function PromptCardsPage() {
   };
 
   const hasFilter =
-    Boolean(search.trim()) || category !== 'all' || scope !== 'all' || enabledFilter !== 'all';
+    Boolean(search.trim()) || category !== 'all' || scope !== 'all' || target !== 'all' || enabledFilter !== 'all';
   const clearFilters = () => {
     setSearch('');
     setCategory('all');
     setScope('all');
+    setTarget('all');
     setEnabledFilter('all');
   };
 
-  const columns: Column<PromptCard>[] = [
-    {
-      key: 'name',
-      header: '提示卡',
-      render: (card) => {
-        const meta = categoryMeta(card.category);
-        return (
-          <div className="hstack gap-8">
-            <span className={`cx-metric-icon tone-${meta.tone}`}><Icon name="book" size={14} /></span>
-            <div className="vstack gap-2" style={{ minWidth: 0 }}>
-              <span className="strong truncate">{card.name}</span>
-              <span className="tiny dim truncate">{card.description || '暂无说明'}</span>
-            </div>
+  const renderCard = (card: PromptCard) => {
+    const category = categoryMeta(card.category);
+    return (
+      <Card className="prompt-tile card-pad" key={card.id}>
+        <div className="prompt-tile__head">
+          <span className={`cx-metric-icon tone-${category.tone}`}><Icon name="book" size={15} /></span>
+          <div className="prompt-tile__title">
+            <div className="strong truncate" title={card.name}>{card.name}</div>
+            <div className="tiny dim prompt-tile__desc" title={card.description || undefined}>{card.description || '暂无说明'}</div>
           </div>
-        );
-      },
-    },
-    {
-      key: 'category',
-      header: '类别',
-      width: 105,
-      render: (card) => {
-        const meta = categoryMeta(card.category);
-        return <Badge size="sm" tone={meta.tone as Tone}>{meta.label}</Badge>;
-      },
-    },
-    {
-      key: 'scope',
-      header: '范围',
-      width: 150,
-      render: (card) => (
-        <div className="vstack gap-2" style={{ minWidth: 0, alignItems: 'flex-start' }}>
-          <Badge size="sm" tone={card.scope === 'org' ? 'violet' : card.scope === 'team' ? 'cyan' : card.scope === 'project' ? 'blue' : 'slate'}>{scopeMeta(card.scope).label}</Badge>
-          <span className="tiny dim truncate">{cardTarget(card) || '—'}</span>
+          <Badge size="sm" tone={category.tone as Tone}>{category.label}</Badge>
         </div>
-      ),
-    },
-    {
-      key: 'content',
-      header: '内容',
-      render: (card) => <span className="prompt-card-preview" title={card.content}>{card.content}</span>,
-    },
-    {
-      key: 'enabled',
-      header: '状态',
-      width: 100,
-      render: (card) => (
-        <div className="hstack gap-6" onClick={(event) => event.stopPropagation()}>
-          <Switch checked={card.enabled} disabled={togglingId === card.id} onChange={() => void handleToggle(card)} />
-          <span className="tiny dim">{card.enabled ? '启用' : '停用'}</span>
+
+        <div className="prompt-tile__meta">
+          <Badge size="sm" tone={card.scope === 'org' ? 'violet' : card.scope === 'team' ? 'cyan' : card.scope === 'project' ? 'blue' : 'slate'}>
+            {scopeMeta(card.scope).label}
+          </Badge>
+          {card.teamName ? <span className="prompt-tile__meta-item" title={card.teamName}>团队 · {card.teamName}</span> : null}
+          {card.projectName ? <span className="prompt-tile__meta-item" title={card.projectName}>项目 · {card.projectName}</span> : null}
+          {card.personName ? <span className="prompt-tile__meta-item" title={card.personName}>人员 · {card.personName}</span> : null}
         </div>
-      ),
-      sortValue: (card) => (card.enabled ? 1 : 0),
-    },
-    {
-      key: 'updatedAt',
-      header: '最近更新',
-      width: 135,
-      render: (card) => (
-        <div className="vstack gap-2">
-          <span className="tiny dim">{fmtRelative(card.updatedAt)}</span>
-          <span className="tiny dim truncate">{card.createdByName || '—'}</span>
+
+        <div className="prompt-tile__content" title={card.content}>{card.content}</div>
+
+        <div className="prompt-tile__foot">
+          <div className="hstack gap-10">
+            <Checkbox
+              size="sm"
+              checked={card.enabled}
+              disabled={!canManageCard(card) || togglingId === card.id}
+              label="启用"
+              onChange={() => canManageCard(card) && void handleToggle(card)}
+            />
+            <Checkbox
+              size="sm"
+              checked={card.autoInject}
+              disabled={!canManageCard(card) || togglingAutoId === card.id}
+              label="自动注入"
+              onChange={() => canManageCard(card) && void handleAutoToggle(card)}
+            />
+          </div>
+          <div className="hstack gap-4">
+            {canManageCard(card) ? (
+              <>
+                <IconButton icon="pencil" label={`编辑 ${card.name}`} size="sm" onClick={() => openEdit(card)} />
+                <IconButton icon="trash" label={`删除 ${card.name}`} size="sm" onClick={() => setDeleteTarget(card)} />
+              </>
+            ) : <span className="tiny dim">继承只读</span>}
+          </div>
         </div>
-      ),
-      sortValue: (card) => Date.parse(card.updatedAt) || 0,
-    },
-    {
-      key: 'actions',
-      header: '操作',
-      width: 96,
-      align: 'right',
-      render: (card) => (
-        <div className="hstack gap-2" style={{ justifyContent: 'flex-end' }} onClick={(event) => event.stopPropagation()}>
-          <IconButton icon="pencil" label={`编辑 ${card.name}`} size="sm" onClick={() => openEdit(card)} />
-          <IconButton icon="trash" label={`删除 ${card.name}`} size="sm" onClick={() => setDeleteTarget(card)} />
+
+        <div className="prompt-tile__date tiny dim">
+          <span>创建于 {fmtRelative(card.createdAt)}</span>
+          <span>更新于 {fmtRelative(card.updatedAt)}</span>
+          {card.createdByName ? <span>创建人 {card.createdByName}</span> : null}
         </div>
-      ),
-    },
-  ];
+      </Card>
+    );
+  };
 
   return (
-    <div className="page">
+    <div className={scopedProjectId ? 'ws-page' : 'page'}>
       <PageHead
-        eyebrow="提示卡 · Prompt Cards"
+        eyebrow={scopedProjectId ? undefined : '提示卡 · Prompt Cards'}
         title="提示卡"
-        desc="把工作流、工作风格、质量标准与角色说明沉淀成卡片；任务引用后，卡片内容会注入 DSH 提示词。"
+        desc={scopedProjectId ? '当前项目可引用的提示卡；项目级卡片可在此维护，组织/团队级卡片为继承只读。' : '管理平台全部提示卡：工作流、工作风格、质量标准与角色说明；可设置自动注入范围，支持按类别、范围、归属对象与启用状态筛选。'}
         actions={
           <>
             <IconButton icon="refresh" label="刷新提示卡" onClick={() => void cards.refresh()} />
@@ -395,6 +420,13 @@ export function PromptCardsPage() {
             ]}
             onChange={(event) => setScope(event.target.value as 'all' | PromptCardScope)}
           />
+          <Select
+            value={target}
+            style={{ width: 190 }}
+            options={targetOptions}
+            onChange={(event) => setTarget(event.target.value)}
+            aria-label="按归属对象筛选"
+          />
           <Segmented<EnabledFilter>
             value={enabledFilter}
             onChange={setEnabledFilter}
@@ -404,28 +436,39 @@ export function PromptCardsPage() {
               { value: 'off', label: '停用' },
             ]}
           />
+          <Select
+            value={sort}
+            style={{ width: 170 }}
+            options={[
+              { value: 'created-desc', label: '创建时间：新 → 旧' },
+              { value: 'created-asc', label: '创建时间：旧 → 新' },
+              { value: 'updated-desc', label: '最近更新' },
+              { value: 'name-asc', label: '名称 A–Z' },
+              { value: 'category-asc', label: '类别排序' },
+            ]}
+            onChange={(event) => setSort(event.target.value)}
+            aria-label="提示卡排序"
+          />
           {hasFilter ? (
             <Button size="sm" variant="ghost" onClick={clearFilters}>
               清除筛选
             </Button>
           ) : null}
         </div>
-        <span className="tiny dim">共 {list.length} 张卡片</span>
+        <span className="tiny dim">共 {sortedList.length} 张卡片</span>
       </div>
 
       {cards.error && !cards.data ? (
         <Card><div style={{ padding: 18 }}><ErrorState message={cards.error} onRetry={() => void cards.refresh()} /></div></Card>
       ) : (
         <Card>
-          <Table
-            columns={columns}
-            rows={pagedList}
-            rowKey={(card) => card.id}
-            sortable
-            resizable
-            loading={cards.loading && !cards.data}
-            empty={
-              hasFilter ? (
+          {cards.loading && !cards.data ? (
+            <div className="grid-cards prompt-card-grid">
+              {[0, 1, 2, 3].map((index) => <Skeleton key={index} h={220} />)}
+            </div>
+          ) : pagedList.length === 0 ? (
+            <div style={{ padding: 18 }}>
+              {hasFilter ? (
                 <EmptyState
                   icon="filter"
                   title="没有匹配的提示卡"
@@ -440,15 +483,19 @@ export function PromptCardsPage() {
                   description="创建第一张卡片，把可复用的工作方式沉淀下来。"
                   action={<Button size="sm" variant="primary" icon="plus" onClick={openCreate}>新建卡片</Button>}
                 />
-              )
-            }
-          />
-          {!cards.loading && list.length > 0 ? (
+              )}
+            </div>
+          ) : (
+            <div className="grid-cards prompt-card-grid" style={{ padding: 14 }}>
+              {pagedList.map(renderCard)}
+            </div>
+          )}
+          {!cards.loading && sortedList.length > 0 ? (
             <div className="ws-table-foot">
               <Pagination
                 page={currentPage}
                 totalPages={totalPages}
-                total={list.length}
+                total={sortedList.length}
                 pageSize={pageSize}
                 pageSizeOptions={[
                   { value: '10', label: '每页 10 行' },
@@ -511,6 +558,9 @@ export function PromptCardsPage() {
             </Field>
           </div>
 
+          {scopedProjectId ? (
+            <Field label="适用范围"><Input value="当前项目（仅本项目可引用）" disabled readOnly /></Field>
+          ) : (
           <div className="grid grid-2">
             <Field
               label="适用范围"
@@ -579,6 +629,8 @@ export function PromptCardsPage() {
             )}
           </div>
 
+          )}
+
           <Field label="说明" htmlFor="prompt-card-desc" hint="一句话说明这张卡片解决什么问题。">
             <Input
               id="prompt-card-desc"
@@ -594,17 +646,29 @@ export function PromptCardsPage() {
             required
             hint="任务引用后作为上下文注入 DSH 提示词；建议写清步骤、标准与禁止事项。"
           >
-            <Textarea
+            <MentionTextarea
               id="prompt-card-content"
               rows={8}
               value={form.content}
               placeholder={'例如：\n1. 先阅读项目提示词与相关文件；\n2. 在 feature/* 分支实现；\n3. 运行测试并输出结果；\n4. 输出变更摘要与风险。'}
-              onChange={(event) => update('content', event.target.value)}
+              onChange={(value) => update('content', value)}
             />
           </Field>
 
-          <div className="hstack gap-10">
-            <Switch checked={form.enabled} onChange={(next) => update('enabled', next)} label="启用卡片" />
+          <div className="vstack gap-8">
+            <Checkbox size="sm" checked={form.enabled} onChange={(next) => update('enabled', next)} label="启用卡片" />
+            <div className="hstack gap-10" style={{ alignItems: 'flex-start' }}>
+              <Checkbox size="sm" checked={form.autoInject} onChange={(next) => update('autoInject', next)} label="自动注入" />
+              <span className="tiny dim" style={{ lineHeight: 1.6 }}>
+                {form.scope === 'org'
+                  ? '开启后自动注入到所有任务。'
+                  : form.scope === 'project'
+                    ? '开启后自动注入到该项目的所有任务。'
+                    : form.scope === 'team'
+                      ? '开启后自动注入到该团队所属项目的所有任务。'
+                      : '开启后自动注入到当前人员创建的所有任务。'}
+              </span>
+            </div>
           </div>
 
           {formError ? (

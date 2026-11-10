@@ -283,12 +283,15 @@ export function buildMemoryBrief(db: Db, projectId: string, maxChars = 500): Mem
 /** 任务完成后只沉淀显式决策/经验，不把普通任务结果写入项目记忆。 */
 export function taskMemoryText(input: {
   decisions?: string[];
+  progress?: string[];
   lessons?: string[];
 }): string {
   const decisions = input.decisions ?? [];
+  const progress = input.progress ?? [];
   const lessons = input.lessons ?? [];
   return [
     decisions.length ? `决策：${decisions.join('；')}` : '',
+    progress.length ? `进展：${progress.join('；')}` : '',
     lessons.length ? `经验：${lessons.join('；')}` : '',
   ].filter(Boolean).join('\n');
 }

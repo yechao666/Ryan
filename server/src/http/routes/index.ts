@@ -13,6 +13,10 @@ import { registerPromptCardRoutes } from './prompt-cards.ts';
 import { registerSettingsRoutes } from './settings.ts';
 import { registerInstanceRoutes } from './instances.ts';
 import { registerAccountRoutes } from './account.ts';
+import { registerWecomBotRoutes } from './wecom-bots.ts';
+import { registerProjectContextRoutes } from './project-context.ts';
+import { registerNotificationRoutes } from './notifications.ts';
+import { registerMentionRoutes } from './mentions.ts';
 
 export function registerRoutes(router: Router, _app: AppContext): void {
   registerAuthRoutes(router);
@@ -28,4 +32,8 @@ export function registerRoutes(router: Router, _app: AppContext): void {
   registerSettingsRoutes(router);
   registerInstanceRoutes(router);
   registerAccountRoutes(router);
+  registerWecomBotRoutes(router);
+  registerProjectContextRoutes(router);
+  registerNotificationRoutes(router);
+  registerMentionRoutes(router);
 }

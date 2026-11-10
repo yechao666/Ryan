@@ -129,10 +129,16 @@ export function ProjectLayout() {
   const tabs: TabItem[] = [
     { to: base, label: '概览', end: true },
     { to: `${base}/tasks`, label: '任务', count: counts.tasks || undefined },
-    { to: `${base}/services`, label: '服务', count: counts.instances || undefined },
+    { to: `${base}/context`, label: '项目背景' },
+    { to: `${base}/services`, label: '智能体', count: counts.instances || undefined },
+    { to: `${base}/wecom-bot`, label: '企微机器人' },
     { to: `${base}/activity`, label: '活动' },
     { to: `${base}/automations`, label: '自动化' },
     { to: `${base}/memory`, label: '记忆' },
+    { to: `${base}/records`, label: '项目记录' },
+    ...(detail.project.reportSettings.enabled ? [{ to: `${base}/retrospective`, label: '复盘总结' }] : []),
+    { to: `${base}/members`, label: '成员', count: counts.members || undefined },
+    { to: `${base}/prompt-cards`, label: '提示卡', count: counts.promptCards || undefined },
     { to: `${base}/settings`, label: '设置' },
   ];
   const context: ProjectOutletContext = { detail, reload };
@@ -194,7 +200,7 @@ export function ProjectLayout() {
             </span>
             <span className="ws-project-meta-item">
               <Icon name="server" size={13} />
-              绑定服务 {counts.instances}
+              绑定智能体 {counts.instances}
             </span>
             {project.repoUrl ? (
               <a className="ws-project-meta-item ws-link" href={project.repoUrl} target="_blank" rel="noreferrer">

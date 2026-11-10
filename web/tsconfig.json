@@ -10,7 +10,8 @@
       "@shared/*": ["../shared/src/*"],
       "@ui": ["./src/components/ui/index.tsx"],
       "@charts": ["./src/components/charts/index.tsx"],
-      "@lib/*": ["./src/lib/*"]
+      "@lib/*": ["./src/lib/*"],
+      "@changfenhuang/dsh-genui/embed": ["./src/types/genui.d.ts"]
     }
   },
   "include": ["src/**/*.ts", "src/**/*.tsx", "../shared/src/**/*.ts"]

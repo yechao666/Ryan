@@ -14,6 +14,13 @@ import { mkdirSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 
+const manifestQuerySchema = z.object({
+  mode: z.enum(['compact', 'detail', 'full']).optional(),
+  prefix: z.string().trim().max(240).optional(),
+  category: z.string().trim().max(80).optional(),
+  tag: z.string().trim().max(80).optional(),
+});
+
 const chatSchema = z.object({
   message: z.string().trim().min(1).max(8_000),
   pathname: z.string().trim().max(500).optional().default('/'),
@@ -337,7 +344,16 @@ export function registerAssistantRoutes(router: Router): void {
   // 助手/客户端读取稳定 API 清单；不从源码推断接口。
   router.get('/api/assistant/manifest', (rc) => {
     requirePerson(rc);
-    rc.json(assistantApiManifest());
+    const query = rc.query(manifestQuerySchema);
+    if (query.prefix && !query.prefix.startsWith('/api/')) {
+      throw errors.badRequest('prefix 必须以 /api/ 开头');
+    }
+    rc.json(assistantApiManifest({
+      mode: query.mode === 'detail' || query.mode === 'full' ? 'detail' : 'compact',
+      prefix: query.prefix,
+      category: query.category,
+      tag: query.tag,
+    }));
   });
 
   router.post('/api/assistant/suggestions', async (rc) => {

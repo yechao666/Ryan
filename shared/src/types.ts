@@ -1,5 +1,5 @@
 /**
- * Ryan 共享契约：以 DSH 服务为资源，人员 @Ryan 直接执行项目任务。
+ * Ryan 共享契约：以 智能体为资源，人员 @Ryan 直接执行项目任务。
  * 前后端唯一事实来源；HTTP JSON 均为 camelCase。
  */
 
@@ -12,6 +12,7 @@ export type TaskSource = 'human' | 'automation' | 'webhook' | 'api' | 'seed';
 export type TaskType = 'feature' | 'bugfix' | 'management' | 'ops' | 'docs' | 'other';
 export type InstanceStatus = 'online' | 'offline' | 'unconfigured' | 'error' | 'revoked';
 export type InstanceKind = 'local' | 'remote';
+export type AgentType = 'dsh' | 'claude';
 export type AutomationTrigger = 'manual' | 'webhook' | 'cron';
 export type MessageAuthor = 'person' | 'aiwo' | 'system';
 export type EventType =
@@ -81,13 +82,25 @@ export interface Project {
   prompt: string;
   repoUrl?: string;
   status: 'active' | 'archived';
-  /** 项目绑定的 DSH 服务；空表示共享池。 */
+  /** 项目绑定的 智能体；空表示共享池。 */
   serviceIds?: string[];
   serviceNames?: string[];
   /** Ryan 内部项目记忆身份（aiwo_<slug>）。 */
   memoryAgentId?: string;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface ProjectReportSettings {
+  enabled: boolean;
+  /** 1=周一 … 7=周日 */
+  weeklyDay: number;
+  /** HH:mm，本地时间 */
+  weeklyTime: string;
+  /** 1–28，避免月份差异 */
+  monthlyDay: number;
+  /** HH:mm，本地时间 */
+  monthlyTime: string;
 }
 
 export interface ProjectCounts {
@@ -99,6 +112,7 @@ export interface ProjectCounts {
 }
 
 export interface ProjectSummary extends Project {
+  reportSettings: ProjectReportSettings;
   counts: ProjectCounts;
   lastActivityAt?: string;
 }
@@ -128,6 +142,8 @@ export interface PromptCard {
   personId?: string;
   personName?: string;
   enabled: boolean;
+  /** 是否自动注入到该范围匹配的所有任务。 */
+  autoInject: boolean;
   createdBy?: string;
   createdByName?: string;
   createdAt: string;
@@ -144,18 +160,24 @@ export interface PromptCardInput {
   teamId?: string;
   personId?: string;
   enabled?: boolean;
+  autoInject?: boolean;
 }
 
 /** 可独立管理的 DSH 实例资源。 */
 export interface DshInstance {
   id: string;
   name: string;
+  /** 智能体类型：DSH / Claude。 */
+  agentType: AgentType;
+  /** 接入方式：本机 / 远端。 */
   kind: InstanceKind;
   host: string;
   port?: number;
   baseUrl?: string;
   version: string;
   pluginVersion?: string;
+  /** 资源能力标签，例如 linux / test / build。 */
+  capabilities: string[];
   status: InstanceStatus;
   lastSeenAt?: string;
   registeredAt: string;
@@ -175,19 +197,23 @@ export type Instance = DshInstance;
 
 export interface DshInstanceInput {
   name: string;
+  agentType?: AgentType;
   kind?: InstanceKind;
   host?: string;
   port?: number;
   baseUrl?: string;
+  capabilities?: string[];
 }
 
 export interface InstanceRegisterInput {
   name: string;
+  agentType?: AgentType;
   kind?: InstanceKind;
   host: string;
   port?: number;
   version: string;
   pluginVersion?: string;
+  capabilities?: string[];
 }
 
 export interface InstanceRegisterResult {
@@ -213,12 +239,18 @@ export interface WorkItem {
   prompt: string;
   promptCardIds: string[];
   promptCards: { id: string; name: string; category: PromptCardCategory }[];
+  /** 任务完成后接手的下一棒人员。 */
+  handoffPersonId?: string;
+  handoffPersonName?: string;
+  handoffPromptCardIds?: string[];
+  handoffNote?: string;
+  notifyPersonIds?: string[];
   status: TaskStatus;
   priority: number;
   leaseUntil?: string;
   instanceId?: string;
   instanceName?: string;
-  /** 任务允许运行的 DSH 服务；为空表示项目池/自动。 */
+  /** 任务允许运行的 智能体；为空表示项目池/自动。 */
   allowedServiceIds?: string[];
   allowedServiceNames?: string[];
   createdBy?: string;
@@ -392,7 +424,7 @@ export interface AuthProvider {
   id: string;
   slug: string;
   name: string;
-  type: 'oidc';
+  type: 'oidc' | 'wecom';
   issuer: string;
   enabled: boolean;
   autoCreate: boolean;
@@ -461,7 +493,7 @@ export interface AssistantSettings {
 export interface SystemSettings {
   security: SecuritySettings;
   assistant: AssistantSettings;
-  /** 项目未绑定服务时使用的默认 DSH 服务。 */
+  /** 项目未绑定服务时使用的默认智能体。 */
   defaultServiceId?: string;
   updatedAt?: string;
   updatedBy?: string;
@@ -504,11 +536,48 @@ export interface ClaimedTask {
   };
 }
 
+export type MemoryReportPeriod = 'week' | 'month';
+
+export interface MemoryReportItem {
+  id: string;
+  title?: string;
+  content: string;
+  category: string;
+  createdAt: string;
+  taskId?: string;
+  status?: string;
+  severity?: string;
+}
+
+export interface MemoryReportSection {
+  key: 'progress' | 'decisions' | 'lessons' | 'risks' | 'changes' | 'acceptance' | 'assumptions' | 'dependencies' | 'insights';
+  title: string;
+  count: number;
+  items: MemoryReportItem[];
+}
+
+export interface MemoryReport {
+  projectId: string;
+  period: MemoryReportPeriod;
+  title: string;
+  start: string;
+  end: string;
+  sections: MemoryReportSection[];
+  counts: Record<'progress' | 'decisions' | 'lessons' | 'risks' | 'changes' | 'acceptance' | 'assumptions' | 'dependencies' | 'insights', number>;
+  markdown: string;
+}
+
 export interface CompleteTaskInput {
   status: 'done' | 'failed';
   summary: string;
   decisions?: string[];
+  progress?: string[];
   lessons?: string[];
+  risks?: string[];
+  changes?: string[];
+  acceptance?: string[];
+  assumptions?: string[];
+  dependencies?: string[];
   error?: string;
   sessionId?: string;
 }
@@ -527,6 +596,10 @@ export interface CreateTaskInput {
   title?: string;
   prompt: string;
   promptCardIds?: string[];
+  handoffPersonId?: string;
+  handoffPromptCardIds?: string[];
+  handoffNote?: string;
+  notifyPersonIds?: string[];
   instanceId?: string;
   instanceIds?: string[];
   priority?: number;
@@ -553,6 +626,10 @@ export interface CreateAutomationInput {
   triggerConfig?: Automation['triggerConfig'];
   promptTemplate: string;
   promptCardIds?: string[];
+  handoffPersonId?: string;
+  handoffPromptCardIds?: string[];
+  handoffNote?: string;
+  notifyPersonIds?: string[];
   instanceId?: string;
   enabled?: boolean;
 }
