@@ -2560,3 +2560,13 @@
 
 .ws-shared-link strong { color: var(--text); font-size: 12px; font-weight: 550; }
 .ws-shared-link em { color: var(--text-dim); font-size: 11px; font-style: normal; }
+
+/* 项目页签按 工作 / 知识 / 协作 / 设置 分组 */
+.ws-tab-sep {
+  align-self: center;
+  width: 1px;
+  height: 16px;
+  flex: none;
+  margin: 0 4px;
+  background: var(--border);
+}

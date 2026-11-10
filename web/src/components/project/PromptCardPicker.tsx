@@ -92,7 +92,7 @@ export function ProjectInstanceSelect({ projectId, open, value, onChange }: Proj
     { value: '', label: '自动调度（推荐）' },
     ...query.instances.map((instance) => {
       const status = INSTANCE_STATUSES.find((item) => item.value === instance.status)?.label ?? instance.status;
-      return { value: instance.id, label: `${instance.name} · ${status}` };
+      return { value: instance.id, label: `${instance.name} · ${status}${instance.capabilities.length ? ` · ${instance.capabilities.join('/')}` : ''}` };
     }),
   ];
 
@@ -154,6 +154,7 @@ export function ProjectInstanceMultiSelect({ projectId, open, value, onChange }:
                   <span>{instance.name}</span>
                   <span className="tiny dim mono">{instance.id}</span>
                   <span className="tiny dim">{instance.status === 'online' ? '在线' : '离线'}</span>
+                  {instance.capabilities.length ? <span className="tiny dim">{instance.capabilities.join('/')}</span> : null}
                 </span>
               }
             />
