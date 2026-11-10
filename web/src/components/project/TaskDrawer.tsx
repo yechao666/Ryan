@@ -336,11 +336,6 @@ export function TaskDrawer({ taskId, onClose, onChanged, inline = false }: TaskD
               <MetaItem label="结束时间">{task.finishedAt ? fmtDateTime(task.finishedAt) : '—'}</MetaItem>
               <MetaItem label="运行时长">{fmtDuration(task.startedAt, task.finishedAt)}</MetaItem>
               <MetaItem label="最近更新">{task.lastMessageAt ? fmtRelative(task.lastMessageAt) : '—'}</MetaItem>
-              {task.handoffPersonId ? (
-                <MetaItem label="完成后接力">
-                  <span className="hstack gap-6"><Icon name="arrowRight" size={12} />{task.handoffPersonName || task.handoffPersonId}</span>
-                </MetaItem>
-              ) : null}
             </div>
 
             <div className="ws-drawer-section ws-detail-panel is-violet">
@@ -353,20 +348,6 @@ export function TaskDrawer({ taskId, onClose, onChanged, inline = false }: TaskD
                 <Markdown text={task.prompt.replace(/^\/goal\s*/i, '')} />
               </div>
             </div>
-
-            {task.handoffPersonId ? (
-              <div className="ws-drawer-section ws-detail-panel is-cyan">
-                <SectionHead
-                  title={<><span className="ws-detail-icon"><Icon name="arrowRight" size={13} /></span>完成后接力</>}
-                  desc="任务完成后自动创建接力任务，交给下一位成员"
-                />
-                <div className="tiny muted" style={{ lineHeight: 1.7 }}>
-                  接力给：<strong>{task.handoffPersonName || task.handoffPersonId}</strong>
-                  {task.notifyPersonIds?.length ? ` · 同时通知 ${task.notifyPersonIds.length} 人` : ''}
-                  {task.handoffNote ? <div className="mt-6" style={{ whiteSpace: 'pre-wrap' }}>{task.handoffNote}</div> : null}
-                </div>
-              </div>
-            ) : null}
 
             {task.promptCards?.length > 0 || task.promptCardIds?.length > 0 ? (
               <div className="ws-drawer-section ws-detail-panel is-blue">

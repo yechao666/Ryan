@@ -41,7 +41,7 @@ import { addMemory, buildMemoryContext, getMemoryBriefMaxChars, memoryAgentIdOf,
 import { ensureMemoryBrief } from '../../memory/brief.ts';
 import { memoryWriteIssue } from '../../memory/policy.ts';
 import { buildInstance, getInstanceRow } from './identity-helpers.ts';
-import { projectContextText } from '../../projects/context.ts';
+import { buildProjectBrief } from '../../projects/context.ts';
 import { createTaskNotification } from '../../lib/notifications.ts';
 
 const LEASE_MS = 3 * 60_000;
@@ -399,7 +399,7 @@ export function registerRuntimeRoutes(router: Router): void {
         id: project.id,
         name: project.name,
         slug: project.slug,
-        prompt: [project.prompt, projectContextText(db, project.id)].filter(Boolean).join('\n\n'),
+        prompt: buildProjectBrief(db, project.id, project.prompt),
         repoUrl: project.repo_url ?? undefined,
         type: project.type as ClaimedTask['project']['type'],
         memoryAgentId,
@@ -592,79 +592,6 @@ export function registerRuntimeRoutes(router: Router): void {
             });
           }
         }
-      }
-    }
-    if (input.status === 'done' && task.handoff_person_id) {
-      try {
-        const handoffTask = createTaskRecord(db, rc.app.bus, {
-          projectId: task.project_id,
-          source: 'api',
-          type: task.type as never,
-          title: `接力：${task.title}`,
-          prompt: [
-            '[接力任务]',
-            `上一任务 #${task.id}「${task.title}」已完成。`,
-            task.handoff_note ? `交接说明：${task.handoff_note}` : '',
-            '',
-            '上一任务执行结果：',
-            input.summary,
-          ].filter(Boolean).join('\n'),
-          promptCardIds: parseStringArray(task.handoff_prompt_card_ids),
-          createdBy: task.handoff_person_id,
-          priority: task.priority,
-          metadata: {
-            handoffFromTaskId: task.id,
-            handoffFromTitle: task.title,
-            handoffNotifyPersonIds: parseStringArray(task.notify_person_ids),
-          },
-          activitySummary: `任务接力：${task.title}`,
-          eventMessage: `创建接力任务：${task.title}`,
-        });
-        insertTaskEvent(db, {
-          taskId: task.id,
-          projectId: task.project_id,
-          type: 'task.handoff',
-          message: `已转交给 ${task.handoff_person_name ?? task.handoff_person_id}`,
-          payload: {
-            handoffTaskId: handoffTask.id,
-            handoffPersonId: task.handoff_person_id,
-            notifyPersonIds: parseStringArray(task.notify_person_ids),
-          },
-        });
-        recordActivity(db, rc.app.bus, {
-          projectId: task.project_id,
-          projectName: task.project_name ?? undefined,
-          type: 'task.created',
-          actor: (task.executor_name ?? '') + '@Ryan',
-          summary: `任务接力：${task.title} → ${task.handoff_person_name ?? task.handoff_person_id}`,
-          taskId: handoffTask.id,
-        });
-      } catch (error) {
-        insertTaskEvent(db, {
-          taskId: task.id,
-          projectId: task.project_id,
-          type: 'task.handoff_failed',
-          message: `接力任务创建失败：${error instanceof Error ? error.message : String(error)}`,
-        });
-      }
-    }
-    if (input.status === 'done') {
-      const notifyIds = parseStringArray(task.notify_person_ids);
-      for (const notifyPersonId of notifyIds) {
-        db.prepare(
-          `INSERT INTO task_notifications (id, person_id, task_id, project_id, type, title, body, read_at, created_at)
-           VALUES (?, ?, ?, ?, 'task.completed', ?, ?, NULL, ?)`,
-        ).run(
-          newId('ntf'),
-          notifyPersonId,
-          task.id,
-          task.project_id,
-          task.handoff_person_id ? `任务完成，已接力：${task.title}` : `任务完成：${task.title}`,
-          task.handoff_person_id
-            ? `任务「${task.title}」已完成，接力给 ${task.handoff_person_name ?? task.handoff_person_id}。`
-            : `任务「${task.title}」已完成。\n${truncateSummary(input.summary)}`,
-          nowIso(),
-        );
       }
     }
     writeBackTaskMemory(rc, task, input);

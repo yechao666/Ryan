@@ -29,18 +29,6 @@ export function migrate(db: Db): void {
     db.exec('ALTER TABLE projects ADD COLUMN workspace_path TEXT');
   }
   const taskColumns = db.prepare('PRAGMA table_info(work_items)').all() as unknown as { name: string }[];
-  if (!taskColumns.some((column) => column.name === 'handoff_person_id')) {
-    db.exec('ALTER TABLE work_items ADD COLUMN handoff_person_id TEXT REFERENCES persons(id) ON DELETE SET NULL');
-  }
-  if (!taskColumns.some((column) => column.name === 'handoff_prompt_card_ids')) {
-    db.exec("ALTER TABLE work_items ADD COLUMN handoff_prompt_card_ids TEXT NOT NULL DEFAULT '[]'");
-  }
-  if (!taskColumns.some((column) => column.name === 'handoff_note')) {
-    db.exec("ALTER TABLE work_items ADD COLUMN handoff_note TEXT NOT NULL DEFAULT ''");
-  }
-  if (!taskColumns.some((column) => column.name === 'notify_person_ids')) {
-    db.exec("ALTER TABLE work_items ADD COLUMN notify_person_ids TEXT NOT NULL DEFAULT '[]'");
-  }
   if (!taskColumns.some((column) => column.name === 'allowed_service_ids')) {
     db.exec("ALTER TABLE work_items ADD COLUMN allowed_service_ids TEXT NOT NULL DEFAULT '[]'");
   }

@@ -240,11 +240,6 @@ export interface WorkItem {
   promptCardIds: string[];
   promptCards: { id: string; name: string; category: PromptCardCategory }[];
   /** 任务完成后接手的下一棒人员。 */
-  handoffPersonId?: string;
-  handoffPersonName?: string;
-  handoffPromptCardIds?: string[];
-  handoffNote?: string;
-  notifyPersonIds?: string[];
   status: TaskStatus;
   priority: number;
   leaseUntil?: string;
@@ -596,10 +591,6 @@ export interface CreateTaskInput {
   title?: string;
   prompt: string;
   promptCardIds?: string[];
-  handoffPersonId?: string;
-  handoffPromptCardIds?: string[];
-  handoffNote?: string;
-  notifyPersonIds?: string[];
   instanceId?: string;
   instanceIds?: string[];
   priority?: number;
@@ -626,10 +617,6 @@ export interface CreateAutomationInput {
   triggerConfig?: Automation['triggerConfig'];
   promptTemplate: string;
   promptCardIds?: string[];
-  handoffPersonId?: string;
-  handoffPromptCardIds?: string[];
-  handoffNote?: string;
-  notifyPersonIds?: string[];
   instanceId?: string;
   enabled?: boolean;
 }

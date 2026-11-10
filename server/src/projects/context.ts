@@ -51,12 +51,27 @@ export function listProjectContext(db: Db, projectId: string): ProjectContextIte
   return rows.map(mapContextRow);
 }
 
-/** 将项目背景按条目标题拼成给执行智能体的上下文块。 */
+/**
+ * 项目执行简报：项目提示词 + 逐条背景。
+ * 所有智能体通过同一份项目简报获得共享上下文；各自的工作区文件不在此处合并。
+ */
+export function buildProjectBrief(db: Db, projectId: string, projectPrompt = '', maxChars = 16_000): string {
+  const items = listProjectContext(db, projectId);
+  const sections: string[] = [];
+  if (projectPrompt.trim()) sections.push(`## 项目提示词\n${projectPrompt.trim()}`);
+  if (items.length > 0) {
+    sections.push('## 项目背景与上下文');
+    for (const item of items) {
+      sections.push(`### ${item.title}\n${item.content}`);
+    }
+  }
+  const text = sections.join('\n\n');
+  return text.length <= maxChars ? text : `${text.slice(0, maxChars)}\n\n[项目背景已截断]`;
+}
+
+/** 兼容旧调用：只返回背景条目。 */
 export function projectContextText(db: Db, projectId: string): string {
   const items = listProjectContext(db, projectId);
   if (items.length === 0) return '';
-  return [
-    '## 项目背景与上下文',
-    ...items.map((item) => `### ${item.title}\n${item.content}`),
-  ].join('\n\n');
+  return items.map((item) => `### ${item.title}\n${item.content}`).join('\n\n');
 }

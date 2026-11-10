@@ -3,7 +3,7 @@ import type { Router } from '../router.ts';
 import type { RequestContext } from '../context.ts';
 import { requirePerson, requireProject } from '../auth.ts';
 import { errors } from '../respond.ts';
-import { canContributeProject, canViewProject, getProjectRow, type ProjectRow } from '../../lib/access.ts';
+import { canViewProject, getProjectRow, type ProjectRow } from '../../lib/access.ts';
 import { recordActivity } from '../../lib/activity.ts';
 import { checkUserInput } from '../../security/check.ts';
 import { generateTaskTitle } from '../../tasks/title.ts';
@@ -40,10 +40,6 @@ export interface TaskRow {
   title: string;
   prompt: string;
   prompt_card_ids: string;
-  handoff_person_id: string | null;
-  handoff_prompt_card_ids: string;
-  handoff_note: string;
-  notify_person_ids: string;
   status: string;
   priority: number;
   lease_until: string | null;
@@ -65,7 +61,6 @@ export interface TaskRow {
   instance_name?: string | null;
   created_by_name?: string | null;
   executor_name?: string | null;
-  handoff_person_name?: string | null;
 }
 
 export interface TaskEventRow {
@@ -89,14 +84,12 @@ export const TASK_SELECT = `
          p.status AS project_status,
          i.name AS instance_name,
          cp.name AS created_by_name,
-         ep.name AS executor_name,
-         hp.name AS handoff_person_name
+         ep.name AS executor_name
     FROM work_items w
     JOIN projects p ON p.id = w.project_id
     LEFT JOIN dsh_instances i ON i.id = w.instance_id
     LEFT JOIN persons cp ON cp.id = w.created_by
     LEFT JOIN persons ep ON ep.id = COALESCE(w.executor_person_id, w.created_by)
-    LEFT JOIN persons hp ON hp.id = w.handoff_person_id
 `;
 
 export function parseJsonObject(raw: string | null | undefined): Record<string, unknown> {
@@ -189,11 +182,6 @@ export function mapWorkItem(row: TaskRow): WorkItem {
     prompt: row.prompt,
     promptCardIds: ids,
     promptCards: [],
-    ...(row.handoff_person_id ? { handoffPersonId: row.handoff_person_id } : {}),
-    ...(row.handoff_person_name ? { handoffPersonName: row.handoff_person_name } : {}),
-    ...(parseStringArray(row.handoff_prompt_card_ids).length ? { handoffPromptCardIds: parseStringArray(row.handoff_prompt_card_ids) } : {}),
-    ...(row.handoff_note ? { handoffNote: row.handoff_note } : {}),
-    ...(parseStringArray(row.notify_person_ids).length ? { notifyPersonIds: parseStringArray(row.notify_person_ids) } : {}),
     status: row.status as TaskStatus,
     priority: Number(row.priority ?? 0),
     createdAt: row.created_at,
@@ -297,10 +285,6 @@ export interface CreateTaskRecordInput {
   title: string;
   prompt: string;
   promptCardIds?: string[];
-  handoffPersonId?: string | null;
-  handoffPromptCardIds?: string[];
-  handoffNote?: string;
-  notifyPersonIds?: string[];
   instanceId?: string | null;
   instanceIds?: string[];
   source?: TaskSource;
@@ -395,8 +379,7 @@ export function createTaskRecord(db: Db, bus: EventBus, input: CreateTaskRecordI
     scheduledServiceId = fairPickService(db, input.projectId, onlineServiceIds(db, allowedServiceIds));
   }
   const explicitCardIds = [...new Set(input.promptCardIds ?? [])];
-  const handoffCardIds = [...new Set(input.handoffPromptCardIds ?? [])];
-  const validationCardIds = [...new Set([...explicitCardIds, ...handoffCardIds])];
+  const validationCardIds = explicitCardIds;
   if (validationCardIds.length > 0) {
     const placeholders = validationCardIds.map(() => '?').join(', ');
     const found = rowsOf<{ id: string; scope: string; project_id: string | null; team_id: string | null; person_id: string | null }>(
@@ -416,18 +399,6 @@ export function createTaskRecord(db: Db, bus: EventBus, input: CreateTaskRecordI
       throw errors.badRequest('引用的提示卡不在当前项目可用范围内');
     }
   }
-  const handoffPersonId = input.handoffPersonId ?? null;
-  if (handoffPersonId) {
-    const handoffPerson = rowOf<{ id: string; is_admin: number; name: string }>(db, 'SELECT id, is_admin, name FROM persons WHERE id = ?', [handoffPersonId]);
-    if (!handoffPerson) throw errors.badRequest('接力人员不存在');
-    if (!canContributeProject(db, { id: handoffPerson.id, isAdmin: Number(handoffPerson.is_admin) === 1 }, project)) {
-      throw errors.badRequest('接力人员没有该项目任务权限');
-    }
-  }
-  const notifyPersonIds = [...new Set([...(input.notifyPersonIds ?? []), ...(handoffPersonId ? [handoffPersonId] : [])])];
-  for (const personId of notifyPersonIds) {
-    if (!rowOf<{ id: string }>(db, 'SELECT id FROM persons WHERE id = ?', [personId])) throw errors.badRequest('通知人员不存在');
-  }
   const cardIds = [...new Set([...explicitCardIds, ...autoInjectCardIds(db, input.projectId, effectiveCreatedBy)])];
 
   const id = newId('tsk');
@@ -439,9 +410,9 @@ export function createTaskRecord(db: Db, bus: EventBus, input: CreateTaskRecordI
   const executorName = creator.name;
   db.prepare(
     `INSERT INTO work_items
-       (id, project_id, source, type, title, prompt, prompt_card_ids, handoff_person_id, handoff_prompt_card_ids, handoff_note, notify_person_ids, status, priority, lease_until, instance_id,
+       (id, project_id, source, type, title, prompt, prompt_card_ids, status, priority, lease_until, instance_id,
         allowed_service_ids, created_by, executor_person_id, created_at, started_at, finished_at, result, error, metadata, dedupe_key)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'queued', ?, NULL, ?, ?, ?, ?, ?, NULL, NULL, NULL, NULL, ?, ?)`,
+     VALUES (?, ?, ?, ?, ?, ?, ?, 'queued', ?, NULL, ?, ?, ?, ?, ?, NULL, NULL, NULL, NULL, ?, ?)`,
   ).run(
     id,
     input.projectId,
@@ -450,10 +421,6 @@ export function createTaskRecord(db: Db, bus: EventBus, input: CreateTaskRecordI
     title,
     prompt,
     JSON.stringify(cardIds),
-    handoffPersonId,
-    JSON.stringify(handoffCardIds),
-    input.handoffNote ?? '',
-    JSON.stringify(notifyPersonIds),
     input.priority ?? 0,
     scheduledServiceId,
     JSON.stringify(allowedServiceIds),
@@ -565,10 +532,6 @@ const createTaskSchema = z.object({
   title: z.string().trim().max(300).optional(),
   prompt: z.string().min(1).max(20_000),
   promptCardIds: z.array(z.string().min(1)).max(20).optional(),
-  handoffPersonId: z.string().min(1).optional(),
-  handoffPromptCardIds: z.array(z.string().min(1)).max(20).optional(),
-  handoffNote: z.string().max(4_000).optional(),
-  notifyPersonIds: z.array(z.string().min(1)).max(20).optional(),
   instanceId: z.string().min(1).optional(),
   instanceIds: z.array(z.string().min(1)).max(50).optional(),
   priority: z.number().int().min(-100).max(100).optional(),
@@ -671,10 +634,6 @@ export function registerTaskRoutes(router: Router): void {
       title,
       prompt: input.prompt,
       promptCardIds: input.promptCardIds,
-      handoffPersonId: input.handoffPersonId,
-      handoffPromptCardIds: input.handoffPromptCardIds,
-      handoffNote: input.handoffNote,
-      notifyPersonIds: input.notifyPersonIds,
       instanceId: input.instanceId,
       instanceIds: input.instanceIds,
       source: input.source ?? 'human',

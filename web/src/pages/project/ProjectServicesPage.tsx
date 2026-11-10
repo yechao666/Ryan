@@ -81,8 +81,8 @@ export function ProjectServicesPage() {
   return (
     <div className="ws-page">
       <PageHead
-        title="项目智能体"
-        desc="绑定到本项目的智能体资源；项目是跨智能体共享信息区，每个智能体在各自工作区执行任务，共享项目背景、记忆与记录。"
+        title="智能体与工作区"
+        desc="绑定到本项目的智能体资源；项目共享背景、记忆和记录，每个智能体在各自主机的工作区执行任务。"
         actions={
           <Button variant="primary" icon="plus" disabled={unbound.length === 0} onClick={openAdd}>
             添加智能体
@@ -155,6 +155,7 @@ export function ProjectServicesPage() {
                       {service.id} · {service.host || '未设置主机'}
                       {service.port ? `:${service.port}` : ''}
                       {service.currentTask ? ` · 正在执行：${service.currentTask.title}` : ' · 空闲'}
+                      {service.capabilities.length ? ` · ${service.capabilities.join(' / ')}` : ''}
                     </span>
                   </div>
                   <AgentTypeBadge type={service.agentType} />
