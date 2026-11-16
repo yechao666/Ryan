@@ -33,8 +33,6 @@ export function LoginPage() {
   const [qrConfig, setQrConfig] = useState<{ appid: string; agentid: string; redirectUri: string; state: string; authorizeUrl: string; qrUrl: string } | null>(null);
   const [qrError, setQrError] = useState<string | null>(null);
 
-  if (person) return <Navigate to="/" replace />;
-
   const demoAccounts = meta.data?.demoAccounts ?? [];
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
@@ -78,7 +76,8 @@ export function LoginPage() {
   useEffect(() => {
     if (!qrProvider) return;
     const onMessage = (event: MessageEvent): void => {
-      if (event.origin !== window.location.origin) return;
+      const qrOrigin = qrConfig ? (() => { try { return new URL(qrConfig.qrUrl).origin; } catch { return ''; } })() : '';
+      if (event.origin !== window.location.origin && event.origin !== qrOrigin) return;
       const data = event.data as { type?: unknown; token?: unknown };
       if (data?.type !== 'ryan-wecom-login' || typeof data.token !== 'string') return;
       setQrProvider(null);
@@ -88,7 +87,9 @@ export function LoginPage() {
     };
     window.addEventListener('message', onMessage);
     return () => window.removeEventListener('message', onMessage);
-  }, [qrProvider, loginWithToken, navigate]);
+  }, [qrProvider, qrConfig, loginWithToken, navigate]);
+
+  if (person) return <Navigate to="/" replace />;
 
   return (
     <div className="login-page">
@@ -317,6 +318,7 @@ export function LoginPage() {
           </div>
         )}
         <div className="tiny dim center">二维码由企业微信提供，使用企业微信扫码授权。</div>
+        {qrProvider ? <div className="tiny dim center">Mock 环境可直接<a href={`/api/auth/sso/${encodeURIComponent(qrProvider.slug)}/start`}>打开授权页</a></div> : null}
       </Modal>
     </div>
   );

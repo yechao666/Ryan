@@ -14,6 +14,7 @@ import { registerSettingsRoutes } from './settings.ts';
 import { registerInstanceRoutes } from './instances.ts';
 import { registerAccountRoutes } from './account.ts';
 import { registerWecomBotRoutes } from './wecom-bots.ts';
+import { registerWecomChatRoutes } from './wecom-chats.ts';
 import { registerProjectContextRoutes } from './project-context.ts';
 import { registerNotificationRoutes } from './notifications.ts';
 import { registerMentionRoutes } from './mentions.ts';
@@ -33,6 +34,7 @@ export function registerRoutes(router: Router, _app: AppContext): void {
   registerInstanceRoutes(router);
   registerAccountRoutes(router);
   registerWecomBotRoutes(router);
+  registerWecomChatRoutes(router);
   registerProjectContextRoutes(router);
   registerNotificationRoutes(router);
   registerMentionRoutes(router);

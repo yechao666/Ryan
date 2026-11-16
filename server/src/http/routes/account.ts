@@ -46,6 +46,16 @@ function baseUrl(rc: any): string {
   return `${proto}://${host}`;
 }
 
+function wecomApiBase(): string {
+  return (process.env.AIWO_WECOM_API_BASE || 'https://qyapi.weixin.qq.com').replace(/\/+$/, '');
+}
+function wecomAuthBase(): string {
+  return (process.env.AIWO_WECOM_AUTH_BASE || 'https://open.weixin.qq.com').replace(/\/+$/, '');
+}
+function wecomQrBase(): string {
+  return process.env.AIWO_WECOM_QR_BASE || 'https://login.work.weixin.qq.com/wwlogin/sso/login';
+}
+
 function providerRow(db: any, by: { id?: string; slug?: string }): ProviderRow | undefined {
   if (by.id) return rowOf<ProviderRow>(db, 'SELECT * FROM auth_providers WHERE id = ?', [by.id]);
   return rowOf<ProviderRow>(db, 'SELECT * FROM auth_providers WHERE slug = ?', [by.slug ?? '']);
@@ -123,14 +133,14 @@ function wecomEmail(value: unknown): string {
 
 async function wecomIdentity(provider: ProviderRow, code: string): Promise<{ subject: string; email: string; name: string }> {
   if (!provider.issuer || !provider.client_secret) throw new Error('企业微信 Corp ID 或 Secret 未配置');
-  const tokenUrl = new URL('https://qyapi.weixin.qq.com/cgi-bin/gettoken');
+  const tokenUrl = new URL(`${wecomApiBase()}/cgi-bin/gettoken`);
   tokenUrl.searchParams.set('corpid', provider.issuer);
   tokenUrl.searchParams.set('corpsecret', provider.client_secret);
   const tokenData = await wecomJson(tokenUrl);
   const accessToken = String(tokenData.access_token ?? '');
   if (!accessToken) throw new Error('企业微信未返回 access_token');
 
-  const infoUrl = new URL('https://qyapi.weixin.qq.com/cgi-bin/auth/getuserinfo');
+  const infoUrl = new URL(`${wecomApiBase()}/cgi-bin/auth/getuserinfo`);
   infoUrl.searchParams.set('access_token', accessToken);
   infoUrl.searchParams.set('code', code);
   const info = await wecomJson(infoUrl);
@@ -140,7 +150,7 @@ async function wecomIdentity(provider: ProviderRow, code: string): Promise<{ sub
   let email = '';
   let name = '';
   try {
-    const userUrl = new URL('https://qyapi.weixin.qq.com/cgi-bin/user/get');
+    const userUrl = new URL(`${wecomApiBase()}/cgi-bin/user/get`);
     userUrl.searchParams.set('access_token', accessToken);
     userUrl.searchParams.set('userid', subject);
     const user = await wecomJson(userUrl);
@@ -153,7 +163,7 @@ async function wecomIdentity(provider: ProviderRow, code: string): Promise<{ sub
 }
 
 function wecomAuthorizeUrl(provider: ProviderRow, redirectUri: string, state: string): string {
-  const url = new URL('https://open.weixin.qq.com/connect/oauth2/authorize');
+  const url = new URL(`${wecomAuthBase()}/connect/oauth2/authorize`);
   url.searchParams.set('appid', provider.issuer);
   url.searchParams.set('agentid', provider.client_id);
   url.searchParams.set('redirect_uri', redirectUri);
@@ -165,7 +175,7 @@ function wecomAuthorizeUrl(provider: ProviderRow, redirectUri: string, state: st
 }
 
 function wecomQrUrl(provider: ProviderRow, redirectUri: string, state: string): string {
-  const url = new URL('https://login.work.weixin.qq.com/wwlogin/sso/login');
+  const url = new URL(wecomQrBase());
   url.searchParams.set('login_type', 'CorpApp');
   url.searchParams.set('appid', provider.issuer);
   url.searchParams.set('agentid', provider.client_id);
@@ -261,8 +271,8 @@ function completeIdentityLogin(
     rc.res.end(`<!doctype html><meta charset="utf-8"><title>企业微信登录</title><script>
       const token = ${tokenLiteral};
       const payload = { type: 'ryan-wecom-login', token };
-      if (window.parent !== window) window.parent.postMessage(payload, window.location.origin);
-      else if (window.opener) window.opener.postMessage(payload, window.location.origin);
+      if (window.parent !== window) window.parent.postMessage(payload, '*');
+      else if (window.opener) window.opener.postMessage(payload, '*');
       else window.location.replace('/login#token=' + encodeURIComponent(token));
     </script>`);
     return;

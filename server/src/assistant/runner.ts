@@ -28,6 +28,8 @@ export interface AssistantTurn {
   onEvent?: (event: Record<string, unknown>) => void;
   /** 浏览器断开/取消时中止 DSH 子进程。 */
   signal?: AbortSignal;
+  /** assistant=右侧系统助手；wecom=企业微信机器人（默认 DSH 编排器）。 */
+  mode?: 'assistant' | 'wecom';
 }
 
 export interface AssistantResult {
@@ -86,7 +88,30 @@ async function deepseekKey(): Promise<string> {
   return '';
 }
 
+function buildWecomPrompt(input: AssistantTurn): string {
+  return [
+    '你是 Ryan 的企业微信机器人，运行在 Ryan 默认 DSH 智能体上。',
+    '你的职责是理解人员需求、管理任务和回答任务状态；你不直接执行开发、测试、改文件或运行命令。',
+    '需要实际执行工作时，必须通过 aiwo_api 在项目下创建任务，由项目执行资源完成。',
+    '',
+    `当前人员：${input.personName}（${input.personId}）`,
+    `当前项目：${input.projectId ?? '未知'}`,
+    `企业微信会话：${input.pathname}`,
+    '',
+    '规则：',
+    '- 使用 aiwo_api 的开放 API；需要创建任务时调用 POST /api/tasks。',
+    '- 不要直接执行具体工作，不要声称你亲自完成了开发或测试。',
+    '- 回复会直接发送到企业微信，使用中文纯文本；不要输出 dsh-ui、代码围栏或 HIVE_NAVIGATE。',
+    '- 创建任务后告诉用户任务标题和 ID；用户询问进度时查询任务再回答。',
+    '- 简单确认也要简洁，不要输出操作说明以外的大段模板。',
+    '',
+    '用户消息：',
+    input.message,
+  ].join('\n');
+}
+
 function buildPrompt(input: AssistantTurn): string {
+  if (input.mode === 'wecom') return buildWecomPrompt(input);
   const routeLines = ASSISTANT_NAVIGATION_ROUTES.map((route) => `- ${route.path}：${route.name}`).join('\n');
   return [
     '你是 Ryan 平台内置的 DSH 系统助手，运行在一个真实的 DSH headless 智能体中。',

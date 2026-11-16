@@ -21,6 +21,7 @@ import {
 } from '@ui';
 import { useProject } from './context.ts';
 import { TaskConversation } from './TaskConversation.tsx';
+import { TaskMessages } from './TaskMessages.tsx';
 import { Markdown } from './Markdown.tsx';
 import {
   isActiveTask,
@@ -127,6 +128,7 @@ export function TaskDrawer({ taskId, onClose, onChanged, inline = false }: TaskD
   const [memoryExpanded, setMemoryExpanded] = useState(false);
   const [runtimeEvents, setRuntimeEvents] = useState<RuntimeEvent[]>([]);
   const [runtimeRawOpen, setRuntimeRawOpen] = useState(false);
+  const [messageSending, setMessageSending] = useState(false);
   const [tab, setTab] = useState<'result' | 'process'>('process');
 
   const query = useAsync(() => api.task(taskId ?? ''), [taskId], Boolean(taskId));
@@ -230,6 +232,21 @@ export function TaskDrawer({ taskId, onClose, onChanged, inline = false }: TaskD
       toast.error(cause instanceof Error ? cause.message : '取消任务失败，请重试。');
     } finally {
       setCancelling(false);
+    }
+  }, [taskId, refresh, notifyChanged, toast]);
+
+  const handleSendMessage = useCallback(async (content: string): Promise<void> => {
+    if (!taskId) return;
+    setMessageSending(true);
+    try {
+      await api.sendTaskMessage(taskId, content);
+      await refresh();
+      notifyChanged();
+      toast.success('消息已发送');
+    } catch (cause) {
+      toast.error(cause instanceof Error ? cause.message : '发送消息失败，请重试。');
+    } finally {
+      setMessageSending(false);
     }
   }, [taskId, refresh, notifyChanged, toast]);
 
@@ -347,6 +364,20 @@ export function TaskDrawer({ taskId, onClose, onChanged, inline = false }: TaskD
               <div className="ws-task-prompt">
                 <Markdown text={task.prompt.replace(/^\/goal\s*/i, '')} />
               </div>
+            </div>
+
+            <div className="ws-drawer-section ws-detail-panel is-blue">
+              <SectionHead
+                title={<><span className="ws-detail-icon"><Icon name="send" size={13} /></span>任务对话</>}
+                desc="任务就是对话。完成后继续发送消息，会在同一任务中重新排队执行。"
+                actions={<Badge tone="violet" size="sm">{(detail?.messages ?? []).length} 条消息</Badge>}
+              />
+              <TaskMessages
+                messages={detail?.messages ?? []}
+                disabled={isActiveTask(task.status)}
+                sending={messageSending}
+                onSend={handleSendMessage}
+              />
             </div>
 
             {task.promptCards?.length > 0 || task.promptCardIds?.length > 0 ? (

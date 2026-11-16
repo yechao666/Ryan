@@ -760,7 +760,7 @@
 }
 
 /* ===== 三列布局：助手作为最右侧常驻列，不再浮动 ===== */
-.shell > .cx-assistant {
+.shell-body > .cx-assistant {
   position: sticky;
   top: 0;
   right: auto;
@@ -778,9 +778,9 @@
   backdrop-filter: blur(18px);
 }
 
-.shell > .cx-assistant.mode-docked,
-.shell > .cx-assistant.mode-float,
-.shell > .cx-assistant.mode-expanded {
+.shell-body > .cx-assistant.mode-docked,
+.shell-body > .cx-assistant.mode-float,
+.shell-body > .cx-assistant.mode-expanded {
   top: auto;
   right: auto;
   bottom: auto;
@@ -789,10 +789,10 @@
   background: linear-gradient(180deg, rgba(15, 17, 26, 0.96), rgba(7, 8, 13, 0.99));
 }
 
-.shell > .cx-assistant .cx-assistant-panel,
-.shell > .cx-assistant.mode-docked .cx-assistant-panel,
-.shell > .cx-assistant.mode-float .cx-assistant-panel,
-.shell > .cx-assistant.mode-expanded .cx-assistant-panel {
+.shell-body > .cx-assistant .cx-assistant-panel,
+.shell-body > .cx-assistant.mode-docked .cx-assistant-panel,
+.shell-body > .cx-assistant.mode-float .cx-assistant-panel,
+.shell-body > .cx-assistant.mode-expanded .cx-assistant-panel {
   width: 100% !important;
   max-width: none !important;
   height: 100vh !important;
@@ -802,7 +802,7 @@
   animation: none;
 }
 
-.shell > .cx-assistant .cx-assistant-fab {
+.shell-body > .cx-assistant .cx-assistant-fab {
   margin: 18px 6px 0;
   width: 38px;
   height: 38px;
@@ -812,30 +812,30 @@
   box-shadow: none;
 }
 
-.shell > .cx-assistant .cx-assistant-fab__label {
+.shell-body > .cx-assistant .cx-assistant-fab__label {
   display: none;
 }
 
-.shell > .cx-assistant:not(.is-open) {
+.shell-body > .cx-assistant:not(.is-open) {
   width: 50px !important;
   align-items: center;
   background: rgba(10, 12, 19, 0.96);
 }
 
-.shell > .cx-assistant.is-open .cx-assistant-fab {
+.shell-body > .cx-assistant.is-open .cx-assistant-fab {
   display: none;
 }
 
-.shell > .cx-assistant .cx-assistant-mode {
+.shell-body > .cx-assistant .cx-assistant-mode {
   display: none;
 }
 
-.shell > .cx-assistant .cx-assistant-head {
+.shell-body > .cx-assistant .cx-assistant-head {
   padding-top: 16px;
 }
 
 @media (max-width: 1100px) {
-  .shell > .cx-assistant {
+  .shell-body > .cx-assistant {
     display: none;
   }
 }
@@ -1312,3 +1312,8 @@
   min-width: 96px;
   justify-content: center;
 }
+
+
+/* 顶部导航下的助手布局 */
+.shell-body > .cx-assistant { height: calc(100vh - var(--topbar-height)); position: sticky; top: var(--topbar-height); }
+.shell-body > .cx-assistant .cx-assistant-panel { height: calc(100vh - var(--topbar-height)) !important; }

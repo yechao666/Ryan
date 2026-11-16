@@ -2570,3 +2570,16 @@
   margin: 0 4px;
   background: var(--border);
 }
+
+/* 项目页签：业务 / 管理 分组 */
+.ws-tabs { display: flex; align-items: center; flex-wrap: wrap; }
+.ws-tab-group { display: inline-flex; align-items: center; align-self: stretch; padding: 0 6px 0 10px; color: var(--text-faint); font-size: 9px; letter-spacing: .12em; }
+.ws-tab-group.with-label { margin-right: 2px; padding-top: 3px; }
+
+/* 任务即对话：任务详情中的连续对话与发送框 */
+.ws-task-dialog { display:flex; flex-direction:column; gap:14px; }
+.ws-task-dialog .ws-chat-flow { max-height:520px; overflow:auto; padding-right:4px; }
+.ws-task-composer { border:1px solid var(--border); border-radius:10px; background:var(--panel-2); padding:10px; display:flex; flex-direction:column; gap:8px; }
+.ws-task-composer textarea { width:100%; resize:vertical; min-height:52px; border:0; outline:0; background:transparent; color:var(--text); font-size:13px; line-height:1.7; }
+.ws-task-composer textarea::placeholder { color:var(--text-dim); }
+.ws-task-composer__foot { display:flex; align-items:center; justify-content:space-between; gap:10px; }

@@ -17,6 +17,7 @@ import type {
   EventType,
   PromptCardCategory,
   TaskEvent,
+  TaskMessage,
   TaskSource,
   TaskStatus,
   TaskType,
@@ -216,6 +217,63 @@ export function mapTaskEvent(row: TaskEventRow): TaskEvent {
   return event;
 }
 
+export interface TaskMessageRow {
+  id: string;
+  task_id: string;
+  role: string;
+  content: string;
+  author_person_id: string | null;
+  author_name: string;
+  source: string;
+  metadata: string;
+  created_at: string;
+}
+
+export function mapTaskMessage(row: TaskMessageRow): TaskMessage {
+  return {
+    id: row.id,
+    taskId: row.task_id,
+    role: row.role,
+    content: row.content,
+    ...(row.author_person_id ? { authorPersonId: row.author_person_id } : {}),
+    ...(row.author_name ? { authorName: row.author_name } : {}),
+    source: row.source,
+    createdAt: row.created_at,
+  };
+}
+
+export function listTaskMessages(db: Db, taskId: string): TaskMessage[] {
+  return rowsOf<TaskMessageRow>(
+    db,
+    'SELECT * FROM task_messages WHERE task_id = ? ORDER BY created_at ASC, id ASC',
+    [taskId],
+  ).map(mapTaskMessage);
+}
+
+export function insertTaskMessage(
+  db: Db,
+  input: { taskId: string; role: string; content: string; authorPersonId?: string | null; authorName?: string; source?: string; metadata?: Record<string, unknown>; createdAt?: string },
+): TaskMessage {
+  const id = newId('tmsg');
+  db.prepare(
+    `INSERT INTO task_messages (id, task_id, role, content, author_person_id, author_name, source, metadata, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+  ).run(
+    id,
+    input.taskId,
+    input.role,
+    input.content,
+    input.authorPersonId ?? null,
+    input.authorName ?? '',
+    input.source ?? 'web',
+    JSON.stringify(input.metadata ?? {}),
+    input.createdAt ?? nowIso(),
+  );
+  const row = rowOf<TaskMessageRow>(db, 'SELECT * FROM task_messages WHERE id = ?', [id]);
+  if (!row) throw errors.internal('任务消息写入后读取失败');
+  return mapTaskMessage(row);
+}
+
 export function getTaskRow(db: Db, id: string): TaskRow | null {
   return rowOf<TaskRow>(db, `${TASK_SELECT} WHERE w.id = ?`, [id]) ?? null;
 }
@@ -226,6 +284,13 @@ export function getWorkItem(db: Db, id: string): WorkItem | null {
   const item = mapWorkItem(row);
   item.promptCards = cardsForTask(db, item.promptCardIds);
   if (item.allowedServiceIds?.length) item.allowedServiceNames = serviceNamesForTask(db, item.allowedServiceIds);
+  const stats = rowOf<{ count: number; last_at: string | null }>(
+    db,
+    'SELECT COUNT(*) AS count, MAX(created_at) AS last_at FROM task_messages WHERE task_id = ?',
+    [item.id],
+  );
+  item.messageCount = Number(stats?.count ?? 0);
+  if (stats?.last_at) item.lastMessageAt = stats.last_at;
   return item;
 }
 
@@ -442,6 +507,15 @@ export function createTaskRecord(db: Db, bus: EventBus, input: CreateTaskRecordI
     payload: { source, type, promptCardIds: cardIds, allowedServiceIds, instanceId: scheduledServiceId },
     createdAt,
   });
+  insertTaskMessage(db, {
+    taskId: id,
+    role: 'user',
+    content: input.prompt.trim(),
+    authorPersonId: effectiveCreatedBy,
+    authorName: creator.name,
+    source,
+    createdAt,
+  });
   recordActivity(db, bus, {
     projectId: input.projectId,
     projectName: project.name,
@@ -540,6 +614,10 @@ const createTaskSchema = z.object({
   metadata: z.record(z.unknown()).optional(),
 });
 
+const taskMessageSchema = z.object({
+  content: z.string().trim().min(1).max(20_000),
+});
+
 const activityQuerySchema = z.object({
   projectId: z.string().min(1).optional(),
   limit: z.coerce.number().int().min(1).max(100).default(30),
@@ -589,7 +667,8 @@ export function registerTaskRoutes(router: Router): void {
     }
     args.push(params.limit);
     const sql = `${TASK_SELECT}${where.length ? ` WHERE ${where.join(' AND ')}` : ''}
-      ORDER BY w.priority DESC, w.created_at DESC LIMIT ?`;
+      ORDER BY CASE WHEN w.status IN ('queued', 'assigned', 'running', 'waiting_input') THEN 0 ELSE 1 END,
+        w.priority DESC, w.created_at DESC LIMIT ?`;
     const items = rowsOf<TaskRow>(db, sql, args).map(mapWorkItem);
     for (const item of items) {
       item.promptCards = cardsForTask(db, item.promptCardIds);
@@ -605,6 +684,7 @@ export function registerTaskRoutes(router: Router): void {
     const project = requireProject(rc, task.project_id, 'view');
     rc.json({
       task: getWorkItem(rc.app.db, task.id),
+      messages: listTaskMessages(rc.app.db, task.id),
       events: listTaskEvents(rc.app.db, task.id),
       memory: {
         projectId: project.id,
@@ -646,11 +726,63 @@ export function registerTaskRoutes(router: Router): void {
     rc.json(task);
   });
 
-  router.post('/api/tasks/:id/messages', (rc) => {
+  router.post('/api/tasks/:id/messages', async (rc) => {
+    const person = requirePerson(rc);
     const task = getTaskRow(rc.app.db, rc.params.id);
     if (!task) throw errors.notFound('任务不存在');
-    requireProject(rc, task.project_id, 'view');
-    throw errors.conflict('Ryan 任务不支持对话，只展示执行过程');
+    requireProject(rc, task.project_id, 'contribute');
+    if (['assigned', 'running', 'waiting_input'].includes(task.status)) {
+      throw errors.conflict('任务正在执行，请等待本轮结束后继续对话');
+    }
+    const input = await rc.body(taskMessageSchema);
+    const security = await checkUserInput({
+      db: rc.app.db,
+      personId: person.id,
+      source: 'task',
+      content: input.content,
+    });
+    if (!security.allowed) {
+      throw errors.badRequest(security.blockedMessage ?? '输入未通过安全检查', { reason: security.reason });
+    }
+    const now = nowIso();
+    const resumed = ['done', 'failed', 'cancelled'].includes(task.status);
+    if (resumed) {
+      rc.app.db.prepare(
+        `UPDATE work_items
+            SET status = 'queued', lease_until = NULL, started_at = NULL, finished_at = NULL,
+                result = NULL, error = NULL
+          WHERE id = ?`,
+      ).run(task.id);
+    }
+    insertTaskMessage(rc.app.db, {
+      taskId: task.id,
+      role: 'user',
+      content: input.content,
+      authorPersonId: person.id,
+      authorName: person.name,
+      source: 'web',
+      createdAt: now,
+    });
+    insertTaskEvent(rc.app.db, {
+      taskId: task.id,
+      projectId: task.project_id,
+      instanceId: task.instance_id,
+      type: resumed ? 'task.resumed' : 'task.message',
+      message: resumed ? '继续任务对话，重新排队执行' : '收到任务对话消息',
+      payload: { personId: person.id, resumed },
+      createdAt: now,
+    });
+    recordActivity(rc.app.db, rc.app.bus, {
+      projectId: task.project_id,
+      projectName: task.project_name ?? undefined,
+      type: resumed ? 'task.resumed' : 'task.message',
+      actor: executorLabel(person.name),
+      summary: `${resumed ? '继续任务' : '任务消息'}：${task.title}`,
+      taskId: task.id,
+    });
+    const updated = getWorkItem(rc.app.db, task.id);
+    if (!updated) throw errors.internal('任务消息写入后读取失败');
+    rc.json({ task: updated, messages: listTaskMessages(rc.app.db, task.id) });
   });
 
   router.post('/api/tasks/:id/cancel', (rc) => {

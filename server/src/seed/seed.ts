@@ -167,6 +167,13 @@ export function seedDatabase(db: DatabaseSync): void {
   );
 
   db.prepare(
+    `INSERT INTO auth_providers (id, slug, name, type, issuer, client_id, client_secret, scopes, enabled, auto_create, created_at, updated_at)
+     VALUES (?, ?, ?, 'wecom', ?, ?, ?, '', 1, 1, ?, ?)`,
+  ).run(
+    'prov_mock_wecom', 'wecom-mock', '企业微信 Mock', 'wwmockcorp', '1000002', 'mock-secret', iso(60), iso(60),
+  );
+
+  db.prepare(
     `INSERT INTO system_settings (key, value, updated_by, updated_at) VALUES ('security', ?, 'per_linwei', ?)`,
   ).run(JSON.stringify({ endpoint: '', enabled: false, model: '', apiKey: '', timeoutMs: 8000, blockMessage: '该输入未通过安全检查，请调整后重试。' }), iso(60));
   db.prepare(

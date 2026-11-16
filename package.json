@@ -9,15 +9,16 @@
     "node": ">=22.18.0"
   },
   "scripts": {
-    "dev": "node --watch server/src/main.ts",
+    "dev": "node --env-file-if-exists=.env --watch server/src/main.ts",
     "dev:web": "pnpm --filter @aiwo/web run dev",
     "build": "pnpm --filter @aiwo/web run build",
-    "start": "node server/src/main.ts",
+    "start": "node --env-file-if-exists=.env server/src/main.ts",
     "seed": "node server/src/seed/run-seed.ts --force",
     "test": "node --test 'server/src/**/*.test.ts'",
     "typecheck": "tsc -p server/tsconfig.json --noEmit && tsc -p web/tsconfig.json --noEmit",
     "verify": "pnpm run typecheck && pnpm run test && pnpm run build",
-    "test:runtime": "node --test integrations/aiwo-instance/test/*.mjs"
+    "test:runtime": "node --test integrations/aiwo-instance/test/*.mjs",
+    "start:wecom-mock": "AIWO_WECOM_API_BASE=http://127.0.0.1:4800 AIWO_WECOM_AUTH_BASE=http://127.0.0.1:4800 AIWO_WECOM_QR_BASE=http://127.0.0.1:4800/wwopen/sso/qrConnect AIWO_WECOM_AI_BASE=http://127.0.0.1:4800 AIWO_WECOM_AI_WS_URL=ws://127.0.0.1:4800/wecom/ai-bot node server/src/main.ts"
   },
   "devDependencies": {
     "@types/node": "^24.10.1",

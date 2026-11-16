@@ -809,3 +809,27 @@ test('助手会话按账号隔离，支持创建/重命名/删除', async () => 
   ok(await call(`/api/assistant/conversations/${id}`, { token: tokenLin, method: 'DELETE' }));
   assert.equal((await call(`/api/assistant/conversations/${id}`, { token: tokenLin })).status, 404);
 });
+
+test('任务即对话：任务消息可继续，完成后重新排队', async () => {
+  const task = ok(await call('/api/projects/prj_calc/tasks', {
+    token: tokenLin,
+    method: 'POST',
+    body: { title: '对话测试任务', prompt: '先说明当前状态。' },
+  }));
+  const id = task.id as string;
+  const first = ok(await call(`/api/tasks/${id}`, { token: tokenLin }));
+  assert.ok(Array.isArray(first.messages));
+  assert.equal(first.messages.length, 1);
+  assert.equal(first.messages[0].content, '先说明当前状态。');
+
+  const continued = ok(await call(`/api/tasks/${id}/messages`, {
+    token: tokenLin,
+    method: 'POST',
+    body: { content: '继续补充一个风险点。' },
+  }));
+  assert.equal(continued.task.status, 'queued');
+  assert.equal(continued.messages.length, 2);
+  assert.equal(continued.messages[1].content, '继续补充一个风险点。');
+
+  ok(await call(`/api/tasks/${id}/cancel`, { token: tokenLin, method: 'POST' }));
+});

@@ -19,6 +19,8 @@ export type EventType =
   | 'task.created'
   | 'task.claimed'
   | 'task.progress'
+  | 'task.message'
+  | 'task.resumed'
   | 'task.completed'
   | 'task.failed'
   | 'task.cancelled'
@@ -226,6 +228,17 @@ export interface InstanceTokenResult {
   command: string;
 }
 
+export interface TaskMessage {
+  id: string;
+  taskId: string;
+  role: 'user' | 'assistant' | 'system' | string;
+  content: string;
+  authorPersonId?: string;
+  authorName?: string;
+  source?: string;
+  createdAt: string;
+}
+
 export interface WorkItem {
   id: string;
   projectId: string;
@@ -258,6 +271,8 @@ export interface WorkItem {
   metadata: Record<string, unknown>;
   messageCount: number;
   lastMessageAt?: string;
+  /** claim 时附带的任务对话历史；任务详情单独返回 messages。 */
+  messages?: TaskMessage[];
 }
 
 export interface TaskEvent {
@@ -273,6 +288,7 @@ export interface TaskEvent {
 
 export interface TaskDetail {
   task: WorkItem;
+  messages: TaskMessage[];
   events: TaskEvent[];
   memory: {
     projectId?: string;

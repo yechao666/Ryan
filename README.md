@@ -1,5 +1,7 @@
 # Ryan · 人员 @Ryan 的 DSH 编排平台
 
+> 完整项目设计见 [DESIGN.md](./DESIGN.md)。
+
 Ryan 是一个面向员工的 **人机协作与智能体资源平台**。三个核心对象是：**员工账号、智能体资源、项目共享区**。
 
 - **员工账号**：平台账户一般对应一位员工，可绑定企业微信作为统一身份；支持本地密码、组织认证和管理员权限。员工负责创建任务、维护项目上下文和验收结果。
@@ -57,6 +59,50 @@ node agent.mjs --name my-dsh-01
 5. ACP 不可用时自动回退 `dsh --profile headless --json -`；远端 DSH 只需要安装这个代理，不需要暴露 ACP 端口。
 
 > ACP 是 stdio JSON-RPC；远端无法直接 stdio 连接，所以由服务代理 outbound 连 Ryan，代理在本地驱动 ACP。
+
+## 企业微信 Mock
+
+本地开发可以接 `../wecom-mock`，不连接真实企业微信：
+
+```bash
+# 1. 启动 Mock（4800）
+cd ../wecom-mock && npm start
+
+# 2. 启动第一版 Ryan，企业微信接口指向 Mock（4500）
+cd ../aiwo && pnpm start:wecom-mock
+```
+
+演示种子自带认证源 **企业微信 Mock**：
+
+- CorpID：`wwmockcorp`
+- AgentID：`1000002`
+- Secret：`mock-secret`
+- 登录页会显示「企业微信扫码登录 · 企业微信 Mock」。
+
+也可以手动设置环境变量：
+
+```bash
+AIWO_WECOM_API_BASE=http://127.0.0.1:4800
+AIWO_WECOM_AUTH_BASE=http://127.0.0.1:4800
+AIWO_WECOM_QR_BASE=http://127.0.0.1:4800/wwopen/sso/qrConnect
+AIWO_WECOM_AI_BASE=http://127.0.0.1:4800
+AIWO_WECOM_AI_WS_URL=ws://127.0.0.1:4800/wecom/ai-bot
+```
+
+企业微信消息链路：
+
+- Mock 企业微信 → Ryan 项目机器人 → 默认 DSH 协调器 → 创建/查询项目任务。
+- DSH 只负责理解需求和任务编排，不直接执行开发、测试或文件操作。
+- 每个外部企业微信单聊/群聊映射一个 Ryan 会话，可在「企业微信」页查看。
+- 任务完成后，Ryan 通过机器人把结果发送回原企业微信会话。
+
+项目级「企微机器人」页也支持用 Mock 创建智能机器人：
+
+- 环境变量 `AIWO_WECOM_AI_BASE` 指向 Mock 时，页面出现「一键连接 Mock」。
+- 点击后会调用 Mock 创建机器人、保存凭据，并通过 WebSocket 连接。
+- 也支持原有二维码生成、扫码确认、轮询凭据流程。
+
+第一版保留原有的右侧 Ryan 助手；新增独立「对话」页，选择项目后显示 `Ryan@项目`。
 
 ## 快速开始
 

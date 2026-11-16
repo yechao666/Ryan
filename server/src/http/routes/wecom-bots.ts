@@ -2,6 +2,7 @@ import type { Router } from '../router.ts';
 import { requirePerson, requireProject } from '../auth.ts';
 import { errors as httpErrors } from '../respond.ts';
 import {
+  connectMockProjectBot,
   getProjectBot,
   pollProjectBotRegistration,
   removeProjectBot,
@@ -12,7 +13,17 @@ import {
 export function registerWecomBotRoutes(router: Router): void {
   router.get('/api/projects/:id/wecom-bot', (rc) => {
     const project = requireProject(rc, rc.params.id, 'view');
-    rc.json({ bot: getProjectBot(project.id) });
+    rc.json({ bot: getProjectBot(project.id), mockAvailable: Boolean(process.env.AIWO_WECOM_AI_BASE) });
+  });
+
+  router.post('/api/projects/:id/wecom-bot/mock/connect', async (rc) => {
+    const project = requireProject(rc, rc.params.id, 'manage');
+    const person = requirePerson(rc);
+    try {
+      rc.json({ bot: await connectMockProjectBot(project.id, person.id) });
+    } catch (error) {
+      throw httpErrors.badRequest(error instanceof Error ? error.message : '连接 Mock 企业微信机器人失败');
+    }
   });
 
   router.post('/api/projects/:id/wecom-bot/register/start', async (rc) => {

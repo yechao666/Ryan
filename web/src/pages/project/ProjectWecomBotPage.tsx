@@ -26,6 +26,7 @@ export function ProjectWecomBotPage() {
   const [registrationStatus, setRegistrationStatus] = useState<string>('pending');
   const [registrationError, setRegistrationError] = useState<string | null>(null);
   const [starting, setStarting] = useState(false);
+  const [connectingMock, setConnectingMock] = useState(false);
   const [removing, setRemoving] = useState(false);
   const [confirmRemove, setConfirmRemove] = useState(false);
 
@@ -80,6 +81,19 @@ export function ProjectWecomBotPage() {
     };
   }, [registration?.attemptId, registrationStatus, project.id]);
 
+  const connectMock = async (): Promise<void> => {
+    setConnectingMock(true);
+    try {
+      await api.connectMockProjectWecomBot(project.id);
+      toast.success('已连接 Mock 企业微信机器人');
+      await botQuery.refresh();
+    } catch (cause) {
+      toast.error(errorMessage(cause, '连接 Mock 企业微信机器人失败'));
+    } finally {
+      setConnectingMock(false);
+    }
+  };
+
   const remove = async (): Promise<void> => {
     setRemoving(true);
     try {
@@ -108,15 +122,25 @@ export function ProjectWecomBotPage() {
       <PageHead
         title="企业微信机器人"
         desc="为当前项目扫码注册企业微信机器人；仅已绑定 Ryan 账号的企业微信成员发消息时才会创建项目任务。"
-        actions={bot ? (
-          <Button variant="outline" icon="refresh" loading={starting} onClick={() => void startRegistration()}>
-            重新扫码绑定
-          </Button>
-        ) : undefined}
+        actions={(
+          <div className="hstack gap-8">
+            {botQuery.data?.mockAvailable ? (
+              <Button variant="primary" icon="wechat" loading={connectingMock} onClick={() => void connectMock()}>
+                {bot ? '重新连接 Mock' : '一键连接 Mock'}
+              </Button>
+            ) : null}
+            {bot ? (
+              <Button variant="outline" icon="refresh" loading={starting} onClick={() => void startRegistration()}>
+                重新扫码绑定
+              </Button>
+            ) : null}
+          </div>
+        )}
       />
 
       <Callout tone="cyan" icon="wechat">
         无需配置 Corp ID 或 Secret：点击下方按钮后，用企业微信扫描二维码即可注册机器人。机器人凭据只保存在 Ryan 服务端。
+        {botQuery.data?.mockAvailable ? ' 当前环境已检测到 Mock 企业微信，可以一键创建并连接。' : ''}
       </Callout>
 
       {botQuery.loading && !botQuery.data ? (
@@ -153,7 +177,7 @@ export function ProjectWecomBotPage() {
             icon="wechat"
             title="还没有绑定企业微信机器人"
             description="扫码后，机器人会接入当前项目。企业微信消息会自动转成项目任务。"
-            action={<Button variant="primary" icon="wechat" loading={starting} onClick={() => void startRegistration()}>扫码注册机器人</Button>}
+            action={<div className="hstack gap-8"><Button variant="primary" icon="wechat" loading={starting} onClick={() => void startRegistration()}>扫码注册机器人</Button>{botQuery.data?.mockAvailable ? <Button variant="outline" icon="wechat" loading={connectingMock} onClick={() => void connectMock()}>一键连接 Mock</Button> : null}</div>}
           />
         </Card>
       )}

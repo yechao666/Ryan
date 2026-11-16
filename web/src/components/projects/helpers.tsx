@@ -85,6 +85,8 @@ const ACTIVITY_META: Record<EventType, { icon: IconName; tone: Tone }> = {
   'task.created': { icon: 'plus', tone: 'blue' },
   'task.claimed': { icon: 'server', tone: 'violet' },
   'task.progress': { icon: 'activity', tone: 'cyan' },
+  'task.message': { icon: 'send', tone: 'blue' },
+  'task.resumed': { icon: 'refresh', tone: 'violet' },
   'task.completed': { icon: 'checkCircle', tone: 'green' },
   'task.failed': { icon: 'xCircle', tone: 'red' },
   'task.cancelled': { icon: 'x', tone: 'slate' },

@@ -254,7 +254,14 @@ export function Assistant() {
 
   useEffect(() => {
     localStorage.setItem('aiwo.assistant.open', open ? '1' : '0');
+    window.dispatchEvent(new CustomEvent('aiwo:assistant-state', { detail: { open } }));
   }, [open]);
+
+  useEffect(() => {
+    const onToggle = () => setOpen((value) => !value);
+    window.addEventListener('aiwo:assistant-toggle', onToggle);
+    return () => window.removeEventListener('aiwo:assistant-toggle', onToggle);
+  }, []);
 
   useEffect(() => {
     localStorage.setItem('aiwo.assistant.width', String(width));
@@ -680,8 +687,10 @@ export function Assistant() {
     [conversations],
   );
 
+  if (!open) return null;
+
   return (
-    <div className={`cx-assistant ${open ? 'is-open' : ''}`} style={open ? { width } : undefined}>
+    <div className={`cx-assistant is-open`} style={{ width }}>
       {open ? (
         <section className="cx-assistant-panel" aria-label="Ryan 助手">
           <span className="cx-assistant-resize" title="拖动调整宽度" onPointerDown={beginResize} />
@@ -892,12 +901,7 @@ export function Assistant() {
             </div>
           </form>
         </section>
-      ) : (
-        <button type="button" className="cx-assistant-fab" title="打开 Ryan 助手" onClick={() => setOpen(true)}>
-          <span className="cx-assistant-fab__icon"><Icon name="sparkles" size={18} /></span>
-          <span className="cx-assistant-fab__label">助手</span>
-        </button>
-      )}
+      ) : null}
     </div>
   );
 }

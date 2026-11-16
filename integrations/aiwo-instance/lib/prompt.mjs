@@ -55,11 +55,29 @@ ${brief}
     sections.push(`# 引用提示卡\n${cardText}`);
   }
 
-  const goalText = stripGoalPrefix(task.prompt);
-  const taskLines = [];
-  if (task.title) taskLines.push(task.title);
-  if (goalText) taskLines.push(goalText);
-  if (taskLines.length > 0) sections.push(`# 任务\n${taskLines.join('\n')}`);
+  const messages = Array.isArray(task.messages) ? task.messages : [];
+  if (messages.length > 0) {
+    const lines = [
+      '这是一段持续的任务对话。历史消息用于理解上下文；最后一条人员消息是当前要处理的最新要求。',
+      '如果本轮是对上一轮结果的继续，请直接修正/补充，不要从零重做。',
+      'Ryan 是主 Agent，你是执行子 Agent；完成后把结果作为本轮回复返回。',
+      '',
+    ];
+    for (const message of messages.slice(-80)) {
+      const role = message?.role === 'user' ? '人员' : message?.role === 'assistant' ? 'Ryan/子Agent' : '系统';
+      const author = typeof message?.authorName === 'string' && message.authorName ? `（${message.authorName}）` : '';
+      const content = String(message?.content ?? '').trim();
+      if (content) lines.push(`## ${role}${author}\n${content.slice(0, 12000)}`);
+    }
+    sections.push(`# 任务对话\n${lines.join('\n')}`);
+    if (task.title) sections.push(`# 任务标题\n${task.title}`);
+  } else {
+    const goalText = stripGoalPrefix(task.prompt);
+    const taskLines = [];
+    if (task.title) taskLines.push(task.title);
+    if (goalText) taskLines.push(goalText);
+    if (taskLines.length > 0) sections.push(`# 任务\n${taskLines.join('\n')}`);
+  }
 
   if (executor.label) sections.push(`# 执行者\n${executor.label}`);
 

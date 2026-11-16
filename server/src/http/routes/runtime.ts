@@ -31,6 +31,8 @@ import {
   getTaskRow,
   getWorkItem,
   insertTaskEvent,
+  insertTaskMessage,
+  listTaskMessages,
   mapWorkItem,
   parseJsonObject,
   parseStringArray,
@@ -132,6 +134,10 @@ const registerSchema = z.object({
 const progressSchema = z.object({
   message: z.string().trim().min(1).max(4_000),
   payload: z.record(z.unknown()).optional(),
+});
+
+const runtimeTaskMessageSchema = z.object({
+  content: z.string().trim().min(1).max(20_000),
 });
 
 const runtimeEventsSchema = z.object({
@@ -374,6 +380,7 @@ export function registerRuntimeRoutes(router: Router): void {
     const person = task.created_by ? rowOf<{ id: string; name: string }>(db, 'SELECT id, name FROM persons WHERE id = ?', [task.created_by]) : undefined;
     const memoryAgentId = memoryAgentIdOf(db, project.id) ?? '';
     const item = getWorkItem(db, task.id)!;
+    item.messages = listTaskMessages(db, task.id);
     const memoryBrief = await ensureMemoryBrief(db, project.id);
 
     insertTaskEvent(db, {
@@ -489,9 +496,19 @@ export function registerRuntimeRoutes(router: Router): void {
     rc.json({ ok: true });
   });
 
-  router.post('/api/runtime/tasks/:id/messages', (rc) => {
-    authenticateInstance(rc);
-    throw errors.conflict('Ryan 任务不支持对话，只展示执行过程');
+  router.post('/api/runtime/tasks/:id/messages', async (rc) => {
+    const instance = authenticateInstance(rc);
+    const task = requireInstanceTask(rc.app.db, rc.params.id, instance.id);
+    const input = await rc.body(runtimeTaskMessageSchema);
+    const message = insertTaskMessage(rc.app.db, {
+      taskId: task.id,
+      role: 'assistant',
+      content: input.content,
+      authorName: 'Ryan',
+      source: 'agent',
+      metadata: { instanceId: instance.id },
+    });
+    rc.json(message, 201);
   });
 
   router.post('/api/runtime/tasks/:id/complete', async (rc) => {
@@ -505,6 +522,15 @@ export function registerRuntimeRoutes(router: Router): void {
       `UPDATE work_items SET status = ?, finished_at = ?, result = ?, error = ?, lease_until = NULL
         WHERE id = ?`,
     ).run(input.status, now, input.summary, input.error ?? null, task.id);
+    insertTaskMessage(db, {
+      taskId: task.id,
+      role: 'assistant',
+      content: input.status === 'done' ? input.summary : `任务失败：${input.error ?? input.summary}`,
+      authorName: 'Ryan',
+      source: 'agent',
+      metadata: { status: input.status, instanceId: instance.id },
+      createdAt: now,
+    });
     insertTaskEvent(db, {
       taskId: task.id,
       projectId: task.project_id,

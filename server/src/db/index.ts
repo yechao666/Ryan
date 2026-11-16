@@ -7,7 +7,7 @@ import { DEMO_PASSWORD } from '../../../shared/src/constants.ts';
 
 const here = dirname(fileURLToPath(import.meta.url));
 export type Db = DatabaseSync;
-export const SCHEMA_VERSION = 15;
+export const SCHEMA_VERSION = 18;
 
 export function openDatabase(dbPath: string): Db {
   if (dbPath !== ':memory:') mkdirSync(dirname(dbPath), { recursive: true });
@@ -23,6 +23,18 @@ export function migrate(db: Db): void {
   const schema = readFileSync(join(here, 'schema.sql'), 'utf8');
   db.exec(schema);
   db.exec('PRAGMA foreign_keys = ON;');
+  // v16 -> v17：已有任务补一条初始对话消息，让历史任务也按“任务即对话”展示。
+  db.exec(`
+    INSERT INTO task_messages (id, task_id, role, content, author_person_id, author_name, source, metadata, created_at)
+    SELECT 'tmsg_' || lower(hex(randomblob(10))), w.id, 'user', w.prompt, w.created_by,
+           COALESCE((SELECT name FROM persons p WHERE p.id = w.created_by), '人员'), 'task', '{}', w.created_at
+      FROM work_items w
+     WHERE NOT EXISTS (SELECT 1 FROM task_messages m WHERE m.task_id = w.id)
+  `);
+  const wecomLinkColumns = db.prepare('PRAGMA table_info(wecom_chat_links)').all() as unknown as { name: string }[];
+  if (!wecomLinkColumns.some((column) => column.name === 'task_id')) {
+    db.exec('ALTER TABLE wecom_chat_links ADD COLUMN task_id TEXT');
+  }
   // v1 -> v2：项目显式工作区目录；旧库补列，避免要求重建数据。
   const columns = db.prepare('PRAGMA table_info(projects)').all() as unknown as { name: string }[];
   if (!columns.some((column) => column.name === 'workspace_path')) {

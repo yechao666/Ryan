@@ -13,7 +13,6 @@ import { ProjectLayout } from '../pages/ProjectLayout.tsx';
 import { ProjectOverviewPage } from '../pages/project/ProjectOverviewPage.tsx';
 import { ProjectTasksPage } from '../pages/project/ProjectTasksPage.tsx';
 import { ProjectTaskDetailPage } from '../pages/project/ProjectTaskDetailPage.tsx';
-import { ProjectActivityPage } from '../pages/project/ProjectActivityPage.tsx';
 import { ProjectAutomationsPage } from '../pages/project/ProjectAutomationsPage.tsx';
 import { ProjectMemoryPage } from '../pages/project/ProjectMemoryPage.tsx';
 import { ProjectRecordsPage } from '../pages/project/ProjectRecordsPage.tsx';
@@ -28,6 +27,9 @@ import { NotificationsPage } from '../pages/NotificationsPage.tsx';
 import { AccountPage } from '../pages/AccountPage.tsx';
 import { AccountsPage } from '../pages/AccountsPage.tsx';
 import { ChatRecordsPage } from '../pages/ChatRecordsPage.tsx';
+import { ConversationPage } from '../pages/ConversationPage.tsx';
+import { WecomChatsPage } from '../pages/WecomChatsPage.tsx';
+import { SystemLogsPage } from '../pages/SystemLogsPage.tsx';
 
 function RequireAuth({ children }: { children: React.ReactNode }) {
   const { person, loading } = useAuth();
@@ -55,12 +57,16 @@ export function AppRoutes() {
         }
       >
         <Route path="/" element={<DashboardPage />} />
+        <Route path="/conversation" element={<ConversationPage />} />
+        <Route path="/wecom-chats" element={<WecomChatsPage />} />
+        <Route path="/system-logs" element={<SystemLogsPage />} />
+        <Route path="/conversation/:conversationId" element={<ConversationPage />} />
         <Route path="/projects" element={<ProjectsPage />} />
         <Route path="/projects/:projectId" element={<ProjectLayout />}>
           <Route index element={<ProjectOverviewPage />} />
           <Route path="tasks" element={<ProjectTasksPage />} />
           <Route path="tasks/:taskId" element={<ProjectTaskDetailPage />} />
-          <Route path="activity" element={<ProjectActivityPage />} />
+          <Route path="activity" element={<Navigate to="/system-logs" replace />} />
           <Route path="automations" element={<ProjectAutomationsPage />} />
           <Route path="memory" element={<ProjectMemoryPage />} />
           <Route path="records" element={<ProjectRecordsPage />} />

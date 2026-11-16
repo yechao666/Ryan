@@ -270,6 +270,20 @@ CREATE INDEX IF NOT EXISTS idx_tasks_instance ON work_items(instance_id, status,
 CREATE INDEX IF NOT EXISTS idx_tasks_created ON work_items(created_at DESC);
 CREATE UNIQUE INDEX IF NOT EXISTS idx_tasks_dedupe ON work_items(project_id, dedupe_key) WHERE dedupe_key IS NOT NULL;
 
+-- 任务即对话：任务内的持续对话消息（人员 / Ryan / 子 Agent）
+CREATE TABLE IF NOT EXISTS task_messages (
+  id               TEXT PRIMARY KEY,
+  task_id          TEXT NOT NULL REFERENCES work_items(id) ON DELETE CASCADE,
+  role             TEXT NOT NULL,
+  content          TEXT NOT NULL DEFAULT '',
+  author_person_id TEXT REFERENCES persons(id) ON DELETE SET NULL,
+  author_name      TEXT NOT NULL DEFAULT '',
+  source           TEXT NOT NULL DEFAULT 'web',
+  metadata         TEXT NOT NULL DEFAULT '{}',
+  created_at       TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_task_messages_task ON task_messages(task_id, created_at ASC);
+
 -- 任务完成/接力通知
 CREATE TABLE IF NOT EXISTS task_notifications (
   id          TEXT PRIMARY KEY,
@@ -387,6 +401,23 @@ CREATE TABLE IF NOT EXISTS system_settings (
 INSERT OR IGNORE INTO meta (key, value) VALUES ('schema_version', '1');
 
 -- 助手会话与消息：会话可在“聊天记录”中统一管理，过程事件一并保存
+CREATE TABLE IF NOT EXISTS wecom_chat_links (
+  id              TEXT PRIMARY KEY,
+  project_id      TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+  bot_id          TEXT NOT NULL,
+  chat_id         TEXT NOT NULL,
+  chat_type       TEXT NOT NULL DEFAULT 'single',
+  person_id       TEXT NOT NULL REFERENCES persons(id) ON DELETE CASCADE,
+  conversation_id TEXT NOT NULL REFERENCES assistant_conversations(id) ON DELETE CASCADE,
+  task_id         TEXT,
+  title           TEXT NOT NULL DEFAULT '',
+  created_at      TEXT NOT NULL,
+  updated_at      TEXT NOT NULL,
+  UNIQUE(project_id, bot_id, chat_type, chat_id)
+);
+CREATE INDEX IF NOT EXISTS idx_wecom_chat_person ON wecom_chat_links(person_id, updated_at DESC);
+CREATE INDEX IF NOT EXISTS idx_wecom_chat_project ON wecom_chat_links(project_id, updated_at DESC);
+
 CREATE TABLE IF NOT EXISTS assistant_conversations (
   id          TEXT PRIMARY KEY,
   person_id   TEXT NOT NULL REFERENCES persons(id) ON DELETE CASCADE,

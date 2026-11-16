@@ -271,6 +271,31 @@ export interface ProjectWecomBot {
   connectedAt?: string;
 }
 
+export interface WecomConversation {
+  id: string;
+  projectId: string;
+  projectName: string;
+  botId: string;
+  chatId: string;
+  chatType: 'single' | 'group' | string;
+  title: string;
+  lastMessage: string;
+  lastAt: string;
+  conversationId: string;
+}
+
+export interface WecomConversationMessage {
+  id: string;
+  role: 'user' | 'assistant' | string;
+  content: string;
+  created_at: string;
+}
+
+export interface WecomConversationDetail {
+  link: WecomConversation & Record<string, unknown>;
+  messages: WecomConversationMessage[];
+}
+
 export interface ProjectWecomBotRegistration {
   attemptId: string;
   status: string;
@@ -512,8 +537,20 @@ export const api = {
     return request(`/api/projects/${projectId}/context-items/${itemId}`, { method: 'DELETE' });
   },
 
-  projectWecomBot(projectId: string): Promise<{ bot: ProjectWecomBot | null }> {
+  projectWecomBot(projectId: string): Promise<{ bot: ProjectWecomBot | null; mockAvailable?: boolean }> {
     return request(`/api/projects/${projectId}/wecom-bot`);
+  },
+
+  wecomConversations(): Promise<WecomConversation[]> {
+    return request('/api/wecom/conversations');
+  },
+
+  wecomConversationMessages(id: string): Promise<WecomConversationDetail> {
+    return request(`/api/wecom/conversations/${encodeURIComponent(id)}/messages`);
+  },
+
+  connectMockProjectWecomBot(projectId: string): Promise<{ bot: ProjectWecomBot }> {
+    return request(`/api/projects/${projectId}/wecom-bot/mock/connect`, { method: 'POST' });
   },
 
   startProjectWecomBotRegistration(projectId: string): Promise<ProjectWecomBotRegistration> {
@@ -607,6 +644,9 @@ export const api = {
   },
   cancelTask(id: string): Promise<WorkItem> {
     return request(`/api/tasks/${id}/cancel`, { method: 'POST' });
+  },
+  sendTaskMessage(id: string, content: string): Promise<{ task: TaskDetail['task']; messages: TaskDetail['messages'] }> {
+    return request(`/api/tasks/${id}/messages`, { method: 'POST', body: JSON.stringify({ content }) });
   },
 
   notifications(unreadOnly = false): Promise<{ unread: number; notifications: TaskNotificationItem[] }> {

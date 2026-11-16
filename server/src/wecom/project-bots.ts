@@ -7,12 +7,15 @@ import QRCode from 'qrcode';
 import { WSClient, generateReqId } from '@wecom/aibot-node-sdk';
 import type { Db } from '../db/index.ts';
 import type { EventBus } from '../lib/bus.ts';
-import { newId, nowIso } from '../lib/ids.ts';
-import { createTaskRecord } from '../http/routes/tasks.ts';
+import { newId, nowIso, randomToken, sha256 } from '../lib/ids.ts';
+import { createTaskRecord, insertTaskEvent, insertTaskMessage, parseJsonObject } from '../http/routes/tasks.ts';
+import { runAssistantTurn } from '../assistant/runner.ts';
 import { canContributeProject, getProjectRow } from '../lib/access.ts';
+import { recordActivity } from '../lib/activity.ts';
 
-const QR_GENERATE_URL = 'https://work.weixin.qq.com/ai/qc/generate';
-const QR_POLL_URL = 'https://work.weixin.qq.com/ai/qc/query_result';
+const AI_QR_BASE = (process.env.AIWO_WECOM_AI_BASE || 'https://work.weixin.qq.com').replace(/\/+$/, '');
+const QR_GENERATE_URL = `${AI_QR_BASE}/ai/qc/generate`;
+const QR_POLL_URL = `${AI_QR_BASE}/ai/qc/query_result`;
 const ATTEMPT_TTL_MS = 5 * 60_000;
 const ATTEMPT_POLL_MS = 3_000;
 
@@ -119,6 +122,8 @@ function safeAuthUrl(value: unknown): string {
   const raw = clean(value);
   try {
     const url = new URL(raw);
+    const mockBase = process.env.AIWO_WECOM_AI_BASE ? new URL(process.env.AIWO_WECOM_AI_BASE) : null;
+    if (mockBase) return url.origin === mockBase.origin ? url.toString() : '';
     return url.protocol === 'https:' && url.hostname === 'work.weixin.qq.com' ? url.toString() : '';
   } catch {
     return '';
@@ -169,6 +174,21 @@ export async function startProjectBotRegistration(projectId: string, createdBy: 
     expiresAt: new Date(attempt.expiresAt).toISOString(),
     pollIntervalMs: attempt.pollIntervalMs,
   };
+}
+
+/** 一键连接 Mock 企业微信：向 Mock 申请机器人凭据后走同一套绑定/WS 连接。 */
+export async function connectMockProjectBot(projectId: string, createdBy: string | null): Promise<PublicProjectBot> {
+  const base = (process.env.AIWO_WECOM_AI_BASE || '').replace(/\/+$/, '');
+  if (!base) throw new Error('未配置 Mock 企业微信地址');
+  const response = await fetch(`${base}/api/mock/robots`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ name: `Ryan 项目机器人 · ${projectId}` }),
+    signal: AbortSignal.timeout(10_000),
+  });
+  const data = await response.json() as { robot?: { botId?: string; secret?: string }; error?: string };
+  if (!response.ok || !data.robot?.botId || !data.robot?.secret) throw new Error(data.error ?? 'Mock 企业微信未返回机器人凭据');
+  return bindBot(projectId, data.robot.botId, data.robot.secret, createdBy);
 }
 
 async function bindBot(projectId: string, remoteBotId: string, secret: string, createdBy: string | null): Promise<PublicProjectBot> {
@@ -259,15 +279,214 @@ function boundWecomPerson(userId: string): { id: string; name: string; isAdmin: 
   return row ? { id: row.id, name: row.name, isAdmin: Number(row.is_admin) === 1 } : undefined;
 }
 
+interface WecomLinkRow {
+  id: string;
+  project_id: string;
+  bot_id: string;
+  chat_id: string;
+  chat_type: string;
+  person_id: string;
+  conversation_id: string;
+  task_id: string | null;
+  title: string;
+  created_at: string;
+  updated_at: string;
+}
+
+const coordinatorTokens = new Map<string, string>();
+let completionSubscribed = false;
+
+function coordinatorToken(personId: string): string {
+  const cached = coordinatorTokens.get(personId);
+  if (cached) return cached;
+  const token = `ryan_s_${randomToken(24)}`;
+  db().prepare(
+    `INSERT INTO sessions (token_hash, person_id, created_at, expires_at, ip, user_agent)
+     VALUES (?, ?, ?, ?, 'wecom-bot', 'ryan coordinator')`,
+  ).run(sha256(token), personId, nowIso(), new Date(Date.now() + 2 * 3_600_000).toISOString());
+  coordinatorTokens.set(personId, token);
+  return token;
+}
+
+function linkFor(projectId: string, botId: string, chatType: string, chatId: string): WecomLinkRow | undefined {
+  return db().prepare(
+    'SELECT * FROM wecom_chat_links WHERE project_id = ? AND bot_id = ? AND chat_type = ? AND chat_id = ?',
+  ).get(projectId, botId, chatType, chatId) as unknown as WecomLinkRow | undefined;
+}
+
+function ensureLink(input: {
+  projectId: string; botId: string; chatType: string; chatId: string;
+  personId: string; senderName: string;
+}): WecomLinkRow {
+  const existing = linkFor(input.projectId, input.botId, input.chatType, input.chatId);
+  if (existing) {
+    db().prepare('UPDATE wecom_chat_links SET updated_at = ? WHERE id = ?').run(nowIso(), existing.id);
+    return existing;
+  }
+  const now = nowIso();
+  const conversationId = newId('conv');
+  const title = input.chatType === 'group'
+    ? `企业微信群 · ${input.chatId.slice(-8)}`
+    : `企业微信 · ${input.senderName}`;
+  db().prepare(
+    'INSERT INTO assistant_conversations (id, person_id, title, pathname, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)',
+  ).run(conversationId, input.personId, title, `/projects/${input.projectId}/wecom-bot`, now, now);
+  const id = newId('wcl');
+  db().prepare(
+    `INSERT INTO wecom_chat_links (id, project_id, bot_id, chat_id, chat_type, person_id, conversation_id, title, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+  ).run(id, input.projectId, input.botId, input.chatId, input.chatType, input.personId, conversationId, title, now, now);
+  return db().prepare('SELECT * FROM wecom_chat_links WHERE id = ?').get(id) as unknown as WecomLinkRow;
+}
+
+function insertAssistantMessage(conversationId: string, role: 'user' | 'assistant', content: string): string {
+  const id = newId('amsg');
+  db().prepare('INSERT INTO assistant_messages (id, conversation_id, role, content, process, created_at) VALUES (?, ?, ?, ?, ?, ?)')
+    .run(id, conversationId, role, content, '[]', nowIso());
+  db().prepare('UPDATE assistant_conversations SET updated_at = ? WHERE id = ?').run(nowIso(), conversationId);
+  return id;
+}
+
+function linkTasksToWecom(projectId: string, senderId: string, since: string, link: WecomLinkRow, senderName: string): string[] {
+  const rows = db().prepare(
+    'SELECT id, metadata FROM work_items WHERE project_id = ? AND created_by = ? AND created_at >= ? ORDER BY created_at ASC',
+  ).all(projectId, senderId, since) as unknown as { id: string; metadata: string }[];
+  const linked: string[] = [];
+  for (const row of rows) {
+    const metadata = {
+      ...parseJsonObject(row.metadata),
+      wecomProjectBot: true,
+      wecomChatId: link.chat_id,
+      wecomChatType: link.chat_type,
+      wecomBotId: link.bot_id,
+      wecomChatLinkId: link.id,
+      wecomConversationId: link.conversation_id,
+      wecomSenderId: senderId,
+      wecomSenderName: senderName,
+    };
+    db().prepare('UPDATE work_items SET metadata = ? WHERE id = ?').run(JSON.stringify(metadata), row.id);
+    linked.push(row.id);
+  }
+  if (linked.length > 0) {
+    db().prepare('UPDATE wecom_chat_links SET task_id = ? WHERE id = ?').run(linked[0], link.id);
+  }
+  return linked;
+}
+
+function stripWecomReply(text: string): string {
+  return text
+    .replace(/```dsh-ui[\s\S]*?```/gi, '')
+    .replace(/^HIVE_NAVIGATE:\s*\/\S+\s*$/gim, '')
+    .trim();
+}
+
+function findLinkedTask(link: WecomLinkRow): { id: string; title: string; status: string; project_id: string; instance_id: string | null; created_by: string | null } | undefined {
+  if (!link.task_id) return undefined;
+  return db().prepare('SELECT id, title, status, project_id, instance_id, created_by FROM work_items WHERE id = ?')
+    .get(link.task_id) as unknown as { id: string; title: string; status: string; project_id: string; instance_id: string | null; created_by: string | null } | undefined;
+}
+
+/** 同一企业微信会话继续同一个系统任务对话；done/failed 后自动重新排队。 */
+function appendWecomTaskMessage(link: WecomLinkRow, taskId: string, content: string, senderId: string, senderName: string): boolean {
+  const task = db().prepare('SELECT id, status, project_id FROM work_items WHERE id = ?').get(taskId) as unknown as { id: string; status: string; project_id: string } | undefined;
+  if (!task) return false;
+  if (['assigned', 'running', 'waiting_input'].includes(task.status)) return false;
+  const now = nowIso();
+  insertTaskMessage(db(), {
+    taskId,
+    role: 'user',
+    content,
+    authorPersonId: senderId,
+    authorName: senderName,
+    source: 'wecom',
+    createdAt: now,
+  });
+  if (['done', 'failed', 'cancelled'].includes(task.status)) {
+    db().prepare(
+      "UPDATE work_items SET status = 'queued', lease_until = NULL, started_at = NULL, finished_at = NULL, result = NULL, error = NULL WHERE id = ?",
+    ).run(taskId);
+  }
+  insertTaskEvent(db(), {
+    taskId,
+    projectId: task.project_id,
+    type: 'task.message',
+    message: '收到企业微信继续消息',
+    payload: { senderId, source: 'wecom' },
+    createdAt: now,
+  });
+  recordActivity(db(), bus(), {
+    projectId: task.project_id,
+    type: 'task.message',
+    actor: '企业微信',
+    summary: '企业微信继续任务对话',
+    taskId,
+  });
+  db().prepare('UPDATE wecom_chat_links SET updated_at = ? WHERE id = ?').run(now, link.id);
+  return true;
+}
+
+async function notifyWecomTaskCompletion(taskId: string): Promise<void> {
+  const task = db().prepare(
+    'SELECT id, project_id, title, status, result, error, metadata, created_by FROM work_items WHERE id = ?',
+  ).get(taskId) as unknown as { id: string; project_id: string; title: string; status: string; result: string | null; error: string | null; metadata: string; created_by: string | null } | undefined;
+  if (!task) return;
+  const metadata = parseJsonObject(task.metadata);
+  if (metadata.wecomProjectBot !== true || typeof metadata.wecomChatId !== 'string' || !metadata.wecomChatId) return;
+  const runtime = runtimes.get(task.project_id);
+  if (!runtime) return;
+  const chatId = metadata.wecomChatId;
+  const ok = task.status === 'done';
+  const body = ok ? (task.result ?? '任务已完成') : (task.error ?? '任务执行失败');
+  const link = db().prepare('SELECT * FROM wecom_chat_links WHERE id = ? OR conversation_id = ? LIMIT 1').get(
+    String(metadata.wecomChatLinkId ?? metadata.wecomConversationId ?? ''),
+    String(metadata.wecomConversationId ?? ''),
+  ) as unknown as WecomLinkRow | undefined;
+  const content = `${ok ? '✅ 任务已完成' : '❌ 任务失败'}\n任务：${task.title}\n${ok ? '结果' : '原因'}：${body.slice(0, 3000)}${publicBaseUrl ? `\n${publicBaseUrl.replace(/\/$/, '')}/projects/${task.project_id}/tasks/${task.id}` : ''}`;
+  try {
+    await runtime.client.sendMessage(chatId, { msgtype: 'markdown', markdown: { content } });
+    if (link) insertAssistantMessage(link.conversation_id, 'assistant', content);
+  } catch (error) {
+    console.warn('[project-wecom-bot] 任务完成消息发送失败', error);
+  }
+}
+
+export function listWecomConversations(personId: string, isAdmin: boolean): Record<string, unknown>[] {
+  const rows = db().prepare(
+    `SELECT l.*, p.name AS project_name,
+       (SELECT content FROM assistant_messages m WHERE m.conversation_id = l.conversation_id ORDER BY m.created_at DESC LIMIT 1) AS last_message,
+       (SELECT created_at FROM assistant_messages m WHERE m.conversation_id = l.conversation_id ORDER BY m.created_at DESC LIMIT 1) AS last_at
+     FROM wecom_chat_links l JOIN projects p ON p.id = l.project_id
+     ${isAdmin ? '' : 'WHERE l.person_id = ?'}
+     ORDER BY COALESCE(last_at, l.updated_at) DESC`,
+  ).all(...(isAdmin ? [] : [personId])) as unknown as Record<string, unknown>[];
+  return rows.map((row) => ({
+    id: row.id, projectId: row.project_id, projectName: row.project_name, botId: row.bot_id,
+    chatId: row.chat_id, chatType: row.chat_type, title: row.title,
+    lastMessage: row.last_message ?? '', lastAt: row.last_at ?? row.updated_at,
+    conversationId: row.conversation_id,
+  }));
+}
+
+export function getWecomConversationMessages(linkId: string, personId: string, isAdmin: boolean): { link: Record<string, unknown>; messages: Record<string, unknown>[] } | null {
+  const link = db().prepare('SELECT * FROM wecom_chat_links WHERE id = ?').get(linkId) as unknown as WecomLinkRow | undefined;
+  if (!link) return null;
+  if (!isAdmin && link.person_id !== personId) return null;
+  const messages = db().prepare('SELECT id, role, content, created_at FROM assistant_messages WHERE conversation_id = ? ORDER BY created_at ASC')
+    .all(link.conversation_id) as unknown as Record<string, unknown>[];
+  return { link: { ...link, projectId: link.project_id, chatId: link.chat_id, chatType: link.chat_type }, messages };
+}
+
 async function handleText(projectId: string, frame: any): Promise<void> {
   const client = runtimes.get(projectId)?.client;
-  if (!client) return;
+  const row = botRow(projectId);
+  if (!client || !row) return;
   const body = frame?.body && typeof frame.body === 'object' ? frame.body : {};
   const content = clean(body.text?.content);
   if (!content) return;
   const senderId = clean(body.from?.userid);
   const chatType = clean(body.chattype) || (body.chatid ? 'group' : 'single');
   const chatId = clean(body.chatid);
+  const replyTo = chatId || senderId;
   const streamId = generateReqId('stream');
   if (!senderId) {
     await client.replyStream(frame, streamId, '无法识别发送者身份，已拒收该消息。', true).catch(() => undefined);
@@ -275,48 +494,66 @@ async function handleText(projectId: string, frame: any): Promise<void> {
   }
   const sender = boundWecomPerson(senderId);
   if (!sender) {
-    await client.replyStream(
-      frame,
-      streamId,
-      `企业微信账号「${senderId}」尚未绑定 Ryan 账号，已拒收该消息。请先在 Ryan 账号管理中绑定企业微信后再发送。`,
-      true,
-    ).catch(() => undefined);
+    await client.replyStream(frame, streamId, `企业微信账号「${senderId}」尚未绑定 Ryan 账号，已拒收该消息。请先在 Ryan 账号管理中绑定企业微信后再发送。`, true).catch(() => undefined);
     return;
   }
-  const senderName = sender.name;
+  let assistantMessageId = '';
   try {
     const project = getProjectRow(db(), projectId);
     if (!project) throw new Error('项目不存在');
     if (!canContributeProject(db(), { id: sender.id, isAdmin: sender.isAdmin }, project)) {
-      await client.replyStream(frame, streamId, `${senderName} 没有该项目任务权限，已拒收该消息。`, true).catch(() => undefined);
+      await client.replyStream(frame, streamId, `${sender.name} 没有该项目任务权限，已拒收该消息。`, true).catch(() => undefined);
       return;
     }
-    const row = botRow(projectId);
-    const safeContent = content.replace(/\s+/g, ' ').slice(0, 72);
-    const sourceLine = chatType === 'group'
-      ? `发送人：${senderName}（${senderId || '未知'}） · 群聊：${chatId || '未知'}`
-      : `发送人：${senderName}（${senderId || '未知'}）`;
-    const task = createTaskRecord(db(), bus(), {
-      projectId,
-      title: `企业微信 · ${senderName}：${safeContent}`,
-      prompt: `[来自企业微信]\n${sourceLine}\n\n${content}`,
-      source: 'api',
-      type: 'other',
-      createdBy: sender.id,
-      metadata: {
-        wecomProjectBot: true,
-        wecomSenderId: senderId,
-        wecomSenderName: senderName,
-        wecomChatType: chatType,
-        ...(chatId ? { wecomChatId: chatId } : {}),
-      },
-      activitySummary: `企业微信机器人收到 ${senderName} 的消息并创建任务`,
-      eventMessage: `企业微信机器人收到 ${senderName} 的消息`,
+
+    const link = ensureLink({
+      projectId, botId: row.remote_bot_id, chatType,
+      chatId: replyTo, personId: sender.id, senderName: sender.name,
     });
-    const link = publicBaseUrl ? `${publicBaseUrl.replace(/\/$/, '')}/projects/${encodeURIComponent(projectId)}/tasks/${encodeURIComponent(task.id)}` : '';
-    await client.replyStream(frame, streamId, `已收到 ${senderName} 的消息，并创建项目任务：${task.title}${link ? `\n${link}` : ''}`, true);
+    insertAssistantMessage(link.conversation_id, 'user', content);
+    assistantMessageId = insertAssistantMessage(link.conversation_id, 'assistant', '');
+    const linkedTask = findLinkedTask(link);
+    if (linkedTask) {
+      const accepted = appendWecomTaskMessage(link, linkedTask.id, content, sender.id, sender.name);
+      const active = ['assigned', 'running', 'waiting_input'].includes(linkedTask.status);
+      const replyText = accepted
+        ? `已收到，继续任务对话「${linkedTask.title}」。` + (['done', 'failed', 'cancelled'].includes(linkedTask.status) ? '该任务已重新排队执行。' : '')
+        : active ? 'Ryan 正在执行该任务，请等待本轮结束后继续。' : '任务状态异常，暂时无法继续。';
+      db().prepare('UPDATE assistant_messages SET content = ? WHERE id = ?').run(replyText, assistantMessageId);
+      db().prepare('UPDATE assistant_conversations SET updated_at = ? WHERE id = ?').run(nowIso(), link.conversation_id);
+      try {
+        await client.sendMessage(replyTo, { msgtype: 'markdown', markdown: { content: replyText } });
+      } catch {
+        await client.replyStream(frame, streamId, replyText, true).catch(() => undefined);
+      }
+      return;
+    }
+    const startedAt = nowIso();
+    const reply = await runAssistantTurn({
+      personId: sender.id,
+      personName: sender.name,
+      message: content,
+      pathname: `/projects/${projectId}/wecom-bot`,
+      projectId,
+      conversationId: link.conversation_id,
+      token: coordinatorToken(sender.id),
+      apiBase: publicBaseUrl || process.env.AIWO_PUBLIC_URL || 'http://127.0.0.1:4500',
+      mode: 'wecom',
+    });
+    const text = stripWecomReply(reply.reply) || '已收到。';
+    db().prepare('UPDATE assistant_messages SET content = ? WHERE id = ?').run(text, assistantMessageId);
+    db().prepare('UPDATE assistant_conversations SET updated_at = ? WHERE id = ?').run(nowIso(), link.conversation_id);
+    db().prepare('UPDATE wecom_chat_links SET updated_at = ? WHERE id = ?').run(nowIso(), link.id);
+    linkTasksToWecom(projectId, sender.id, startedAt, link, sender.name);
+    try {
+      await client.sendMessage(replyTo, { msgtype: 'markdown', markdown: { content: text } });
+    } catch {
+      await client.replyStream(frame, streamId, text, true).catch(() => undefined);
+    }
   } catch (error) {
-    await client.replyStream(frame, streamId, `处理失败：${error instanceof Error ? error.message : '无法创建任务'}`, true).catch(() => undefined);
+    const message = error instanceof Error ? error.message : '处理失败';
+    if (assistantMessageId) db().prepare('UPDATE assistant_messages SET content = ? WHERE id = ?').run(`处理失败：${message}`, assistantMessageId);
+    await client.replyStream(frame, streamId, `处理失败：${message}`, true).catch(() => undefined);
   }
 }
 
@@ -325,6 +562,7 @@ async function connectBot(row: BotRow): Promise<void> {
   const client = new WSClient({
     botId: row.remote_bot_id,
     secret: row.secret,
+    ...(process.env.AIWO_WECOM_AI_WS_URL ? { wsUrl: process.env.AIWO_WECOM_AI_WS_URL } : {}),
     logger: {
       debug: () => undefined,
       info: () => undefined,
@@ -379,6 +617,14 @@ export async function initializeProjectWecomBots(databaseImpl: Db, busImpl: Even
   database = databaseImpl;
   eventBus = busImpl;
   publicBaseUrl = baseUrl;
+  if (!completionSubscribed) {
+    completionSubscribed = true;
+    eventBus.subscribe((event) => {
+      if (event.type !== 'task.completed' && event.type !== 'task.failed') return;
+      if (!event.taskId) return;
+      void notifyWecomTaskCompletion(event.taskId);
+    });
+  }
   const rows = database.prepare('SELECT * FROM project_wecom_bots').all() as unknown as BotRow[];
   for (const row of rows) {
     try {
